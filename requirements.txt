@@ -1,0 +1,5 @@
+flask
+apscheduler
+gspread
+google-auth
+requests
