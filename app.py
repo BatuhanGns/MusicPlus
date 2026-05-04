@@ -84,9 +84,12 @@ def api_dashboard():
         idx_sanatci = headers.index("Sanatçı")
         idx_sure    = headers.index("Süre (sn)")
         idx_tarih   = headers.index("Dinlenme Tarihi")
+        
+        # ISO tarihini alabilmek için sütunu buluyoruz
+        idx_iso = headers.index("_played_at_iso") if "_played_at_iso" in headers else -1
 
-        track_counts  = defaultdict(lambda: {"count": 0, "sanatci": "", "sure": 0})
-        artist_counts = defaultdict(lambda: {"count": 0, "sure": 0})
+        track_counts  = defaultdict(lambda: {"count": 0, "sanatci": "", "sure": 0, "ilk_iso": None})
+        artist_counts = defaultdict(lambda: {"count": 0, "sure": 0, "ilk_iso": None})
         gun_sure      = defaultdict(int)
         ay_stats      = defaultdict(lambda: {"sure": 0, "kayit": 0, "gunler": set()})
         toplam_sure   = 0
@@ -102,15 +105,24 @@ def api_dashboard():
             except:
                 sure = 0
 
+            iso = row[idx_iso].strip() if idx_iso != -1 and len(row) > idx_iso else ""
             toplam_sure += sure
 
             if sarki:
                 track_counts[sarki]["count"]  += 1
                 track_counts[sarki]["sure"]   += sure
                 track_counts[sarki]["sanatci"] = sanatci
+                if iso and iso != "—":
+                    if track_counts[sarki]["ilk_iso"] is None or iso < track_counts[sarki]["ilk_iso"]:
+                        track_counts[sarki]["ilk_iso"] = iso
+
             if sanatci:
                 artist_counts[sanatci]["count"] += 1
                 artist_counts[sanatci]["sure"]  += sure
+                if iso and iso != "—":
+                    if artist_counts[sanatci]["ilk_iso"] is None or iso < artist_counts[sanatci]["ilk_iso"]:
+                        artist_counts[sanatci]["ilk_iso"] = iso
+
             if tarih:
                 gun_sure[tarih] += sure
                 try:
@@ -122,14 +134,25 @@ def api_dashboard():
                 except:
                     pass
 
+        # Gün hesaplama fonksiyonu
+        bugun_date = datetime.now(timezone.utc).date()
+        def calc_days(iso_str):
+            if not iso_str: return None
+            try:
+                dt = datetime.strptime(iso_str[:10], "%Y-%m-%d").date()
+                diff = (bugun_date - dt).days
+                return diff if diff >= 0 else 0
+            except:
+                return None
+
         top_sarkilar = sorted(
-            [{"sarki": k, "sanatci": v["sanatci"], "count": v["count"], "sure": v["sure"]}
+            [{"sarki": k, "sanatci": v["sanatci"], "count": v["count"], "sure": v["sure"], "kac_gundur": calc_days(v["ilk_iso"])}
              for k, v in track_counts.items()],
             key=lambda x: -x["count"]
         )[:10]
 
         top_sanatcilar = sorted(
-            [{"sanatci": k, "count": v["count"], "sure": v["sure"]}
+            [{"sanatci": k, "count": v["count"], "sure": v["sure"], "kac_gundur": calc_days(v["ilk_iso"])}
              for k, v in artist_counts.items()],
             key=lambda x: -x["count"]
         )[:10]
@@ -189,7 +212,6 @@ def api_sarki_detay(sarki_adi):
         toplam_sure  = 0
         sanatci      = ""
         
-        # İlk dinlenme tarihini tutacağımız değişken
         ilk_dinlenme_iso = None 
 
         for row in rows:
@@ -208,19 +230,16 @@ def api_sarki_detay(sarki_adi):
 
             iso = row[idx_iso].strip()
             if iso and iso != "—":
-                # Tarihleri ISO formatında kıyaslayarak en eskisini buluyoruz
                 if ilk_dinlenme_iso is None or iso < ilk_dinlenme_iso:
                     ilk_dinlenme_iso = iso
 
                 try:
-                    # Saat analizi
                     dt = datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M")
                     saat_counts[dt.hour] += 1
                     vakit_counts[get_vakit(dt.hour)] += 1
                 except:
                     pass
 
-        # Bulduğumuz en eski ISO tarihini okunabilir formata (GG.AA.YYYY) çeviriyoruz
         ilk_tarih_str = "Bilinmiyor"
         if ilk_dinlenme_iso:
             try:
@@ -419,7 +438,7 @@ def api_ay_detay(ay_label):
         for row in rows:
             if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_tarih):
                 continue
-            tarih = row[idx_tarih].strip()  # DD.MM.YYYY
+            tarih = row[idx_tarih].strip()
             if not tarih:
                 continue
             try:
