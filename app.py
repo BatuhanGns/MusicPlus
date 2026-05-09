@@ -228,6 +228,49 @@ def api_dashboard():
         logger.error(f"Dashboard hatası: {e}")
         return jsonify({"error": str(e)}), 500
 
+
+# ----- DEBUG -----
+
+@app.route("/api/debug/token")
+def debug_token():
+    """Mevcut token scope kontrolü"""
+    if not session.get("logged_in"):
+        return jsonify({"error": "Giris yapilmamis"}), 401
+    try:
+        token = spotify._get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        scope_tests = {}
+        tests = {
+            "playlist-read-private": "https://api.spotify.com/v1/me/playlists?limit=1",
+            "user-library-read": "https://api.spotify.com/v1/me/tracks?limit=1",
+            "user-read-recently-played": "https://api.spotify.com/v1/me/player/recently-played?limit=1",
+        }
+        for scope, url in tests.items():
+            r = requests.get(url, headers=headers)
+            scope_tests[scope] = "OK" if r.status_code == 200 else f"FAIL ({r.status_code})"
+
+        me = requests.get("https://api.spotify.com/v1/me", headers=headers).json()
+        uid = me.get("id", "")
+        r2 = requests.post(
+            f"https://api.spotify.com/v1/users/{uid}/playlists",
+            headers={**headers, "Content-Type": "application/json"},
+            json={"name": "__scope_test_silinecek__", "public": False}
+        )
+        if r2.status_code in (200, 201):
+            pl_id = r2.json().get("id")
+            requests.delete(f"https://api.spotify.com/v1/playlists/{pl_id}/followers", headers=headers)
+            scope_tests["playlist-modify-private"] = "OK"
+        else:
+            scope_tests["playlist-modify-private"] = f"FAIL ({r2.status_code})"
+
+        return jsonify({
+            "user": me.get("display_name"),
+            "token_source": "session_refresh" if session.get("refresh_token") else "env_var",
+            "scope_tests": scope_tests
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ----- DÜZENLE & SPOTIFY ACTIONS -----
 
 @app.route("/api/playlists")
