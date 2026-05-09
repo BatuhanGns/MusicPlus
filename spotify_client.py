@@ -21,12 +21,16 @@ class SpotifyClient:
         self._user_id = None
 
     def get_auth_url(self, redirect_uri):
-        # Yetkiler (scopes) URL'ye + ile değil zorunlu olarak %20 ile eklenecek
-        scopes = "playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private user-library-modify user-follow-modify user-read-recently-played"
+        # 1. ÇÖZÜM: user-library-read eklendi
+        scopes = (
+            "playlist-read-private playlist-read-collaborative "
+            "playlist-modify-public playlist-modify-private "
+            "user-library-read user-library-modify "
+            "user-follow-modify user-read-recently-played"
+        )
         encoded_scopes = urllib.parse.quote(scopes)
         encoded_redirect = urllib.parse.quote(redirect_uri)
         
-        # URL'yi bizzat manuel oluşturarak hata payını sıfıra indiriyoruz
         return f"https://accounts.spotify.com/authorize?client_id={self.client_id}&response_type=code&redirect_uri={encoded_redirect}&scope={encoded_scopes}&show_dialog=true"
 
     def exchange_code(self, code, redirect_uri):
@@ -63,22 +67,20 @@ class SpotifyClient:
         if new_refresh_token:
             self.refresh_token = new_refresh_token
             logger.info("✅ YENİ REFRESH TOKEN ALINDI VE SESSION'A KAYDEDİLDİ.")
-            # Render ortamı için ekrana basıyoruz
-            logger.info(f"!!! YENİ REFRESH TOKEN (RENDER'A KAYDEDEBİLİRSİN): {new_refresh_token} !!!")
+            logger.info(f"YENİ REFRESH TOKEN (RENDER'A KAYDEDEBİLİRSİN): {new_refresh_token}")
             
         return True
 
     def _get_access_token(self):
         in_req = has_request_context()
         
-        # Kullanıcı istekleriyle arka plan işlemlerini KESİN OLARAK ayırdık
         if in_req:
-            # Sadece Session token'ları kullanılacak
             access_token = session.get("access_token")
             expires_at = session.get("token_expires_at", 0)
-            r_token = session.get("refresh_token") or self.refresh_token or os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
+            # 2. ÇÖZÜM: Session varsa KESİNLİKLE eski (bayat) .env token'ına düşme!
+            r_token = session.get("refresh_token") 
         else:
-            # Arka plan işlemleri (sync)
+            # Sadece arka plan işlemleri (sync_job) eski / global token'ı kullanabilir
             access_token = self._access_token
             expires_at = self._token_expires_at
             r_token = self.refresh_token or os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
@@ -140,8 +142,8 @@ class SpotifyClient:
         return {}
 
     def get_me(self):
-        # Kullanıcı ID'sini önbellekte hatalı saklama bug'ı giderildi
         in_req = has_request_context()
+        # 3. ÇÖZÜM: Güvenlik için user_id önbelleğini yalnızca aktif session varsa kullanıyoruz
         if in_req and "user_id" in session:
             return session["user_id"]
             
@@ -236,6 +238,7 @@ class SpotifyClient:
         results = {}
         for i in range(0, len(track_ids), 50):
             chunk = track_ids[i:i+50]
+            # user-library-read izni artık alındığı için burası sorunsuz çalışacak.
             data = self._req("GET", "/me/tracks/contains", params={"ids": ",".join(chunk)})
             for tid, is_saved in zip(chunk, data):
                 results[tid] = is_saved
