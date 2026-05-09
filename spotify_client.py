@@ -4,6 +4,7 @@ import logging
 import requests
 import base64
 import urllib.parse
+from flask import session, has_request_context
 
 logger = logging.getLogger(__name__)
 
@@ -12,25 +13,21 @@ API_BASE = "https://api.spotify.com/v1"
 
 class SpotifyClient:
     def __init__(self):
-        self.client_id = os.environ["SPOTIFY_CLIENT_ID"]
-        self.client_secret = os.environ["SPOTIFY_CLIENT_SECRET"]
+        self.client_id = os.environ.get("SPOTIFY_CLIENT_ID", "")
+        self.client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
         self.refresh_token = os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
         self._access_token = None
         self._token_expires_at = 0
         self._user_id = None
 
     def get_auth_url(self, redirect_uri):
-        # Yetkiler (boşlukla ayrılmış liste)
         scopes = "playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private user-library-modify user-follow-modify user-read-recently-played"
-        
-        # Güvenli URL parametreleri oluşturma
         params = {
             "client_id": self.client_id,
             "response_type": "code",
             "redirect_uri": redirect_uri,
             "scope": scopes
         }
-        
         url_params = urllib.parse.urlencode(params)
         return f"https://accounts.spotify.com/authorize?{url_params}"
 
@@ -48,45 +45,86 @@ class SpotifyClient:
             "redirect_uri": redirect_uri
         })
         
-        # Eğer hala hata alıyorsan konsolda tam sebebini görmek için:
         if resp.status_code != 200:
-            logger.error(f"Spotify Code Exchange Error: {resp.text}")
-            
+            logger.error(f"Code Exchange Hatası: {resp.text}")
         resp.raise_for_status()
         data = resp.json()
         
-        self._access_token = data["access_token"]
-        self._token_expires_at = time.time() + data["expires_in"]
+        new_access_token = data["access_token"]
+        new_expires_at = time.time() + data["expires_in"]
+        new_refresh_token = data.get("refresh_token")
+
+        # Vercel Serverless durumu için verileri tarayıcı çerezine (session) kaydediyoruz
+        if has_request_context():
+            session["access_token"] = new_access_token
+            session["token_expires_at"] = new_expires_at
+            if new_refresh_token:
+                session["refresh_token"] = new_refresh_token
         
-        if "refresh_token" in data:
-            self.refresh_token = data["refresh_token"]
-            logger.info(f"✅ YENİ REFRESH TOKEN ALINDI VE UYGULANDI.")
+        self._access_token = new_access_token
+        self._token_expires_at = new_expires_at
+        if new_refresh_token:
+            self.refresh_token = new_refresh_token
+            logger.info("✅ YENİ REFRESH TOKEN ALINDI VE SESSION'A KAYDEDİLDİ.")
         return True
 
     def _get_access_token(self):
-        if self._access_token and time.time() < self._token_expires_at - 60:
-            return self._access_token
+        # 1. Ortam kontrolü: Vercel üzerinde Flask isteği içinde miyiz?
+        in_req = has_request_context()
+        
+        # 2. Tokenları çerezden (session) al. Vercel unutsun, çerez unutmaz.
+        if in_req:
+            access_token = session.get("access_token", self._access_token)
+            expires_at = session.get("token_expires_at", self._token_expires_at)
+            r_token = session.get("refresh_token") or self.refresh_token or os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
+        else:
+            access_token = self._access_token
+            expires_at = self._token_expires_at
+            r_token = self.refresh_token or os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
 
-        if not self.refresh_token:
-            raise Exception("Refresh token bulunamadı! Giriş yapılması gerekiyor.")
+        # 3. Access token süresi geçerli mi?
+        if access_token and time.time() < expires_at - 60:
+            return access_token
 
-        credentials = base64.b64encode(
-            f"{self.client_id}:{self.client_secret}".encode()
-        ).decode()
+        # 4. Yenilemek için Refresh Token zorunlu
+        if not r_token:
+            logger.error("Token yenilemek için Refresh token bulunamadı.")
+            raise Exception("Geçerli bir oturum bulunamadı, lütfen çıkış yapıp tekrar Spotify ile giriş yapın.")
 
+        # 5. Spotify API'den yeni yetki isteği
+        credentials = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
         resp = requests.post(TOKEN_URL, headers={
             "Authorization": f"Basic {credentials}",
             "Content-Type": "application/x-www-form-urlencoded"
         }, data={
             "grant_type": "refresh_token",
-            "refresh_token": self.refresh_token
+            "refresh_token": r_token
         })
+        
+        if resp.status_code != 200:
+            logger.error(f"Token Yenileme (Refresh) Hatası: {resp.text}")
+            # Eğer token tamamen patlamışsa kullanıcıyı sistemden çıkartıyoruz ki tekrar giriş yapsın
+            if in_req and "invalid_grant" in resp.text:
+                session.clear()
         resp.raise_for_status()
+        
         data = resp.json()
-        self._access_token = data["access_token"]
-        self._token_expires_at = time.time() + data["expires_in"]
-        logger.info("🔑 Spotify token arka planda yenilendi.")
-        return self._access_token
+        new_access_token = data["access_token"]
+        new_expires_at = time.time() + data["expires_in"]
+        new_refresh_token = data.get("refresh_token", r_token)
+
+        # 6. Yeni verileri tekrar hafızaya al
+        if in_req:
+            session["access_token"] = new_access_token
+            session["token_expires_at"] = new_expires_at
+            session["refresh_token"] = new_refresh_token
+        
+        self._access_token = new_access_token
+        self._token_expires_at = new_expires_at
+        self.refresh_token = new_refresh_token
+
+        logger.info("🔑 Spotify token arka planda yenilendi ve Vercel engeli aşıldı.")
+        return new_access_token
 
     def _req(self, method, endpoint, **kwargs):
         token = self._get_access_token()
@@ -95,6 +133,10 @@ class SpotifyClient:
         url = f"{API_BASE}{endpoint}" if not endpoint.startswith("http") else endpoint
         
         resp = requests.request(method, url, headers=headers, **kwargs)
+        
+        if resp.status_code >= 400:
+            logger.error(f"Spotify API Error ({resp.status_code}) on {url}: {resp.text}")
+        
         resp.raise_for_status()
         if resp.text:
             return resp.json()
@@ -122,6 +164,8 @@ class SpotifyClient:
             })
         return tracks
 
+    # --- PLAYLIST & EDIT İŞLEMLERİ ---
+    
     def get_my_playlists(self):
         data = self._req("GET", "/me/playlists", params={"limit": 50})
         return [{"id": p["id"], "name": p["name"], "count": p["tracks"]["total"]} for p in data.get("items", [])]
@@ -166,6 +210,8 @@ class SpotifyClient:
                 if feat:
                     features[feat["id"]] = feat
         return features
+
+    # --- TOPLU TAKİP / BEĞENİ İŞLEMLERİ ---
 
     def modify_following(self, action, artist_ids):
         artist_ids = list(set(artist_ids))
