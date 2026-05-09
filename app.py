@@ -72,12 +72,20 @@ def sync_job():
     except Exception as e:
         logger.error(f"Sync hatası: {e}")
 
+# ----- YARDIMCI FONKSİYON -----
+def get_redirect_uri():
+    # Vercel gibi proxy arkası sistemlerde Flask bazen HTTP döndürür. 
+    # Canlı ortamda olduğumuzu anlarsak HTTPS'e zorluyoruz.
+    base_url = request.url_root
+    if "localhost" not in base_url and "127.0.0.1" not in base_url:
+        base_url = base_url.replace("http://", "https://")
+    return base_url + "callback"
+
 # ----- AUTH ROTALARI -----
 
 @app.route("/login")
 def login():
-    # Callback URL'sini dinamik olarak oluştur (localhost veya prod ortamı)
-    redirect_uri = url_for('callback', _external=True)
+    redirect_uri = get_redirect_uri()
     auth_url = spotify.get_auth_url(redirect_uri)
     return redirect(auth_url)
 
@@ -86,7 +94,7 @@ def callback():
     code = request.args.get("code")
     if code:
         try:
-            redirect_uri = url_for('callback', _external=True)
+            redirect_uri = get_redirect_uri()
             spotify.exchange_code(code, redirect_uri)
             session["logged_in"] = True
             logger.info("✅ Kullanıcı başarıyla giriş yaptı.")
@@ -105,7 +113,6 @@ def logout():
 @app.route("/")
 @app.route("/dashboard")
 def dashboard():
-    # Jinja'ya kullanıcının giriş yapıp yapmadığı bilgisini gönderiyoruz
     logged_in = session.get("logged_in", False)
     return render_template("dashboard.html", logged_in=logged_in)
 
