@@ -3,7 +3,7 @@ import time
 import logging
 import requests
 import base64
-import random
+import urllib.parse
 
 logger = logging.getLogger(__name__)
 
@@ -20,21 +20,19 @@ class SpotifyClient:
         self._user_id = None
 
     def get_auth_url(self, redirect_uri):
-        # Playlist düzenleme, beğeni ve takip işlemleri için GEREKLİ tüm izinler (scopes)
-        scopes = (
-            "playlist-read-private "
-            "playlist-read-collaborative "
-            "playlist-modify-public "
-            "playlist-modify-private "
-            "user-library-modify "
-            "user-follow-modify "
-            "user-read-recently-played"
-        )
-        url = (
-            f"https://accounts.spotify.com/authorize?client_id={self.client_id}"
-            f"&response_type=code&redirect_uri={redirect_uri}&scope={scopes}"
-        )
-        return url
+        # Yetkiler (boşlukla ayrılmış liste)
+        scopes = "playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private user-library-modify user-follow-modify user-read-recently-played"
+        
+        # Güvenli URL parametreleri oluşturma
+        params = {
+            "client_id": self.client_id,
+            "response_type": "code",
+            "redirect_uri": redirect_uri,
+            "scope": scopes
+        }
+        
+        url_params = urllib.parse.urlencode(params)
+        return f"https://accounts.spotify.com/authorize?{url_params}"
 
     def exchange_code(self, code, redirect_uri):
         credentials = base64.b64encode(
@@ -49,30 +47,20 @@ class SpotifyClient:
             "code": code,
             "redirect_uri": redirect_uri
         })
+        
+        # Eğer hala hata alıyorsan konsolda tam sebebini görmek için:
+        if resp.status_code != 200:
+            logger.error(f"Spotify Code Exchange Error: {resp.text}")
+            
         resp.raise_for_status()
         data = resp.json()
         
         self._access_token = data["access_token"]
         self._token_expires_at = time.time() + data["expires_in"]
         
-        # Eğer yeni bir refresh_token geldiyse kaydet
         if "refresh_token" in data:
             self.refresh_token = data["refresh_token"]
             logger.info(f"✅ YENİ REFRESH TOKEN ALINDI VE UYGULANDI.")
-            
-            # (Opsiyonel) Lokal geliştirme ortamı için .env dosyasını güncellemeyi dener
-            try:
-                with open(".env", "r") as f:
-                    lines = f.readlines()
-                with open(".env", "w") as f:
-                    for line in lines:
-                        if line.startswith("SPOTIFY_REFRESH_TOKEN="):
-                            f.write(f"SPOTIFY_REFRESH_TOKEN={self.refresh_token}\n")
-                        else:
-                            f.write(line)
-            except:
-                pass
-                
         return True
 
     def _get_access_token(self):
@@ -134,8 +122,6 @@ class SpotifyClient:
             })
         return tracks
 
-    # --- PLAYLIST & EDIT İŞLEMLERİ ---
-    
     def get_my_playlists(self):
         data = self._req("GET", "/me/playlists", params={"limit": 50})
         return [{"id": p["id"], "name": p["name"], "count": p["tracks"]["total"]} for p in data.get("items", [])]
@@ -180,8 +166,6 @@ class SpotifyClient:
                 if feat:
                     features[feat["id"]] = feat
         return features
-
-    # --- TOPLU TAKİP / BEĞENİ İŞLEMLERİ ---
 
     def modify_following(self, action, artist_ids):
         artist_ids = list(set(artist_ids))

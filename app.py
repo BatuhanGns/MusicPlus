@@ -5,7 +5,7 @@ import random
 import logging
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
-from flask import Flask, jsonify, render_template, request, Response, stream_with_context, redirect, session, url_for
+from flask import Flask, jsonify, render_template, request, Response, stream_with_context, redirect, session
 from apscheduler.schedulers.background import BackgroundScheduler
 from spotify_client import SpotifyClient
 from sheets_client import SheetsClient
@@ -14,7 +14,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-# Oturum yönetimi için gerekli secret key (Güvenlik amaçlı)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "muzik_istatistiklerin_gizli_anahtar")
 
 spotify = SpotifyClient()
@@ -74,12 +73,12 @@ def sync_job():
 
 # ----- YARDIMCI FONKSİYON -----
 def get_redirect_uri():
-    # Vercel gibi proxy arkası sistemlerde Flask bazen HTTP döndürür. 
-    # Canlı ortamda olduğumuzu anlarsak HTTPS'e zorluyoruz.
-    base_url = request.url_root
-    if "localhost" not in base_url and "127.0.0.1" not in base_url:
-        base_url = base_url.replace("http://", "https://")
-    return base_url + "callback"
+    # Vercel için en güvenilir redirect link üreticisi
+    host = request.headers.get('Host', request.host)
+    if "localhost" in host or "127.0.0.1" in host:
+        return f"http://{host}/callback"
+    else:
+        return f"https://{host}/callback"
 
 # ----- AUTH ROTALARI -----
 
