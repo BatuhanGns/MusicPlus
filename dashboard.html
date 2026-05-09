@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spotify İstatistikleri</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0a0a0a; --surface:#111; --surface2:#1a1a1a; --border:#222;
+    --green:#1db954; --green-dim:#1aa34a22; --text:#e8e8e8; --muted:#555; --muted2:#333;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:48px 48px;opacity:.3;pointer-events:none;z-index:0;}
+  .wrapper{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:48px 24px;}
+
+  header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:56px;gap:16px;flex-wrap:wrap;}
+  .logo-area h1{font-family:'Syne',sans-serif;font-size:clamp(28px,5vw,48px);font-weight:800;letter-spacing:-1px;line-height:1;}
+  .logo-area h1 span{color:var(--green);}
+  .logo-area p{margin-top:8px;color:var(--muted);font-size:12px;letter-spacing:2px;text-transform:uppercase;}
+  .sync-info{text-align:right;font-size:11px;color:var(--muted);line-height:1.8;}
+  .sync-info .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse 2s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.8);}}
+
+  /* MENÜ BUTONU VE YAN MENÜ */
+  .hamburger-btn {background:var(--surface); border:1px solid var(--border); color:var(--text); width:34px; height:34px; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:border-color .2s; line-height:1;}
+  .hamburger-btn:hover {border-color:var(--green);}
+  
+  .side-menu {position:fixed; top:0; right:-320px; width:300px; height:100vh; background:var(--surface); border-left:1px solid var(--border); transition:right 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index:200; padding:32px 24px; box-shadow:-10px 0 30px rgba(0,0,0,0.5);}
+  .side-menu.open {right:0;}
+  .menu-overlay {position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:190; opacity:0; pointer-events:none; transition:opacity 0.3s;}
+  .menu-overlay.open {opacity:1; pointer-events:all;}
+  .side-menu-header {display:flex; justify-content:space-between; align-items:center; margin-bottom:40px;}
+  .side-menu-header h2 {font-family:'Syne',sans-serif; font-size:24px; font-weight:800; letter-spacing:1px; color:var(--green);}
+  .menu-item {display:block; padding:16px 0; border-bottom:1px solid var(--border); color:var(--text); text-decoration:none; font-size:14px; font-weight:500; cursor:pointer; transition:all 0.2s; text-transform:uppercase; letter-spacing:1px;}
+  .menu-item:hover, .menu-item.active {color:var(--green); border-bottom-color:var(--green); padding-left:10px;}
+
+  /* EKRAN YÖNETİMİ */
+  .view-section {display:none; animation:fadeIn 0.4s ease;}
+  .view-section.active {display:block;}
+  @keyframes fadeIn {from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
+
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:40px;}
+  .stat-card{background:var(--surface);padding:28px 24px;transition:background .2s;}
+  .stat-card:hover{background:var(--surface2);}
+  .stat-card .label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+  .stat-card .value{font-family:'Syne',sans-serif;font-size:clamp(22px,3vw,32px);font-weight:800;color:var(--green);line-height:1;}
+  .stat-card .sub{font-size:11px;color:var(--muted);margin-top:6px;}
+
+  .section{margin-bottom:40px;}
+  .section-title{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:12px;}
+  .section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+  .rank-list{display:flex;flex-direction:column;gap:1px;}
+  .rank-item{display:grid;grid-template-columns:36px 1fr auto;align-items:center;gap:16px;background:var(--surface);padding:14px 20px;transition:background .15s,border-left-color .15s;border-left:2px solid transparent;cursor:pointer;}
+  .rank-item:hover{background:var(--surface2);border-left-color:var(--green);}
+  .rank-item .num{font-size:11px;color:var(--muted);text-align:right;}
+  .rank-item .info{min-width:0;}
+  .rank-item .name{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .rank-item .sub-info{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  
+  .rank-item .count{text-align:right;font-size:11px;color:var(--muted);white-space:nowrap;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;}
+  .rank-item .count strong{display:inline-block;font-family:'Syne',sans-serif;font-size:18px;color:var(--green);font-weight:700;margin-right:3px;line-height:1;}
+  .rank-item .days{font-size:9px;letter-spacing:0.5px;margin-top:5px;color:var(--muted);}
+  .rank-item .days span{color:var(--green);font-family:'Syne',sans-serif;font-weight:700;}
+
+  .bar-wrap{margin-top:4px;height:2px;background:var(--muted2);border-radius:1px;overflow:hidden;}
+  .bar-fill{height:100%;background:var(--green);border-radius:1px;transform-origin:left;animation:growBar .6s ease forwards;}
+  @keyframes growBar{from{transform:scaleX(0);}to{transform:scaleX(1);}}
+
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+  @media(max-width:680px){.two-col{grid-template-columns:1fr;}}
+
+  .month-table{width:100%;border-collapse:collapse;}
+  .month-table th{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);}
+  .month-table td{padding:12px;font-size:13px;border-bottom:1px solid var(--border);transition:background .15s;}
+  .month-table tr:hover td{background:var(--surface2);}
+  .month-table td:first-child{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;}
+  .month-table td.green{color:var(--green);}
+
+  .week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .week-day{background:var(--surface);border:1px solid var(--border);padding:12px 8px;text-align:center;border-radius:2px;transition:border-color .2s;}
+  .week-day.has-data{border-color:var(--green);}
+  .week-day .day-name{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+  .week-day .day-date{font-size:10px;color:var(--muted);margin-bottom:4px;}
+  .week-day .day-sure{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--green);line-height:1.2;}
+  .week-day .day-sure.empty{color:var(--muted2);}
+  @media(max-width:500px){.week-grid{grid-template-columns:repeat(4,1fr);}}
+
+  /* Aksiyon Butonları (Düzenle ve Profil İçin) */
+  .action-btn {display:block; width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); padding:18px 24px; font-family:'Syne',sans-serif; font-size:15px; font-weight:700; text-align:left; cursor:pointer; transition:all 0.2s; margin-bottom:8px; border-left:4px solid transparent;}
+  .action-btn:hover {background:var(--surface2); border-left-color:var(--green);}
+  .action-btn.danger {color:#ff4444;}
+  .action-btn.danger:hover {background:#ff444411; border-left-color:#ff4444;}
+
+  footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+  .loading{color:var(--muted);font-size:13px;padding:24px 0;}
+
+  /* MODAL VE GRAFİKLER */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .25s;}
+  .modal-overlay.open{opacity:1;pointer-events:all;}
+  .modal{background:var(--surface);border:1px solid var(--border);width:100%;max-width:680px;max-height:85vh;overflow-y:auto;position:relative;transform:translateY(20px);transition:transform .25s;}
+  .modal-overlay.open .modal{transform:translateY(0);}
+  .modal-header{padding:28px 28px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1;}
+  .modal-header h2{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-bottom:4px;}
+  .modal-header p{font-size:11px;color:var(--muted);}
+  .modal-close{position:absolute;top:20px;right:20px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 8px;transition:color .15s;}
+  .modal-close:hover{color:var(--text);}
+  .modal-body{padding:24px 28px;}
+
+  .modal-stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);margin-bottom:28px;}
+  .modal-stat{background:var(--surface2);padding:16px;text-align:center;}
+  .modal-stat .val{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--green);}
+  .modal-stat .lbl{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:4px;}
+
+  .modal-section-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;margin-top:24px;}
+
+  .hour-chart{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;align-items:end;height:64px;margin-bottom:8px;}
+  .hour-bar{background:var(--muted2);border-radius:1px 1px 0 0;min-height:2px;transition:background .2s;position:relative;}
+  .hour-bar.active{background:var(--green);}
+  .hour-bar:hover .hour-tip{display:block;}
+  .hour-tip{display:none;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);padding:4px 6px;font-size:10px;white-space:nowrap;z-index:5;}
+  .hour-labels{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;}
+  .hour-label{font-size:8px;color:var(--muted);text-align:center;}
+
+  .vakit-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+  .vakit-pill{background:var(--surface2);border:1px solid var(--border);padding:8px 14px;font-size:11px;display:flex;gap:10px;align-items:center;}
+  .vakit-pill .vc{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--green);}
+
+  .modal-track-list{display:flex;flex-direction:column;gap:1px;}
+  .modal-track{display:grid;grid-template-columns:28px 1fr auto;gap:12px;align-items:center;background:var(--surface2);padding:10px 14px;}
+  .modal-track .mtn{font-size:10px;color:var(--muted);}
+  .modal-track .mname{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .modal-track .mcnt{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--green);text-align:right;}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+<div class="menu-overlay" id="menuOverlay" onclick="toggleMenu()"></div>
+<div class="side-menu" id="sideMenu">
+  <div class="side-menu-header">
+    <h2>MENÜ</h2>
+    <button style="background:none;border:none;color:var(--text);font-size:24px;cursor:pointer" onclick="toggleMenu()">✕</button>
+  </div>
+  <a class="menu-item active" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler">İstatistiklerin</a>
+  <a class="menu-item" onclick="switchView('duzenle');toggleMenu()" id="nav-duzenle">Düzenle</a>
+  <a class="menu-item" onclick="switchView('profil');toggleMenu()" id="nav-profil">Profilin</a>
+</div>
+
+<div class="wrapper">
+  <header>
+    <div class="logo-area">
+      <h1>MÜZİK<span>.</span><br>İSTATİSTİKLERİN</h1>
+      <p id="headerSubtitle">Kişisel Spotify Verileri</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="sync-info" id="syncInfo"><span class="dot"></span> Yükleniyor...</div>
+      <button onclick="downloadPNG()" id="dlBtn" title="Görüntüyü İndir" class="hamburger-btn">↓</button>
+      <button onclick="toggleMenu()" class="hamburger-btn">☰</button>
+    </div>
+  </header>
+
+  <div id="view-istatistikler" class="view-section active">
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card"><div class="label">Toplam Dinleme</div><div class="value" id="statTotal">—</div><div class="sub">kayıt</div></div>
+      <div class="stat-card" onclick="openTumSarkilarModal()" style="cursor:pointer"><div class="label">Farklı Şarkı ↗</div><div class="value" id="statTracks">—</div><div class="sub">tıkla → tümünü gör</div></div>
+      <div class="stat-card" onclick="openTumSanatcilarModal()" style="cursor:pointer"><div class="label">Farklı Sanatçı ↗</div><div class="value" id="statArtists">—</div><div class="sub">tıkla → tümünü gör</div></div>
+      <div class="stat-card"><div class="label">Toplam Süre</div><div class="value" id="statHours">—</div><div class="sub">saat</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Son 7 Gün</div>
+      <div class="week-grid" id="weekGrid"><div class="loading">Yükleniyor...</div></div>
+    </div>
+
+    <div class="two-col">
+      <div class="section">
+        <div class="section-title">En Çok Dinlenen Şarkılar</div>
+        <div class="rank-list" id="topTracks"><div class="loading">Yükleniyor...</div></div>
+      </div>
+      <div class="section">
+        <div class="section-title">En Çok Dinlenen Sanatçılar</div>
+        <div class="rank-list" id="topArtists"><div class="loading">Yükleniyor...</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Tüm Zamanlar Dinleme Alışkanlıkları</div>
+      <div style="background:var(--surface); padding:24px; border:1px solid var(--border);">
+        <div class="modal-section-title" style="margin-top:0">Genel Saat Dağılımı</div>
+        <div id="globalHourChartContainer"><div class="loading">Yükleniyor...</div></div>
+        <div class="modal-section-title" style="margin-top:24px">Genel Vakit Dağılımı</div>
+        <div id="globalVakitContainer"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Aylık Analiz</div>
+      <div id="monthTable"><div class="loading">Yükleniyor...</div></div>
+    </div>
+  </div>
+
+  <div id="view-duzenle" class="view-section">
+    <div class="section-title">Hızlı Çalma Listesi İşlemleri</div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <button class="action-btn">En Çok Dinlenen Şarkılara Göre Playlist Oluştur</button>
+      <button class="action-btn">Enerjiye Göre Playlist Oluştur</button>
+      <button class="action-btn">En Çok Dinlenen Sanatçılara Göre Playlist Oluştur</button>
+      <button class="action-btn">Mevcut Playlistleri Enerjiye Göre Karıştır</button>
+      <button class="action-btn">Rastgele Karıştır</button>
+    </div>
+  </div>
+
+  <div id="view-profil" class="view-section">
+    <div class="section-title">Hesap Özetin</div>
+    
+    <div style="background:var(--surface); padding:32px 24px; border:1px solid var(--border); margin-bottom:24px; text-align:center;">
+      <p style="color:var(--muted); font-size:11px; letter-spacing:2px; margin-bottom:8px;">MÜZİK İSTATİSTİKLERİN'E KATILIM TARİHİN</p>
+      <h3 id="profilKatilimTarihi" style="font-family:'Syne',sans-serif; font-size:32px; color:var(--green); font-weight:800;">—</h3>
+    </div>
+
+    <div class="section-title">Veri ve Yönetim</div>
+    <button class="action-btn" onclick="window.location.href='/api/export-csv'">Tüm Verilerini İndir (.csv)</button>
+    <button class="action-btn danger">Sistemden Çıkış Yap</button>
+  </div>
+
+  <footer>
+    <span>Bu Bir Spotify Ürünü Değildir</span>
+    <span id="footerTime"></span>
+  </footer>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">—</h2>
+      <p id="modalSub">—</p>
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <div class="loading">Yükleniyor...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// MENÜ VE EKRAN GEÇİŞ FONKSİYONLARI
+function toggleMenu() {
+  document.getElementById('sideMenu').classList.toggle('open');
+  document.getElementById('menuOverlay').classList.toggle('open');
+}
+
+function switchView(viewId) {
+  document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + viewId).classList.add('active');
+  
+  document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('nav-' + viewId).classList.add('active');
+  
+  const titles = {
+    'istatistikler': 'Kişisel Spotify Verileri',
+    'duzenle': 'Playlist Yönetimi',
+    'profil': 'Hesap ve Ayarlar'
+  };
+  document.getElementById('headerSubtitle').textContent = titles[viewId];
+}
+
+// YARDIMCI VE RENDER FONKSİYONLARI
+function fmtSure(sn) {
+  if (!sn) return '—';
+  const s = parseInt(sn);
+  const saat = Math.floor(s / 3600);
+  const dk = Math.floor((s % 3600) / 60);
+  return saat > 0 ? `${saat}s ${dk}dk` : `${dk}dk`;
+}
+
+function openModal() { document.getElementById('modalOverlay').classList.add('open'); }
+function closeModalDirect() { document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModal(e) { if (e.target === document.getElementById('modalOverlay')) closeModalDirect(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalDirect(); });
+
+function renderHourChart(saatler) {
+  const max = Math.max(...saatler.map(s => s.count), 1);
+  return `
+    <div class="hour-chart">
+      ${saatler.map(s => {
+        const h = Math.max(Math.round((s.count / max) * 100), s.count > 0 ? 4 : 2);
+        return `<div class="hour-bar ${s.count > 0 ? 'active' : ''}" style="height:${h}%">
+          <div class="hour-tip">${s.saat}: ${s.count} kez</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="hour-labels">
+      ${saatler.map((s,i) => `<div class="hour-label">${i % 6 === 0 ? s.saat.slice(0,2) : ''}</div>`).join('')}
+    </div>`;
+}
+
+function renderVakitler(vakitler) {
+  if (!vakitler.length) return '';
+  return `<div class="vakit-row">${vakitler.map(v =>
+    `<div class="vakit-pill"><span class="vc">${v.count}</span><span>${v.vakit}</span></div>`
+  ).join('')}</div>`;
+}
+
+async function openSarkiModal(sarki, sanatci) {
+  document.getElementById('modalTitle').textContent = sarki;
+  document.getElementById('modalSub').textContent = sanatci;
+  document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
+  openModal();
+
+  const res  = await fetch(`/api/sarki/${encodeURIComponent(sarki)}`);
+  const data = await res.json();
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="modal-stats" style="grid-template-columns: 1fr 1fr 1fr;">
+      <div class="modal-stat"><div class="val">${data.toplam_count}</div><div class="lbl">Toplam Dinlenme</div></div>
+      <div class="modal-stat"><div class="val">${data.toplam_sure}</div><div class="lbl">Toplam Süre</div></div>
+      <div class="modal-stat"><div class="val" style="font-size:18px; line-height:26px;">${data.ilk_dinlenme}</div><div class="lbl">İlk Dinleme</div></div>
+    </div>
+    <div class="modal-section-title">Dinlenme Saatleri</div>
+    ${renderHourChart(data.saatler)}
+    <div class="modal-section-title" style="margin-top:20px">Vakit Dağılımı</div>
+    ${renderVakitler(data.vakitler)}
+  `;
+}
+
+async function openSanatciModal(sanatci) {
+  document.getElementById('modalTitle').textContent = sanatci;
+  document.getElementById('modalSub').textContent = 'Sanatçı Detayı';
+  document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
+  openModal();
+
+  const res  = await fetch(`/api/sanatci/${encodeURIComponent(sanatci)}`);
+  const data = await res.json();
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="modal-stats">
+      <div class="modal-stat"><div class="val">${data.toplam_count}</div><div class="lbl">Toplam Dinlenme</div></div>
+      <div class="modal-stat"><div class="val">${data.toplam_sure}</div><div class="lbl">Toplam Süre</div></div>
+    </div>
+    <div class="modal-section-title">En Çok Dinlenen Şarkılar</div>
+    <div class="modal-track-list">
+      ${data.top_sarkilar.map((t,i) => `
+        <div class="modal-track">
+          <span class="mtn">${String(i+1).padStart(2,'0')}</span>
+          <span class="mname">${t.sarki}</span>
+          <span class="mcnt">${t.count}</span>
+        </div>`).join('')}
+    </div>
+    <div class="modal-section-title">Dinlenme Saatleri</div>
+    ${renderHourChart(data.saatler)}
+    <div class="modal-section-title" style="margin-top:20px">Vakit Dağılımı</div>
+    ${renderVakitler(data.vakitler)}
+  `;
+}
+
+async function fetchData() {
+  const res = await fetch('/api/dashboard');
+  return res.ok ? res.json() : null;
+}
+
+function renderStats(d) {
+  document.getElementById('statTotal').textContent   = (d.toplam_kayit||0).toLocaleString('tr');
+  document.getElementById('statTracks').textContent  = (d.farkli_sarki||0).toLocaleString('tr');
+  document.getElementById('statArtists').textContent = (d.farkli_sanatci||0).toLocaleString('tr');
+  document.getElementById('statHours').textContent   = Math.floor((d.toplam_sure_sn||0)/3600).toLocaleString('tr');
+  document.getElementById('syncInfo').innerHTML      = `<span class="dot"></span> Aktif &nbsp;|&nbsp; Son sync: ${d.son_sync||'—'}`;
+  
+  if(d.ilk_kayit_tarihi) {
+    document.getElementById('profilKatilimTarihi').textContent = d.ilk_kayit_tarihi;
+  }
+}
+
+function renderWeek(hafta) {
+  document.getElementById('weekGrid').innerHTML = hafta.map(g => `
+    <div class="week-day ${g.sure_sn>0?'has-data':''}">
+      <div class="day-name">${g.gun.slice(0,3)}</div>
+      <div class="day-date">${g.tarih.slice(0,5)}</div>
+      <div class="day-sure ${g.sure_sn===0?'empty':''}">${fmtSure(g.sure_sn)}</div>
+    </div>`).join('');
+}
+
+function renderRankList(id, items, nameKey, subKey, countKey, daysKey, clickFn) {
+  const max = items[0]?.[countKey] || 1;
+  document.getElementById(id).innerHTML = items.slice(0,10).map((item,i) => {
+    let daysHtml = '';
+    if (daysKey && item[daysKey] !== undefined && item[daysKey] !== null) {
+      const d = item[daysKey];
+      daysHtml = `<div class="days">${d === 0 ? 'Bugün keşfedildi' : `<span>${d}</span> gündür`}</div>`;
+    }
+    return `
+    <div class="rank-item" data-name="${(item[nameKey]||'').replace(/"/g,'&quot;')}" data-sub="${(item[subKey]||'').replace(/"/g,'&quot;')}" data-fn="${clickFn}">
+      <div class="num">${String(i+1).padStart(2,'0')}</div>
+      <div class="info">
+        <div class="name">${item[nameKey]||'—'}</div>
+        ${subKey && item[subKey] ? `<div class="sub-info">${item[subKey]}</div>` : ''}
+        <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(item[countKey]/max*100)}%"></div></div>
+      </div>
+      <div class="count">
+        <div><strong>${item[countKey]}</strong>kez</div>
+        ${daysHtml}
+      </div>
+    </div>`
+  }).join('');
+}
+
+function renderMonths(aylar) {
+  document.getElementById('monthTable').innerHTML = `<table class="month-table">
+    <thead><tr><th>Ay</th><th>Aylık Toplam</th><th>Günlük Ortalama</th><th>Dinleme Sayısı</th></tr></thead>
+    <tbody>${[...aylar].reverse().map(a => `
+      <tr style="cursor:pointer" onclick="openAyModal('${a.ay}')">
+        <td>${a.ay} ↗</td>
+        <td class="green">${a.toplam}</td>
+        <td>${a.ortalama}</td>
+        <td>${(a.kayit_sayisi||0).toLocaleString('tr')}</td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function openTumSanatcilarModal() {
+  document.getElementById('modalTitle').textContent = 'Tüm Sanatçılar';
+  document.getElementById('modalSub').textContent = 'Dinlenme sayısına göre sıralı';
+  document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
+  openModal();
+
+  const res  = await fetch('/api/tum-sanatcilar');
+  const data = await res.json();
+  const max  = data.sanatcilar[0]?.count || 1;
+
+  document.getElementById('modalBody').innerHTML = `
+    <div style="margin-bottom:16px;font-size:11px;color:var(--muted)">${data.toplam} farklı sanatçı</div>
+    <div class="modal-track-list">
+      ${data.sanatcilar.map((s,i) => `
+        <div class="modal-track" style="cursor:pointer"
+             data-fn="openSanatciModal" data-name="${s.sanatci.replace(/"/g,'&quot;')}" data-sub="">
+          <span class="mtn">${String(i+1).padStart(2,'0')}</span>
+          <span>
+            <div class="mname">${s.sanatci}</div>
+            <div class="bar-wrap" style="margin-top:4px"><div class="bar-fill" style="width:${Math.round(s.count/max*100)}%"></div></div>
+          </span>
+          <span class="mcnt">${s.count}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+async function downloadPNG() {
+  const btn = document.getElementById('dlBtn');
+  btn.textContent = '⏳';
+  btn.disabled = true;
+  try {
+    const canvas = await html2canvas(document.querySelector('.wrapper'), {
+      backgroundColor: '#0a0a0a',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+    const link = document.createElement('a');
+    link.download = 'muzik-istatistik-' + new Date().toISOString().slice(0,10) + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(e) {
+    alert('İndirme hatası: ' + e.message);
+  }
+  btn.innerHTML = '↓';
+  btn.disabled = false;
+}
+
+async function openTumSarkilarModal() {
+  document.getElementById('modalTitle').textContent = 'Tüm Şarkılar';
+  document.getElementById('modalSub').textContent = 'Dinlenme sayısına göre sıralı';
+  document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
+  openModal();
+
+  const res  = await fetch('/api/tum-sarkilar');
+  const data = await res.json();
+  const max  = data.sarkilar[0]?.count || 1;
+
+  document.getElementById('modalBody').innerHTML = `
+    <div style="margin-bottom:16px;font-size:11px;color:var(--muted)">${data.toplam} farklı şarkı</div>
+    <div class="modal-track-list">
+      ${data.sarkilar.map((t,i) => `
+        <div class="modal-track" style="grid-template-columns:36px 1fr auto auto;gap:10px;cursor:pointer"
+             data-fn="openSarkiModal" data-name="${t.sarki.replace(/"/g,'&quot;')}" data-sub="${t.sanatci.replace(/"/g,'&quot;')}">
+          <span class="mtn">${String(i+1).padStart(2,'0')}</span>
+          <span>
+            <div class="mname">${t.sarki}</div>
+            <div style="font-size:11px;color:var(--muted)">${t.sanatci}</div>
+            <div class="bar-wrap" style="margin-top:4px"><div class="bar-fill" style="width:${Math.round(t.count/max*100)}%"></div></div>
+          </span>
+          <span class="mcnt">${t.count}</span>
+          <span style="font-size:11px;color:var(--muted);text-align:right">${t.sure}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+async function openAyModal(ayLabel) {
+  document.getElementById('modalTitle').textContent = ayLabel;
+  document.getElementById('modalSub').textContent = 'Aylık Detay';
+  document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
+  openModal();
+
+  const res  = await fetch(`/api/ay/${encodeURIComponent(ayLabel)}`);
+  const data = await res.json();
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="modal-stats">
+      <div class="modal-stat"><div class="val">${data.toplam_kayit}</div><div class="lbl">Toplam Dinlenme</div></div>
+      <div class="modal-stat"><div class="val">${data.toplam_sure}</div><div class="lbl">Toplam Süre</div></div>
+    </div>
+
+    <div class="modal-section-title">En Çok Dinlenen Şarkılar</div>
+    <div class="modal-track-list">
+      ${data.top_sarkilar.map((t,i) => `
+        <div class="modal-track" style="cursor:pointer"
+             data-fn="openSarkiModal" data-name="${t.sarki.replace(/"/g,'&quot;')}" data-sub="${t.sanatci.replace(/"/g,'&quot;')}">
+          <span class="mtn">${String(i+1).padStart(2,'0')}</span>
+          <span>
+            <div class="mname">${t.sarki}</div>
+            <div style="font-size:11px;color:var(--muted)">${t.sanatci}</div>
+          </span>
+          <span class="mcnt">${t.count}</span>
+        </div>`).join('')}
+    </div>
+
+    <div class="modal-section-title">En Çok Dinlenen Sanatçılar</div>
+    <div class="modal-track-list">
+      ${data.top_sanatcilar.map((s,i) => `
+        <div class="modal-track" style="cursor:pointer"
+             data-fn="openSanatciModal" data-name="${s.sanatci.replace(/"/g,'&quot;')}" data-sub="">
+          <span class="mtn">${String(i+1).padStart(2,'0')}</span>
+          <span class="mname">${s.sanatci}</span>
+          <span class="mcnt">${s.count}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+async function init() {
+  const data = await fetchData();
+  if (!data) return;
+  renderStats(data);
+  renderWeek(data.hafta);
+  
+  renderRankList('topTracks',   data.top_sarkilar,   'sarki',   'sanatci', 'count', 'kac_gundur', 'openSarkiModal');
+  renderRankList('topArtists',  data.top_sanatcilar, 'sanatci', null,      'count', 'kac_gundur', 'openSanatciModal');
+  
+  // YENİ: GENEL GRAFİKLERİ ÇİZ
+  if (data.genel_saatler && data.genel_vakitler) {
+    document.getElementById('globalHourChartContainer').innerHTML = renderHourChart(data.genel_saatler);
+    document.getElementById('globalVakitContainer').innerHTML = renderVakitler(data.genel_vakitler);
+  }
+  
+  renderMonths(data.aylar);
+  document.getElementById('footerTime').textContent = new Date().toLocaleString('tr-TR');
+}
+
+init();
+
+// Delegated click
+document.addEventListener('click', function(e) {
+  const item = e.target.closest('.rank-item[data-fn]');
+  if (!item) return;
+  const fn   = item.dataset.fn;
+  const name = item.dataset.name;
+  const sub  = item.dataset.sub;
+  if (fn === 'openSarkiModal')  openSarkiModal(name, sub);
+  if (fn === 'openSanatciModal') openSanatciModal(name);
+});
+</script>
+</body>
+</html>
