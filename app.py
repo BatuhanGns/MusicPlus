@@ -5,7 +5,7 @@ import random
 import logging
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
-from flask import Flask, jsonify, render_template, request, Response, stream_with_context
+from flask import Flask, jsonify, render_template, request, Response, stream_with_context, redirect, session, url_for
 from apscheduler.schedulers.background import BackgroundScheduler
 from spotify_client import SpotifyClient
 from sheets_client import SheetsClient
@@ -14,6 +14,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+# Oturum yönetimi için gerekli secret key (Güvenlik amaçlı)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "muzik_istatistiklerin_gizli_anahtar")
+
 spotify = SpotifyClient()
 sheets  = SheetsClient()
 
@@ -56,6 +59,9 @@ def load_tumveri():
 def sync_job():
     global _last_sync
     try:
+        if not spotify.refresh_token:
+            logger.warning("Sync atlandı: Refresh token yok (Kullanıcı henüz giriş yapmadı).")
+            return
         tracks = spotify.get_recently_played()
         if tracks:
             sheets.append_ham(tracks)
@@ -66,12 +72,42 @@ def sync_job():
     except Exception as e:
         logger.error(f"Sync hatası: {e}")
 
+# ----- AUTH ROTALARI -----
+
+@app.route("/login")
+def login():
+    # Callback URL'sini dinamik olarak oluştur (localhost veya prod ortamı)
+    redirect_uri = url_for('callback', _external=True)
+    auth_url = spotify.get_auth_url(redirect_uri)
+    return redirect(auth_url)
+
+@app.route("/callback")
+def callback():
+    code = request.args.get("code")
+    if code:
+        try:
+            redirect_uri = url_for('callback', _external=True)
+            spotify.exchange_code(code, redirect_uri)
+            session["logged_in"] = True
+            logger.info("✅ Kullanıcı başarıyla giriş yaptı.")
+        except Exception as e:
+            logger.error(f"Login (Callback) Hatası: {e}")
+    return redirect("/")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    logger.info("Kullanıcı çıkış yaptı.")
+    return redirect("/")
+
 # ----- TEMEL ROTALAR -----
 
 @app.route("/")
 @app.route("/dashboard")
 def dashboard():
-    return render_template("dashboard.html")
+    # Jinja'ya kullanıcının giriş yapıp yapmadığı bilgisini gönderiyoruz
+    logged_in = session.get("logged_in", False)
+    return render_template("dashboard.html", logged_in=logged_in)
 
 @app.route("/api/export-csv")
 def export_csv():
@@ -90,6 +126,8 @@ def export_csv():
 
 @app.route("/api/dashboard")
 def api_dashboard():
+    if not session.get("logged_in"): return jsonify({"error": "Unauthorized"}), 401
+    
     try:
         headers, rows = load_tumveri()
         if not rows: return jsonify({"error": "Veri yok"})
@@ -180,6 +218,7 @@ def api_dashboard():
 
 @app.route("/api/playlists")
 def get_playlists():
+    if not session.get("logged_in"): return jsonify({"error": "Unauthorized"}), 401
     try:
         pls = spotify.get_my_playlists()
         return jsonify(pls)
@@ -189,6 +228,7 @@ def get_playlists():
 
 @app.route("/api/action/create_playlist", methods=["POST"])
 def create_playlist_action():
+    if not session.get("logged_in"): return jsonify({"error": "Unauthorized"}), 401
     req = request.json
     ptype = req.get("type")
     
@@ -207,7 +247,7 @@ def create_playlist_action():
         if ptype == "top_tracks":
             pl = spotify.create_playlist("Top 50 - En Çok Dinlenenler")
             spotify.add_to_playlist(pl["id"], sorted_ids[:50])
-            return jsonify({"message": "Playlist oluşturuldu!"})
+            return jsonify({"message": "Playlist başarıyla oluşturuldu!"})
             
         elif ptype == "energy":
             top_100 = sorted_ids[:100]
@@ -215,7 +255,7 @@ def create_playlist_action():
             energy_sorted = sorted([tid for tid in top_100 if tid in features], key=lambda x: features[x]["energy"], reverse=True)
             pl = spotify.create_playlist("Yüksek Enerji (Kişisel)")
             spotify.add_to_playlist(pl["id"], energy_sorted)
-            return jsonify({"message": "Enerji playlisti oluşturuldu!"})
+            return jsonify({"message": "Enerji playlisti başarıyla oluşturuldu!"})
             
         return jsonify({"error": "Bilinmeyen tip"}), 400
     except Exception as e:
@@ -224,6 +264,7 @@ def create_playlist_action():
 
 @app.route("/api/action/playlist_edit", methods=["POST"])
 def edit_playlist_action():
+    if not session.get("logged_in"): return jsonify({"error": "Unauthorized"}), 401
     req = request.json
     action = req.get("action")
     pl_id = req.get("playlist_id")

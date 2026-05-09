@@ -14,14 +14,73 @@ class SpotifyClient:
     def __init__(self):
         self.client_id = os.environ["SPOTIFY_CLIENT_ID"]
         self.client_secret = os.environ["SPOTIFY_CLIENT_SECRET"]
-        self.refresh_token = os.environ["SPOTIFY_REFRESH_TOKEN"]
+        self.refresh_token = os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
         self._access_token = None
         self._token_expires_at = 0
         self._user_id = None
 
+    def get_auth_url(self, redirect_uri):
+        # Playlist düzenleme, beğeni ve takip işlemleri için GEREKLİ tüm izinler (scopes)
+        scopes = (
+            "playlist-read-private "
+            "playlist-read-collaborative "
+            "playlist-modify-public "
+            "playlist-modify-private "
+            "user-library-modify "
+            "user-follow-modify "
+            "user-read-recently-played"
+        )
+        url = (
+            f"https://accounts.spotify.com/authorize?client_id={self.client_id}"
+            f"&response_type=code&redirect_uri={redirect_uri}&scope={scopes}"
+        )
+        return url
+
+    def exchange_code(self, code, redirect_uri):
+        credentials = base64.b64encode(
+            f"{self.client_id}:{self.client_secret}".encode()
+        ).decode()
+
+        resp = requests.post(TOKEN_URL, headers={
+            "Authorization": f"Basic {credentials}",
+            "Content-Type": "application/x-www-form-urlencoded"
+        }, data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri
+        })
+        resp.raise_for_status()
+        data = resp.json()
+        
+        self._access_token = data["access_token"]
+        self._token_expires_at = time.time() + data["expires_in"]
+        
+        # Eğer yeni bir refresh_token geldiyse kaydet
+        if "refresh_token" in data:
+            self.refresh_token = data["refresh_token"]
+            logger.info(f"✅ YENİ REFRESH TOKEN ALINDI VE UYGULANDI.")
+            
+            # (Opsiyonel) Lokal geliştirme ortamı için .env dosyasını güncellemeyi dener
+            try:
+                with open(".env", "r") as f:
+                    lines = f.readlines()
+                with open(".env", "w") as f:
+                    for line in lines:
+                        if line.startswith("SPOTIFY_REFRESH_TOKEN="):
+                            f.write(f"SPOTIFY_REFRESH_TOKEN={self.refresh_token}\n")
+                        else:
+                            f.write(line)
+            except:
+                pass
+                
+        return True
+
     def _get_access_token(self):
         if self._access_token and time.time() < self._token_expires_at - 60:
             return self._access_token
+
+        if not self.refresh_token:
+            raise Exception("Refresh token bulunamadı! Giriş yapılması gerekiyor.")
 
         credentials = base64.b64encode(
             f"{self.client_id}:{self.client_secret}".encode()
@@ -38,7 +97,7 @@ class SpotifyClient:
         data = resp.json()
         self._access_token = data["access_token"]
         self._token_expires_at = time.time() + data["expires_in"]
-        logger.info("🔑 Spotify token yenilendi.")
+        logger.info("🔑 Spotify token arka planda yenilendi.")
         return self._access_token
 
     def _req(self, method, endpoint, **kwargs):
@@ -87,7 +146,6 @@ class SpotifyClient:
         return self._req("POST", f"/users/{user_id}/playlists", json=payload)
 
     def add_to_playlist(self, playlist_id, track_ids):
-        # 100'erli paketler halinde ekleme yapılmalı
         uris = [f"spotify:track:{tid}" for tid in track_ids if tid]
         for i in range(0, len(uris), 100):
             chunk = uris[i:i+100]
@@ -108,7 +166,6 @@ class SpotifyClient:
         uris = [f"spotify:track:{tid}" for tid in track_ids if tid]
         if not uris:
             return
-        # İlk 100'ü PUT ile değiştir, kalanları POST ile ekle
         self._req("PUT", f"/playlists/{playlist_id}/tracks", json={"uris": uris[:100]})
         if len(uris) > 100:
             for i in range(100, len(uris), 100):
@@ -116,7 +173,6 @@ class SpotifyClient:
 
     def get_audio_features(self, track_ids):
         features = {}
-        # 100'erli sorgulanabilir
         for i in range(0, len(track_ids), 100):
             chunk = track_ids[i:i+100]
             data = self._req("GET", "/audio-features", params={"ids": ",".join(chunk)})
@@ -128,16 +184,12 @@ class SpotifyClient:
     # --- TOPLU TAKİP / BEĞENİ İŞLEMLERİ ---
 
     def modify_following(self, action, artist_ids):
-        # action: "PUT" (Takip et) veya "DELETE" (Takipten çık)
-        # Max 50 per request
         artist_ids = list(set(artist_ids))
         for i in range(0, len(artist_ids), 50):
             chunk = artist_ids[i:i+50]
             self._req(action, "/me/following", params={"type": "artist", "ids": ",".join(chunk)})
 
     def modify_saved_tracks(self, action, track_ids):
-        # action: "PUT" (Beğen) veya "DELETE" (Beğenme)
-        # Max 50 per request
         track_ids = list(set(track_ids))
         for i in range(0, len(track_ids), 50):
             chunk = track_ids[i:i+50]
