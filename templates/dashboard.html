@@ -236,7 +236,6 @@
       </div>
       <div class="section-title">Veri ve Yönetim</div>
       <button class="action-btn" onclick="window.location.href='/api/export-csv'">Tüm Verilerini İndir (.csv)</button>
-      <!-- ÇIKIŞ YAP YÖNLENDİRMESİ DÜZELTİLDİ -->
       <button class="action-btn danger" onclick="window.location.href='/logout'">Sistemden Çıkış Yap</button>
     </div>
 
@@ -261,7 +260,6 @@
   </div>
 
   <script>
-  // Menü Kontrolü
   function toggleMenu() {
     document.getElementById('sideMenu').classList.toggle('open');
     document.getElementById('menuOverlay').classList.toggle('open');
@@ -276,7 +274,6 @@
     if(viewId === 'duzenle') fetchPlaylists();
   }
 
-  // Araçlar
   function fmtSure(sn) {
     if (!sn) return '—';
     const s = parseInt(sn);
@@ -287,7 +284,6 @@
   function closeModal(e) { if (e.target === document.getElementById('modalOverlay')) closeModalDirect(); }
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalDirect(); });
 
-  // Grafikler
   function renderHourChart(saatler) {
     const max = Math.max(...saatler.map(s => s.count), 1);
     return `<div class="hour-chart">${saatler.map(s => `<div class="hour-bar ${s.count > 0 ? 'active' : ''}" style="height:${Math.max((s.count/max)*100, 2)}%"><div class="hour-tip">${s.saat}: ${s.count} kez</div></div>`).join('')}</div>
@@ -297,7 +293,6 @@
     return `<div class="vakit-row">${vakitler.map(v => `<div class="vakit-pill"><span class="vc">${v.count}</span><span>${v.vakit}</span></div>`).join('')}</div>`;
   }
 
-  // Ana Veri Çekme
   async function init() {
     const res = await fetch('/api/dashboard');
     if(!res.ok) {
@@ -329,22 +324,32 @@
   }
   init();
 
-  // --- DÜZENLEME & API İŞLEMLERİ ---
-
+  // --- API VE HATA YÖNETİMİ ---
   async function fetchPlaylists() {
     const container = document.getElementById('myPlaylistsContainer');
-    const res = await fetch('/api/playlists');
-    const playlists = await res.json();
-    if(!playlists.length) {
-      container.innerHTML = '<div class="loading">Playlist bulunamadı.</div>';
-      return;
+    try {
+      const res = await fetch('/api/playlists');
+      const data = await res.json();
+      
+      if(data.error) {
+        container.innerHTML = `<div class="loading" style="color:#ff4444">${data.error}</div>`;
+        return;
+      }
+      
+      if(!data.length) {
+        container.innerHTML = '<div class="loading">Sana ait düzenlenebilir playlist bulunamadı.</div>';
+        return;
+      }
+      
+      container.innerHTML = data.map((p, i) => `
+        <div class="rank-item" onclick="openPlaylistModal('${p.id}', '${p.name.replace(/'/g,"")}', ${p.count})" style="cursor:pointer; border-left: 2px solid var(--border);">
+          <div class="num">${String(i+1).padStart(2,'0')}</div>
+          <div class="info"><div class="name">${p.name}</div><div class="sub-info">${p.count} Şarkı</div></div>
+          <div class="count"><div><strong>Düzenle</strong></div><div class="days">tıkla ↗</div></div>
+        </div>`).join('');
+    } catch(e) {
+      container.innerHTML = '<div class="loading" style="color:#ff4444">Bağlantı hatası oluştu.</div>';
     }
-    container.innerHTML = playlists.map((p, i) => `
-      <div class="rank-item" onclick="openPlaylistModal('${p.id}', '${p.name.replace(/'/g,"")}', ${p.count})" style="cursor:pointer; border-left: 2px solid var(--border);">
-        <div class="num">${String(i+1).padStart(2,'0')}</div>
-        <div class="info"><div class="name">${p.name}</div><div class="sub-info">${p.count} Şarkı</div></div>
-        <div class="count"><div><strong>Düzenle</strong></div><div class="days">tıkla ↗</div></div>
-      </div>`).join('');
   }
 
   function openPlaylistModal(id, name, count) {
@@ -376,9 +381,10 @@
         method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({type})
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "İşlem başarısız.");
       alert(data.message || data.error);
       fetchPlaylists();
-    } catch(e) { alert("Hata oluştu."); }
+    } catch(e) { alert("Hata oluştu: " + e.message); }
     btn.textContent = oldText;
     btn.disabled = false;
   }
@@ -392,14 +398,14 @@
         method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action, playlist_id})
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "İşlem başarısız.");
       alert(data.message || data.error);
-    } catch(e) { alert("Hata oluştu."); }
+    } catch(e) { alert("Hata: " + e.message); }
     btn.textContent = oldText;
     btn.disabled = false;
     closeModalDirect();
   }
 
-  // İndirme
   async function downloadPNG() {
     const btn = document.getElementById('dlBtn');
     btn.textContent = '⏳';
@@ -437,4 +443,5 @@
 {% endif %}
 </body>
 </html>
+
 
