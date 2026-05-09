@@ -25,20 +25,12 @@ class SpotifyClient:
             "playlist-read-private playlist-read-collaborative "
             "playlist-modify-public playlist-modify-private "
             "user-library-read user-library-modify "
-            "user-follow-modify "
-            "user-read-recently-played"
+            "user-follow-modify user-read-recently-played"
         )
         encoded_scopes = urllib.parse.quote(scopes)
         encoded_redirect = urllib.parse.quote(redirect_uri)
-
-        return (
-            f"https://accounts.spotify.com/authorize"
-            f"?client_id={self.client_id}"
-            f"&response_type=code"
-            f"&redirect_uri={encoded_redirect}"
-            f"&scope={encoded_scopes}"
-            f"&show_dialog=true"
-        )
+        
+        return f"https://accounts.spotify.com/authorize?client_id={self.client_id}&response_type=code&redirect_uri={encoded_redirect}&scope={encoded_scopes}&show_dialog=true"
 
     def exchange_code(self, code, redirect_uri):
         credentials = base64.b64encode(
@@ -53,12 +45,12 @@ class SpotifyClient:
             "code": code,
             "redirect_uri": redirect_uri
         })
-
+        
         if resp.status_code != 200:
             logger.error(f"Code Exchange Hatası: {resp.text}")
         resp.raise_for_status()
         data = resp.json()
-
+        
         new_access_token = data["access_token"]
         new_expires_at = time.time() + data["expires_in"]
         new_refresh_token = data.get("refresh_token")
@@ -68,18 +60,18 @@ class SpotifyClient:
             session["token_expires_at"] = new_expires_at
             if new_refresh_token:
                 session["refresh_token"] = new_refresh_token
-
+        
         self._access_token = new_access_token
         self._token_expires_at = new_expires_at
         if new_refresh_token:
             self.refresh_token = new_refresh_token
             logger.info("✅ YENİ REFRESH TOKEN ALINDI VE SESSION'A KAYDEDİLDİ.")
-
+            
         return True
 
     def _get_access_token(self):
         in_req = has_request_context()
-
+        
         if in_req:
             access_token = session.get("access_token")
             expires_at = session.get("token_expires_at", 0)
@@ -103,13 +95,13 @@ class SpotifyClient:
             "grant_type": "refresh_token",
             "refresh_token": r_token
         })
-
+        
         if resp.status_code != 200:
             logger.error(f"Token Yenileme (Refresh) Hatası: {resp.text}")
             if in_req and "invalid_grant" in resp.text:
                 session.clear()
         resp.raise_for_status()
-
+        
         data = resp.json()
         new_access_token = data["access_token"]
         new_expires_at = time.time() + data["expires_in"]
@@ -119,7 +111,7 @@ class SpotifyClient:
             session["access_token"] = new_access_token
             session["token_expires_at"] = new_expires_at
             session["refresh_token"] = new_refresh_token
-
+        
         self._access_token = new_access_token
         self._token_expires_at = new_expires_at
         self.refresh_token = new_refresh_token
@@ -131,26 +123,26 @@ class SpotifyClient:
         headers = kwargs.pop("headers", {})
         headers["Authorization"] = f"Bearer {token}"
         url = f"{API_BASE}{endpoint}" if not endpoint.startswith("http") else endpoint
-
+        
         resp = requests.request(method, url, headers=headers, **kwargs)
-
-        if resp.status_code == 403:
-            logger.error(f"403 Forbidden on {url}: {resp.text}")
+        
+        if resp.status_code >= 400:
             err_json = {}
-            try: err_json = resp.json()
-            except: pass
-            msg = err_json.get("error", {}).get("message", "").lower()
+            try:
+                err_json = resp.json()
+            except:
+                pass
+            msg = err_json.get("error", {}).get("message", resp.text)
+            logger.error(f"Spotify API Error ({resp.status_code}) on {url}: {msg}")
             
-            # Spotify hesabının maili onaylı değilse detaylı hata döndür
-            if "verified" in msg:
-                raise Exception("Spotify hesabınızın e-posta adresi doğrulanmamış! Çalma listesi oluşturmak/düzenlemek için Spotify profilinizden e-postanızı onaylamanız gereklidir.")
-            else:
-                raise Exception("Spotify bu işleme izin vermedi (403). Sadece kendi oluşturduğunuz listeleri düzenlediğinizden emin olun.")
+            # --- ARTIK GERÇEK HATAYI GÖRECEĞİZ ---
+            if resp.status_code == 403:
+                if "audio-features" in url:
+                    raise Exception("Spotify Kasım 2024'te 'Enerji ve Ses Analizi' özelliğini üçüncü parti uygulamalara kapattı! Bu buton Spotify kısıtlaması nedeniyle çalışmamaktadır.")
+                raise Exception(f"Spotify Engeli (403): {msg}")
                 
-        elif resp.status_code >= 400:
-            logger.error(f"Spotify API Error ({resp.status_code}) on {url}: {resp.text}")
-
-        resp.raise_for_status()
+            raise Exception(f"API Hatası ({resp.status_code}): {msg}")
+            
         if resp.text:
             return resp.json()
         return {}
@@ -159,15 +151,15 @@ class SpotifyClient:
         in_req = has_request_context()
         if in_req and "user_id" in session:
             return session["user_id"]
-
+            
         data = self._req("GET", "/me")
         user_id = data["id"]
-
+        
         if in_req:
             session["user_id"] = user_id
         else:
             self._user_id = user_id
-
+            
         return user_id
 
     def get_recently_played(self, limit=50):
@@ -187,7 +179,7 @@ class SpotifyClient:
         return tracks
 
     # --- PLAYLIST & EDIT İŞLEMLERİ ---
-
+    
     def get_my_playlists(self):
         data = self._req("GET", "/me/playlists", params={"limit": 50})
         user_id = self.get_me()
@@ -196,12 +188,9 @@ class SpotifyClient:
         for p in data.get("items", []):
             if not p:
                 continue
-            
-            # 1. ÇÖZÜM: Sadece kullanıcının kendi oluşturduğu playlistleri getirir (Başkalarınınkini değiştirme yetkimiz yok)
             if p.get("owner", {}).get("id") != user_id:
                 continue
                 
-            # 2. ÇÖZÜM: Şarkı sayısı (count) boş dönme hatası düzeltildi
             tracks_info = p.get("tracks")
             count = 0
             if isinstance(tracks_info, dict):
