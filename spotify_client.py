@@ -21,7 +21,6 @@ class SpotifyClient:
         self._user_id = None
 
     def get_auth_url(self, redirect_uri):
-        # FIX: user-library-read eklendi — /me/tracks/contains için zorunlu
         scopes = (
             "playlist-read-private playlist-read-collaborative "
             "playlist-modify-public playlist-modify-private "
@@ -75,7 +74,6 @@ class SpotifyClient:
         if new_refresh_token:
             self.refresh_token = new_refresh_token
             logger.info("✅ YENİ REFRESH TOKEN ALINDI VE SESSION'A KAYDEDİLDİ.")
-            logger.info(f"!!! YENİ REFRESH TOKEN (RENDER'A KAYDEDEBİLİRSİN): {new_refresh_token} !!!")
 
         return True
 
@@ -138,7 +136,17 @@ class SpotifyClient:
 
         if resp.status_code == 403:
             logger.error(f"403 Forbidden on {url}: {resp.text}")
-            raise Exception("Spotify yetkileriniz eksik kalmış! Lütfen Profil menüsünden 'Sistemden Çıkış Yap'a basıp tekrar giriş yaparak yeni izinleri onaylayın.")
+            err_json = {}
+            try: err_json = resp.json()
+            except: pass
+            msg = err_json.get("error", {}).get("message", "").lower()
+            
+            # Spotify hesabının maili onaylı değilse detaylı hata döndür
+            if "verified" in msg:
+                raise Exception("Spotify hesabınızın e-posta adresi doğrulanmamış! Çalma listesi oluşturmak/düzenlemek için Spotify profilinizden e-postanızı onaylamanız gereklidir.")
+            else:
+                raise Exception("Spotify bu işleme izin vermedi (403). Sadece kendi oluşturduğunuz listeleri düzenlediğinizden emin olun.")
+                
         elif resp.status_code >= 400:
             logger.error(f"Spotify API Error ({resp.status_code}) on {url}: {resp.text}")
 
@@ -182,14 +190,27 @@ class SpotifyClient:
 
     def get_my_playlists(self):
         data = self._req("GET", "/me/playlists", params={"limit": 50})
+        user_id = self.get_me()
         items = []
+        
         for p in data.get("items", []):
-            if not p:  # bazı türlerde None gelebilir
+            if not p:
                 continue
+            
+            # 1. ÇÖZÜM: Sadece kullanıcının kendi oluşturduğu playlistleri getirir (Başkalarınınkini değiştirme yetkimiz yok)
+            if p.get("owner", {}).get("id") != user_id:
+                continue
+                
+            # 2. ÇÖZÜM: Şarkı sayısı (count) boş dönme hatası düzeltildi
+            tracks_info = p.get("tracks")
+            count = 0
+            if isinstance(tracks_info, dict):
+                count = tracks_info.get("total", 0)
+                
             items.append({
-                "id": p["id"],
-                "name": p["name"],
-                "count": (p.get("tracks") or {}).get("total", 0)
+                "id": p.get("id"),
+                "name": p.get("name", "İsimsiz Playlist"),
+                "count": count
             })
         return items
 
