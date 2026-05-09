@@ -71,14 +71,16 @@ def sync_job():
     except Exception as e:
         logger.error(f"Sync hatası: {e}")
 
-# ----- YARDIMCI FONKSİYON -----
+# ----- YARDIMCI FONKSİYON (400 HATASI ÇÖZÜMÜ) -----
 def get_redirect_uri():
-    # Vercel için en güvenilir redirect link üreticisi
-    host = request.headers.get('Host', request.host)
-    if "localhost" in host or "127.0.0.1" in host:
-        return f"http://{host}/callback"
-    else:
-        return f"https://{host}/callback"
+    # request.url_root Vercel'de "https://site.vercel.app/" döner. Sonunda slash vardır.
+    # rstrip('/') ile o slash'i siliyoruz. Böylece //callback olmasını kesin engelliyoruz.
+    base_url = request.url_root.rstrip('/')
+    
+    if "localhost" not in base_url and "127.0.0.1" not in base_url:
+        base_url = base_url.replace("http://", "https://")
+        
+    return f"{base_url}/callback"
 
 # ----- AUTH ROTALARI -----
 
@@ -90,6 +92,12 @@ def login():
 
 @app.route("/callback")
 def callback():
+    # Kullanıcı giriş ekranında "İptal" tuşuna basarsa çökmemesi için kontrol
+    error = request.args.get("error")
+    if error:
+        logger.error(f"Spotify Yetkilendirme Reddedildi: {error}")
+        return redirect("/")
+
     code = request.args.get("code")
     if code:
         try:
