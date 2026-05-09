@@ -15,6 +15,11 @@
   body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:48px 48px;opacity:.3;pointer-events:none;z-index:0;}
   .wrapper{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:48px 24px;}
 
+  /* --- GİRİŞ EKRANI ÖZEL STİLLERİ --- */
+  .login-container { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; text-align:center; padding:24px; }
+  .spotify-btn { background:var(--green); color:#000; border:none; padding:18px 40px; border-radius:50px; font-family:'Syne',sans-serif; font-size:18px; font-weight:800; cursor:pointer; transition:all 0.2s; text-transform:uppercase; letter-spacing:1px; display:inline-flex; align-items:center; gap:12px; }
+  .spotify-btn:hover { transform:scale(1.05); background:#1ed760; }
+
   header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:56px;gap:16px;flex-wrap:wrap;}
   .logo-area h1{font-family:'Syne',sans-serif;font-size:clamp(28px,5vw,48px);font-weight:800;letter-spacing:-1px;line-height:1;}
   .logo-area h1 span{color:var(--green);}
@@ -131,288 +136,305 @@
 </head>
 <body>
 
-<div class="menu-overlay" id="menuOverlay" onclick="toggleMenu()"></div>
-<div class="side-menu" id="sideMenu">
-  <div class="side-menu-header">
-    <h2>MENÜ</h2>
-    <button style="background:none;border:none;color:var(--text);font-size:24px;cursor:pointer" onclick="toggleMenu()">✕</button>
+{% if not logged_in %}
+  <!-- GİRİŞ YAP EKRANI -->
+  <div class="login-container">
+    <h1 style="font-family:'Syne';font-size:clamp(32px, 8vw, 64px);font-weight:800;line-height:1;margin-bottom:16px;">MÜZİK<span style="color:var(--green)">.</span><br>İSTATİSTİKLERİN</h1>
+    <p style="color:var(--muted);letter-spacing:3px;font-size:12px;text-transform:uppercase;margin-bottom:48px;">KİŞİSEL SPOTIFY DENEYİMİ</p>
+    <button class="spotify-btn" onclick="window.location.href='/login'">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.659.3 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.02.6-1.14 4.32-1.38 9.72-.72 13.44 1.56.42.24.6.84.3 1.26zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.2-1.26 11.28-1.02 15.72 1.62.539.3.719 1.02.419 1.56-.299.42-1.02.599-1.559.3z"/></svg>
+      Spotify İle Giriş Yap
+    </button>
   </div>
-  <a class="menu-item active" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler">İstatistiklerin</a>
-  <a class="menu-item" onclick="switchView('duzenle');toggleMenu()" id="nav-duzenle">Düzenle</a>
-  <a class="menu-item" onclick="switchView('profil');toggleMenu()" id="nav-profil">Profilin</a>
-</div>
-
-<div class="wrapper">
-  <header>
-    <div class="logo-area">
-      <h1>MÜZİK<span>.</span><br>İSTATİSTİKLERİN</h1>
-      <p id="headerSubtitle">Kişisel Spotify Verileri</p>
+{% else %}
+  <!-- GİRİŞ YAPILMIŞ DASHBOARD EKRANI -->
+  <div class="menu-overlay" id="menuOverlay" onclick="toggleMenu()"></div>
+  <div class="side-menu" id="sideMenu">
+    <div class="side-menu-header">
+      <h2>MENÜ</h2>
+      <button style="background:none;border:none;color:var(--text);font-size:24px;cursor:pointer" onclick="toggleMenu()">✕</button>
     </div>
-    <div style="display:flex;align-items:center;gap:12px">
-      <div class="sync-info" id="syncInfo"><span class="dot"></span> Yükleniyor...</div>
-      <button onclick="downloadPNG()" id="dlBtn" title="Görüntüyü İndir" class="hamburger-btn">↓</button>
-      <button onclick="toggleMenu()" class="hamburger-btn">☰</button>
-    </div>
-  </header>
+    <a class="menu-item active" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler">İstatistiklerin</a>
+    <a class="menu-item" onclick="switchView('duzenle');toggleMenu()" id="nav-duzenle">Düzenle</a>
+    <a class="menu-item" onclick="switchView('profil');toggleMenu()" id="nav-profil">Profilin</a>
+  </div>
 
-  <!-- İSTATİSTİKLER EKRANI -->
-  <div id="view-istatistikler" class="view-section active">
-    <div class="stats-row" id="statsRow">
-      <div class="stat-card"><div class="label">Toplam Dinleme</div><div class="value" id="statTotal">—</div><div class="sub">kayıt</div></div>
-      <div class="stat-card" onclick="alert('Modal Fonksiyonu (Geçici Olarak Kapalı)')" style="cursor:pointer"><div class="label">Farklı Şarkı ↗</div><div class="value" id="statTracks">—</div><div class="sub">tıkla → tümünü gör</div></div>
-      <div class="stat-card" onclick="alert('Modal Fonksiyonu (Geçici Olarak Kapalı)')" style="cursor:pointer"><div class="label">Farklı Sanatçı ↗</div><div class="value" id="statArtists">—</div><div class="sub">tıkla → tümünü gör</div></div>
-      <div class="stat-card"><div class="label">Toplam Süre</div><div class="value" id="statHours">—</div><div class="sub">saat</div></div>
-    </div>
+  <div class="wrapper">
+    <header>
+      <div class="logo-area">
+        <h1>MÜZİK<span>.</span><br>İSTATİSTİKLERİN</h1>
+        <p id="headerSubtitle">Kişisel Spotify Verileri</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="sync-info" id="syncInfo"><span class="dot"></span> Yükleniyor...</div>
+        <button onclick="downloadPNG()" id="dlBtn" title="Görüntüyü İndir" class="hamburger-btn">↓</button>
+        <button onclick="toggleMenu()" class="hamburger-btn">☰</button>
+      </div>
+    </header>
 
-    <div class="section">
-      <div class="section-title">Son 7 Gün</div>
-      <div class="week-grid" id="weekGrid"><div class="loading">Yükleniyor...</div></div>
-    </div>
+    <!-- İSTATİSTİKLER EKRANI -->
+    <div id="view-istatistikler" class="view-section active">
+      <div class="stats-row" id="statsRow">
+        <div class="stat-card"><div class="label">Toplam Dinleme</div><div class="value" id="statTotal">—</div><div class="sub">kayıt</div></div>
+        <div class="stat-card" onclick="alert('Modal Fonksiyonu (Geçici Olarak Kapalı)')" style="cursor:pointer"><div class="label">Farklı Şarkı ↗</div><div class="value" id="statTracks">—</div><div class="sub">tıkla → tümünü gör</div></div>
+        <div class="stat-card" onclick="alert('Modal Fonksiyonu (Geçici Olarak Kapalı)')" style="cursor:pointer"><div class="label">Farklı Sanatçı ↗</div><div class="value" id="statArtists">—</div><div class="sub">tıkla → tümünü gör</div></div>
+        <div class="stat-card"><div class="label">Toplam Süre</div><div class="value" id="statHours">—</div><div class="sub">saat</div></div>
+      </div>
 
-    <div class="two-col">
       <div class="section">
-        <div class="section-title">En Çok Dinlenen Şarkılar</div>
-        <div class="rank-list" id="topTracks"><div class="loading">Yükleniyor...</div></div>
+        <div class="section-title">Son 7 Gün</div>
+        <div class="week-grid" id="weekGrid"><div class="loading">Yükleniyor...</div></div>
       </div>
+
+      <div class="two-col">
+        <div class="section">
+          <div class="section-title">En Çok Dinlenen Şarkılar</div>
+          <div class="rank-list" id="topTracks"><div class="loading">Yükleniyor...</div></div>
+        </div>
+        <div class="section">
+          <div class="section-title">En Çok Dinlenen Sanatçılar</div>
+          <div class="rank-list" id="topArtists"><div class="loading">Yükleniyor...</div></div>
+        </div>
+      </div>
+
       <div class="section">
-        <div class="section-title">En Çok Dinlenen Sanatçılar</div>
-        <div class="rank-list" id="topArtists"><div class="loading">Yükleniyor...</div></div>
+        <div class="section-title">Tüm Zamanlar Dinleme Alışkanlıkları</div>
+        <div style="background:var(--surface); padding:24px; border:1px solid var(--border);">
+          <div class="modal-section-title" style="margin-top:0">Genel Saat Dağılımı</div>
+          <div id="globalHourChartContainer"><div class="loading">Yükleniyor...</div></div>
+          <div class="modal-section-title" style="margin-top:24px">Genel Vakit Dağılımı</div>
+          <div id="globalVakitContainer"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Aylık Analiz</div>
+        <div id="monthTable"><div class="loading">Yükleniyor...</div></div>
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-title">Tüm Zamanlar Dinleme Alışkanlıkları</div>
-      <div style="background:var(--surface); padding:24px; border:1px solid var(--border);">
-        <div class="modal-section-title" style="margin-top:0">Genel Saat Dağılımı</div>
-        <div id="globalHourChartContainer"><div class="loading">Yükleniyor...</div></div>
-        <div class="modal-section-title" style="margin-top:24px">Genel Vakit Dağılımı</div>
-        <div id="globalVakitContainer"></div>
+    <!-- DÜZENLE EKRANI -->
+    <div id="view-duzenle" class="view-section">
+      <div class="section-title">Yeni Playlist Oluştur</div>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom: 40px;">
+        <button class="action-btn" onclick="createPlaylist('top_tracks', this)">En Çok Dinlenen Şarkılara Göre Playlist Oluştur</button>
+        <button class="action-btn" onclick="createPlaylist('energy', this)">Enerjiye Göre Playlist Oluştur</button>
+      </div>
+
+      <div class="section-title">Playlist'i Düzenle</div>
+      <div class="rank-list" id="myPlaylistsContainer">
+        <div class="loading">Playlistlerin Yükleniyor...</div>
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-title">Aylık Analiz</div>
-      <div id="monthTable"><div class="loading">Yükleniyor...</div></div>
+    <!-- PROFİL EKRANI -->
+    <div id="view-profil" class="view-section">
+      <div class="section-title">Hesap Özetin</div>
+      <div style="background:var(--surface); padding:32px 24px; border:1px solid var(--border); margin-bottom:24px; text-align:center;">
+        <p style="color:var(--muted); font-size:11px; letter-spacing:2px; margin-bottom:8px;">MÜZİK İSTATİSTİKLERİN'E KATILIM TARİHİN</p>
+        <h3 id="profilKatilimTarihi" style="font-family:'Syne',sans-serif; font-size:32px; color:var(--green); font-weight:800;">—</h3>
+      </div>
+      <div class="section-title">Veri ve Yönetim</div>
+      <button class="action-btn" onclick="window.location.href='/api/export-csv'">Tüm Verilerini İndir (.csv)</button>
+      <!-- ÇIKIŞ YAP YÖNLENDİRMESİ DÜZELTİLDİ -->
+      <button class="action-btn danger" onclick="window.location.href='/logout'">Sistemden Çıkış Yap</button>
+    </div>
+
+    <footer>
+      <span>Bu Bir Spotify Ürünü Değildir</span>
+      <span id="footerTime"></span>
+    </footer>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle">—</h2>
+        <p id="modalSub">—</p>
+        <button class="modal-close" onclick="closeModalDirect()">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <div class="loading">Yükleniyor...</div>
+      </div>
     </div>
   </div>
 
-  <!-- DÜZENLE EKRANI -->
-  <div id="view-duzenle" class="view-section">
-    <div class="section-title">Yeni Playlist Oluştur</div>
-    <div style="display:flex; flex-direction:column; gap:8px; margin-bottom: 40px;">
-      <button class="action-btn" onclick="createPlaylist('top_tracks', this)">En Çok Dinlenen Şarkılara Göre Playlist Oluştur</button>
-      <button class="action-btn" onclick="createPlaylist('energy', this)">Enerjiye Göre Playlist Oluştur</button>
-    </div>
-
-    <div class="section-title">Playlist'i Düzenle</div>
-    <div class="rank-list" id="myPlaylistsContainer">
-      <div class="loading">Playlistlerin Yükleniyor...</div>
-    </div>
-  </div>
-
-  <!-- PROFİL EKRANI -->
-  <div id="view-profil" class="view-section">
-    <div class="section-title">Hesap Özetin</div>
-    <div style="background:var(--surface); padding:32px 24px; border:1px solid var(--border); margin-bottom:24px; text-align:center;">
-      <p style="color:var(--muted); font-size:11px; letter-spacing:2px; margin-bottom:8px;">MÜZİK İSTATİSTİKLERİN'E KATILIM TARİHİN</p>
-      <h3 id="profilKatilimTarihi" style="font-family:'Syne',sans-serif; font-size:32px; color:var(--green); font-weight:800;">—</h3>
-    </div>
-    <div class="section-title">Veri ve Yönetim</div>
-    <button class="action-btn" onclick="window.location.href='/api/export-csv'">Tüm Verilerini İndir (.csv)</button>
-    <button class="action-btn danger">Sistemden Çıkış Yap</button>
-  </div>
-
-  <footer>
-    <span>Bu Bir Spotify Ürünü Değildir</span>
-    <span id="footerTime"></span>
-  </footer>
-</div>
-
-<!-- MODAL -->
-<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
-  <div class="modal" id="modal">
-    <div class="modal-header">
-      <h2 id="modalTitle">—</h2>
-      <p id="modalSub">—</p>
-      <button class="modal-close" onclick="closeModalDirect()">✕</button>
-    </div>
-    <div class="modal-body" id="modalBody">
-      <div class="loading">Yükleniyor...</div>
-    </div>
-  </div>
-</div>
-
-<script>
-// Menü Kontrolü
-function toggleMenu() {
-  document.getElementById('sideMenu').classList.toggle('open');
-  document.getElementById('menuOverlay').classList.toggle('open');
-}
-function switchView(viewId) {
-  document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-  document.getElementById('view-' + viewId).classList.add('active');
-  document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
-  document.getElementById('nav-' + viewId).classList.add('active');
-  const titles = {'istatistikler': 'Kişisel Spotify Verileri', 'duzenle': 'Playlist Yönetimi', 'profil': 'Hesap ve Ayarlar'};
-  document.getElementById('headerSubtitle').textContent = titles[viewId];
-  if(viewId === 'duzenle') fetchPlaylists();
-}
-
-// Araçlar
-function fmtSure(sn) {
-  if (!sn) return '—';
-  const s = parseInt(sn);
-  return s > 3600 ? `${Math.floor(s/3600)}s ${Math.floor((s%3600)/60)}dk` : `${Math.floor((s%3600)/60)}dk`;
-}
-function openModal() { document.getElementById('modalOverlay').classList.add('open'); }
-function closeModalDirect() { document.getElementById('modalOverlay').classList.remove('open'); }
-function closeModal(e) { if (e.target === document.getElementById('modalOverlay')) closeModalDirect(); }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalDirect(); });
-
-// Grafikler
-function renderHourChart(saatler) {
-  const max = Math.max(...saatler.map(s => s.count), 1);
-  return `<div class="hour-chart">${saatler.map(s => `<div class="hour-bar ${s.count > 0 ? 'active' : ''}" style="height:${Math.max((s.count/max)*100, 2)}%"><div class="hour-tip">${s.saat}: ${s.count} kez</div></div>`).join('')}</div>
-          <div class="hour-labels">${saatler.map((s,i) => `<div class="hour-label">${i % 6 === 0 ? s.saat.slice(0,2) : ''}</div>`).join('')}</div>`;
-}
-function renderVakitler(vakitler) {
-  return `<div class="vakit-row">${vakitler.map(v => `<div class="vakit-pill"><span class="vc">${v.count}</span><span>${v.vakit}</span></div>`).join('')}</div>`;
-}
-
-// Ana Veri Çekme
-async function init() {
-  const res = await fetch('/api/dashboard');
-  if(!res.ok) return;
-  const data = await res.json();
-  
-  document.getElementById('statTotal').textContent = data.toplam_kayit.toLocaleString('tr');
-  document.getElementById('statTracks').textContent = data.farkli_sarki.toLocaleString('tr');
-  document.getElementById('statArtists').textContent = data.farkli_sanatci.toLocaleString('tr');
-  document.getElementById('statHours').textContent = Math.floor(data.toplam_sure_sn/3600).toLocaleString('tr');
-  document.getElementById('syncInfo').innerHTML = `<span class="dot"></span> Aktif | Son sync: ${data.son_sync}`;
-  document.getElementById('profilKatilimTarihi').textContent = data.ilk_kayit_tarihi;
-  
-  document.getElementById('weekGrid').innerHTML = data.hafta.map(g => `<div class="week-day ${g.sure_sn>0?'has-data':''}"><div class="day-name">${g.gun.slice(0,3)}</div><div class="day-date">${g.tarih.slice(0,5)}</div><div class="day-sure ${g.sure_sn===0?'empty':''}">${fmtSure(g.sure_sn)}</div></div>`).join('');
-  
-  const rankTpl = (items) => items.map((item,i) => `<div class="rank-item"><div class="num">${String(i+1).padStart(2,'0')}</div><div class="info"><div class="name">${item.sarki||item.sanatci}</div>${item.sanatci && item.sarki ? `<div class="sub-info">${item.sanatci}</div>`:''}<div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(item.count/items[0].count*100)}%"></div></div></div><div class="count"><div><strong>${item.count}</strong>kez</div></div></div>`).join('');
-  document.getElementById('topTracks').innerHTML = rankTpl(data.top_sarkilar);
-  document.getElementById('topArtists').innerHTML = rankTpl(data.top_sanatcilar);
-  
-  if (data.genel_saatler) {
-    document.getElementById('globalHourChartContainer').innerHTML = renderHourChart(data.genel_saatler);
-    document.getElementById('globalVakitContainer').innerHTML = renderVakitler(data.genel_vakitler);
+  <script>
+  // Menü Kontrolü
+  function toggleMenu() {
+    document.getElementById('sideMenu').classList.toggle('open');
+    document.getElementById('menuOverlay').classList.toggle('open');
   }
-  
-  document.getElementById('monthTable').innerHTML = `<table class="month-table"><thead><tr><th>Ay</th><th>Aylık Toplam</th><th>Günlük Ortalama</th><th>Dinleme Sayısı</th></tr></thead><tbody>${[...data.aylar].reverse().map(a => `<tr><td>${a.ay}</td><td class="green">${a.toplam}</td><td>${a.ortalama}</td><td>${a.kayit_sayisi}</td></tr>`).join('')}</tbody></table>`;
-  document.getElementById('footerTime').textContent = new Date().toLocaleString('tr-TR');
-}
-init();
-
-// --- DÜZENLEME & API İŞLEMLERİ ---
-
-async function fetchPlaylists() {
-  const container = document.getElementById('myPlaylistsContainer');
-  const res = await fetch('/api/playlists');
-  const playlists = await res.json();
-  if(!playlists.length) {
-    container.innerHTML = '<div class="loading">Playlist bulunamadı.</div>';
-    return;
+  function switchView(viewId) {
+    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+    document.getElementById('view-' + viewId).classList.add('active');
+    document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('nav-' + viewId).classList.add('active');
+    const titles = {'istatistikler': 'Kişisel Spotify Verileri', 'duzenle': 'Playlist Yönetimi', 'profil': 'Hesap ve Ayarlar'};
+    document.getElementById('headerSubtitle').textContent = titles[viewId];
+    if(viewId === 'duzenle') fetchPlaylists();
   }
-  container.innerHTML = playlists.map((p, i) => `
-    <div class="rank-item" onclick="openPlaylistModal('${p.id}', '${p.name.replace(/'/g,"")}', ${p.count})" style="cursor:pointer; border-left: 2px solid var(--border);">
-      <div class="num">${String(i+1).padStart(2,'0')}</div>
-      <div class="info"><div class="name">${p.name}</div><div class="sub-info">${p.count} Şarkı</div></div>
-      <div class="count"><div><strong>Düzenle</strong></div><div class="days">tıkla ↗</div></div>
-    </div>`).join('');
-}
 
-function openPlaylistModal(id, name, count) {
-  document.getElementById('modalTitle').textContent = name;
-  document.getElementById('modalSub').textContent = `Sadece bu playlist için işlem yapılır (${count} Şarkı)`;
-  document.getElementById('modalBody').innerHTML = `
-    <div style="display:flex; flex-direction:column; gap:8px;">
-      <div class="modal-section-title" style="margin-top:0">Karıştırma İşlemleri</div>
-      <button class="action-btn" onclick="plAction('energy_shuffle', '${id}', this)">Enerjiye Göre Karıştır</button>
-      <button class="action-btn" onclick="plAction('random_shuffle', '${id}', this)">Rastgele Karıştır</button>
-      <div class="modal-section-title">Sanatçı İşlemleri</div>
-      <button class="action-btn" onclick="plAction('follow_artists', '${id}', this)">Bütün Sanatçıları Takip Et</button>
-      <button class="action-btn danger" onclick="plAction('unfollow_artists', '${id}', this)">Bütün Sanatçıları Takibi Bırak</button>
-      <div class="modal-section-title">Şarkı (Beğeni) İşlemleri</div>
-      <button class="action-btn" onclick="plAction('like_all', '${id}', this)">Bütün Şarkıları Beğen</button>
-      <button class="action-btn danger" onclick="plAction('unlike_all', '${id}', this)">Bütün Şarkıları Beğenme</button>
-      <button class="action-btn danger" onclick="plAction('remove_liked', '${id}', this)">Beğenilen Şarkıları Kaldır</button>
-      <button class="action-btn danger" onclick="plAction('remove_unliked', '${id}', this)">Beğenilmeyen Şarkıları Kaldır</button>
-    </div>`;
-  openModal();
-}
+  // Araçlar
+  function fmtSure(sn) {
+    if (!sn) return '—';
+    const s = parseInt(sn);
+    return s > 3600 ? `${Math.floor(s/3600)}s ${Math.floor((s%3600)/60)}dk` : `${Math.floor((s%3600)/60)}dk`;
+  }
+  function openModal() { document.getElementById('modalOverlay').classList.add('open'); }
+  function closeModalDirect() { document.getElementById('modalOverlay').classList.remove('open'); }
+  function closeModal(e) { if (e.target === document.getElementById('modalOverlay')) closeModalDirect(); }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalDirect(); });
 
-async function createPlaylist(type, btn) {
-  const oldText = btn.textContent;
-  btn.textContent = "İşlem yapılıyor, lütfen bekleyin...";
-  btn.disabled = true;
-  try {
-    const res = await fetch('/api/action/create_playlist', {
-      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({type})
-    });
+  // Grafikler
+  function renderHourChart(saatler) {
+    const max = Math.max(...saatler.map(s => s.count), 1);
+    return `<div class="hour-chart">${saatler.map(s => `<div class="hour-bar ${s.count > 0 ? 'active' : ''}" style="height:${Math.max((s.count/max)*100, 2)}%"><div class="hour-tip">${s.saat}: ${s.count} kez</div></div>`).join('')}</div>
+            <div class="hour-labels">${saatler.map((s,i) => `<div class="hour-label">${i % 6 === 0 ? s.saat.slice(0,2) : ''}</div>`).join('')}</div>`;
+  }
+  function renderVakitler(vakitler) {
+    return `<div class="vakit-row">${vakitler.map(v => `<div class="vakit-pill"><span class="vc">${v.count}</span><span>${v.vakit}</span></div>`).join('')}</div>`;
+  }
+
+  // Ana Veri Çekme
+  async function init() {
+    const res = await fetch('/api/dashboard');
+    if(!res.ok) {
+      if(res.status === 401) window.location.href = '/login';
+      return;
+    }
     const data = await res.json();
-    alert(data.message || data.error);
-    fetchPlaylists();
-  } catch(e) { alert("Hata oluştu."); }
-  btn.textContent = oldText;
-  btn.disabled = false;
-}
+    
+    document.getElementById('statTotal').textContent = data.toplam_kayit.toLocaleString('tr');
+    document.getElementById('statTracks').textContent = data.farkli_sarki.toLocaleString('tr');
+    document.getElementById('statArtists').textContent = data.farkli_sanatci.toLocaleString('tr');
+    document.getElementById('statHours').textContent = Math.floor(data.toplam_sure_sn/3600).toLocaleString('tr');
+    document.getElementById('syncInfo').innerHTML = `<span class="dot"></span> Aktif | Son sync: ${data.son_sync}`;
+    document.getElementById('profilKatilimTarihi').textContent = data.ilk_kayit_tarihi;
+    
+    document.getElementById('weekGrid').innerHTML = data.hafta.map(g => `<div class="week-day ${g.sure_sn>0?'has-data':''}"><div class="day-name">${g.gun.slice(0,3)}</div><div class="day-date">${g.tarih.slice(0,5)}</div><div class="day-sure ${g.sure_sn===0?'empty':''}">${fmtSure(g.sure_sn)}</div></div>`).join('');
+    
+    const rankTpl = (items) => items.map((item,i) => `<div class="rank-item"><div class="num">${String(i+1).padStart(2,'0')}</div><div class="info"><div class="name">${item.sarki||item.sanatci}</div>${item.sanatci && item.sarki ? `<div class="sub-info">${item.sanatci}</div>`:''}<div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(item.count/items[0].count*100)}%"></div></div></div><div class="count"><div><strong>${item.count}</strong>kez</div></div></div>`).join('');
+    document.getElementById('topTracks').innerHTML = rankTpl(data.top_sarkilar);
+    document.getElementById('topArtists').innerHTML = rankTpl(data.top_sanatcilar);
+    
+    if (data.genel_saatler) {
+      document.getElementById('globalHourChartContainer').innerHTML = renderHourChart(data.genel_saatler);
+      document.getElementById('globalVakitContainer').innerHTML = renderVakitler(data.genel_vakitler);
+    }
+    
+    document.getElementById('monthTable').innerHTML = `<table class="month-table"><thead><tr><th>Ay</th><th>Aylık Toplam</th><th>Günlük Ortalama</th><th>Dinleme Sayısı</th></tr></thead><tbody>${[...data.aylar].reverse().map(a => `<tr><td>${a.ay}</td><td class="green">${a.toplam}</td><td>${a.ortalama}</td><td>${a.kayit_sayisi}</td></tr>`).join('')}</tbody></table>`;
+    document.getElementById('footerTime').textContent = new Date().toLocaleString('tr-TR');
+  }
+  init();
 
-async function plAction(action, playlist_id, btn) {
-  const oldText = btn.textContent;
-  btn.textContent = "İşleniyor ⏳...";
-  btn.disabled = true;
-  try {
-    const res = await fetch('/api/action/playlist_edit', {
-      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action, playlist_id})
-    });
-    const data = await res.json();
-    alert(data.message || data.error);
-  } catch(e) { alert("Hata oluştu."); }
-  btn.textContent = oldText;
-  btn.disabled = false;
-  closeModalDirect();
-}
+  // --- DÜZENLEME & API İŞLEMLERİ ---
 
-// İndirme Düzeltmesi (Şeffaflık/Solukluk Sorunu Giderildi)
-async function downloadPNG() {
-  const btn = document.getElementById('dlBtn');
-  btn.textContent = '⏳';
-  btn.disabled = true;
-  
-  const modalOverlay = document.getElementById('modalOverlay');
-  const menuOverlay = document.getElementById('menuOverlay');
-  const oldModalDisplay = modalOverlay.style.display;
-  const oldMenuDisplay = menuOverlay.style.display;
-  
-  modalOverlay.style.display = 'none';
-  menuOverlay.style.display = 'none';
+  async function fetchPlaylists() {
+    const container = document.getElementById('myPlaylistsContainer');
+    const res = await fetch('/api/playlists');
+    const playlists = await res.json();
+    if(!playlists.length) {
+      container.innerHTML = '<div class="loading">Playlist bulunamadı.</div>';
+      return;
+    }
+    container.innerHTML = playlists.map((p, i) => `
+      <div class="rank-item" onclick="openPlaylistModal('${p.id}', '${p.name.replace(/'/g,"")}', ${p.count})" style="cursor:pointer; border-left: 2px solid var(--border);">
+        <div class="num">${String(i+1).padStart(2,'0')}</div>
+        <div class="info"><div class="name">${p.name}</div><div class="sub-info">${p.count} Şarkı</div></div>
+        <div class="count"><div><strong>Düzenle</strong></div><div class="days">tıkla ↗</div></div>
+      </div>`).join('');
+  }
 
-  try {
-    const canvas = await html2canvas(document.querySelector('.wrapper'), {
-      backgroundColor: '#0a0a0a',
-      scale: 3, // Çözünürlük ve netlik artırıldı
-      useCORS: true,
-      logging: false,
-    });
-    const link = document.createElement('a');
-    link.download = 'muzik-istatistik-' + new Date().toISOString().slice(0,10) + '.png';
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  } catch(e) {
-    alert('İndirme hatası: ' + e.message);
-  } finally {
-    modalOverlay.style.display = oldModalDisplay;
-    menuOverlay.style.display = oldMenuDisplay;
-    btn.innerHTML = '↓';
+  function openPlaylistModal(id, name, count) {
+    document.getElementById('modalTitle').textContent = name;
+    document.getElementById('modalSub').textContent = `Sadece bu playlist için işlem yapılır (${count} Şarkı)`;
+    document.getElementById('modalBody').innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div class="modal-section-title" style="margin-top:0">Karıştırma İşlemleri</div>
+        <button class="action-btn" onclick="plAction('energy_shuffle', '${id}', this)">Enerjiye Göre Karıştır</button>
+        <button class="action-btn" onclick="plAction('random_shuffle', '${id}', this)">Rastgele Karıştır</button>
+        <div class="modal-section-title">Sanatçı İşlemleri</div>
+        <button class="action-btn" onclick="plAction('follow_artists', '${id}', this)">Bütün Sanatçıları Takip Et</button>
+        <button class="action-btn danger" onclick="plAction('unfollow_artists', '${id}', this)">Bütün Sanatçıları Takibi Bırak</button>
+        <div class="modal-section-title">Şarkı (Beğeni) İşlemleri</div>
+        <button class="action-btn" onclick="plAction('like_all', '${id}', this)">Bütün Şarkıları Beğen</button>
+        <button class="action-btn danger" onclick="plAction('unlike_all', '${id}', this)">Bütün Şarkıları Beğenme</button>
+        <button class="action-btn danger" onclick="plAction('remove_liked', '${id}', this)">Beğenilen Şarkıları Kaldır</button>
+        <button class="action-btn danger" onclick="plAction('remove_unliked', '${id}', this)">Beğenilmeyen Şarkıları Kaldır</button>
+      </div>`;
+    openModal();
+  }
+
+  async function createPlaylist(type, btn) {
+    const oldText = btn.textContent;
+    btn.textContent = "İşlem yapılıyor, lütfen bekleyin...";
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/action/create_playlist', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({type})
+      });
+      const data = await res.json();
+      alert(data.message || data.error);
+      fetchPlaylists();
+    } catch(e) { alert("Hata oluştu."); }
+    btn.textContent = oldText;
     btn.disabled = false;
   }
-}
-</script>
+
+  async function plAction(action, playlist_id, btn) {
+    const oldText = btn.textContent;
+    btn.textContent = "İşleniyor ⏳...";
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/action/playlist_edit', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action, playlist_id})
+      });
+      const data = await res.json();
+      alert(data.message || data.error);
+    } catch(e) { alert("Hata oluştu."); }
+    btn.textContent = oldText;
+    btn.disabled = false;
+    closeModalDirect();
+  }
+
+  // İndirme
+  async function downloadPNG() {
+    const btn = document.getElementById('dlBtn');
+    btn.textContent = '⏳';
+    btn.disabled = true;
+    
+    const modalOverlay = document.getElementById('modalOverlay');
+    const menuOverlay = document.getElementById('menuOverlay');
+    const oldModalDisplay = modalOverlay.style.display;
+    const oldMenuDisplay = menuOverlay.style.display;
+    
+    modalOverlay.style.display = 'none';
+    menuOverlay.style.display = 'none';
+
+    try {
+      const canvas = await html2canvas(document.querySelector('.wrapper'), {
+        backgroundColor: '#0a0a0a',
+        scale: 3,
+        useCORS: true,
+        logging: false,
+      });
+      const link = document.createElement('a');
+      link.download = 'muzik-istatistik-' + new Date().toISOString().slice(0,10) + '.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch(e) {
+      alert('İndirme hatası: ' + e.message);
+    } finally {
+      modalOverlay.style.display = oldModalDisplay;
+      menuOverlay.style.display = oldMenuDisplay;
+      btn.innerHTML = '↓';
+      btn.disabled = false;
+    }
+  }
+  </script>
+{% endif %}
 </body>
 </html>
 
