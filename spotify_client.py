@@ -21,12 +21,8 @@ class SpotifyClient:
         self._user_id = None
 
     def get_auth_url(self, redirect_uri):
-        scopes = (
-            "playlist-read-private playlist-read-collaborative "
-            "playlist-modify-public playlist-modify-private "
-            "user-library-read user-library-modify "
-            "user-follow-modify user-read-recently-played"
-        )
+        # Sadece Dinleme Geçmişi yetkisi istiyoruz (Düzenleme yetkileri kaldırıldı)
+        scopes = "user-read-recently-played"
         encoded_scopes = urllib.parse.quote(scopes)
         encoded_redirect = urllib.parse.quote(redirect_uri)
         
@@ -85,7 +81,7 @@ class SpotifyClient:
             return access_token
 
         if not r_token:
-            raise Exception("Geçerli bir oturum bulunamadı. Lütfen 'Profilin' sekmesinden çıkış yapıp tekrar Spotify ile giriş yapın.")
+            raise Exception("Geçerli bir oturum bulunamadı. Lütfen giriş yapın.")
 
         credentials = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
         resp = requests.post(TOKEN_URL, headers={
@@ -125,42 +121,10 @@ class SpotifyClient:
         url = f"{API_BASE}{endpoint}" if not endpoint.startswith("http") else endpoint
         
         resp = requests.request(method, url, headers=headers, **kwargs)
-        
-        if resp.status_code >= 400:
-            err_json = {}
-            try:
-                err_json = resp.json()
-            except:
-                pass
-            msg = err_json.get("error", {}).get("message", resp.text)
-            logger.error(f"Spotify API Error ({resp.status_code}) on {url}: {msg}")
-            
-            # --- ARTIK GERÇEK HATAYI GÖRECEĞİZ ---
-            if resp.status_code == 403:
-                if "audio-features" in url:
-                    raise Exception("Spotify Kasım 2024'te 'Enerji ve Ses Analizi' özelliğini üçüncü parti uygulamalara kapattı! Bu buton Spotify kısıtlaması nedeniyle çalışmamaktadır.")
-                raise Exception(f"Spotify Engeli (403): {msg}")
-                
-            raise Exception(f"API Hatası ({resp.status_code}): {msg}")
-            
+        resp.raise_for_status()
         if resp.text:
             return resp.json()
         return {}
-
-    def get_me(self):
-        in_req = has_request_context()
-        if in_req and "user_id" in session:
-            return session["user_id"]
-            
-        data = self._req("GET", "/me")
-        user_id = data["id"]
-        
-        if in_req:
-            session["user_id"] = user_id
-        else:
-            self._user_id = user_id
-            
-        return user_id
 
     def get_recently_played(self, limit=50):
         data = self._req("GET", "/me/player/recently-played", params={"limit": limit})
@@ -177,92 +141,3 @@ class SpotifyClient:
                 "duration_sec": round(track["duration_ms"] / 1000),
             })
         return tracks
-
-    # --- PLAYLIST & EDIT İŞLEMLERİ ---
-    
-    def get_my_playlists(self):
-        data = self._req("GET", "/me/playlists", params={"limit": 50})
-        user_id = self.get_me()
-        items = []
-        
-        for p in data.get("items", []):
-            if not p:
-                continue
-            if p.get("owner", {}).get("id") != user_id:
-                continue
-                
-            tracks_info = p.get("tracks")
-            count = 0
-            if isinstance(tracks_info, dict):
-                count = tracks_info.get("total", 0)
-                
-            items.append({
-                "id": p.get("id"),
-                "name": p.get("name", "İsimsiz Playlist"),
-                "count": count
-            })
-        return items
-
-    def create_playlist(self, name, description="Müzik İstatistiklerin tarafından oluşturuldu."):
-        user_id = self.get_me()
-        payload = {"name": name, "description": description, "public": False}
-        return self._req("POST", f"/users/{user_id}/playlists", json=payload)
-
-    def add_to_playlist(self, playlist_id, track_ids):
-        uris = [f"spotify:track:{tid}" for tid in track_ids if tid]
-        for i in range(0, len(uris), 100):
-            chunk = uris[i:i+100]
-            self._req("POST", f"/playlists/{playlist_id}/tracks", json={"uris": chunk})
-
-    def get_playlist_tracks(self, playlist_id):
-        tracks = []
-        url = f"/playlists/{playlist_id}/tracks?limit=100"
-        while url:
-            data = self._req("GET", url)
-            for item in data.get("items", []):
-                if item.get("track") and item["track"].get("id"):
-                    tracks.append(item["track"])
-            url = data.get("next")
-        return tracks
-
-    def replace_playlist_tracks(self, playlist_id, track_ids):
-        uris = [f"spotify:track:{tid}" for tid in track_ids if tid]
-        if not uris:
-            return
-        self._req("PUT", f"/playlists/{playlist_id}/tracks", json={"uris": uris[:100]})
-        if len(uris) > 100:
-            for i in range(100, len(uris), 100):
-                self._req("POST", f"/playlists/{playlist_id}/tracks", json={"uris": uris[i:i+100]})
-
-    def get_audio_features(self, track_ids):
-        features = {}
-        for i in range(0, len(track_ids), 100):
-            chunk = track_ids[i:i+100]
-            data = self._req("GET", "/audio-features", params={"ids": ",".join(chunk)})
-            for feat in data.get("audio_features", []):
-                if feat:
-                    features[feat["id"]] = feat
-        return features
-
-    # --- TOPLU TAKİP / BEĞENİ İŞLEMLERİ ---
-
-    def modify_following(self, action, artist_ids):
-        artist_ids = list(set(artist_ids))
-        for i in range(0, len(artist_ids), 50):
-            chunk = artist_ids[i:i+50]
-            self._req(action, "/me/following", params={"type": "artist", "ids": ",".join(chunk)})
-
-    def modify_saved_tracks(self, action, track_ids):
-        track_ids = list(set(track_ids))
-        for i in range(0, len(track_ids), 50):
-            chunk = track_ids[i:i+50]
-            self._req(action, "/me/tracks", json={"ids": chunk})
-
-    def check_saved_tracks(self, track_ids):
-        results = {}
-        for i in range(0, len(track_ids), 50):
-            chunk = track_ids[i:i+50]
-            data = self._req("GET", "/me/tracks/contains", params={"ids": ",".join(chunk)})
-            for tid, is_saved in zip(chunk, data):
-                results[tid] = is_saved
-        return results

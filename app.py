@@ -1,8 +1,6 @@
 import os
-import requests
 import io
 import csv
-import random
 import logging
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
@@ -72,15 +70,10 @@ def sync_job():
     except Exception as e:
         logger.error(f"Sync hatası: {e}")
 
-# ----- YARDIMCI FONKSİYON (400 HATASI ÇÖZÜMÜ) -----
 def get_redirect_uri():
-    # request.url_root Vercel'de "https://site.vercel.app/" döner. Sonunda slash vardır.
-    # rstrip('/') ile o slash'i siliyoruz. Böylece //callback olmasını kesin engelliyoruz.
     base_url = request.url_root.rstrip('/')
-    
     if "localhost" not in base_url and "127.0.0.1" not in base_url:
         base_url = base_url.replace("http://", "https://")
-        
     return f"{base_url}/callback"
 
 # ----- AUTH ROTALARI -----
@@ -93,30 +86,25 @@ def login():
 
 @app.route("/callback")
 def callback():
-    # Kullanıcı giriş ekranında "İptal" tuşuna basarsa çökmemesi için kontrol
     error = request.args.get("error")
     if error:
-        logger.error(f"Spotify Yetkilendirme Reddedildi: {error}")
         return redirect("/")
-
     code = request.args.get("code")
     if code:
         try:
             redirect_uri = get_redirect_uri()
             spotify.exchange_code(code, redirect_uri)
             session["logged_in"] = True
-            logger.info("✅ Kullanıcı başarıyla giriş yaptı.")
         except Exception as e:
-            logger.error(f"Login (Callback) Hatası: {e}")
+            logger.error(f"Login Hatası: {e}")
     return redirect("/")
 
 @app.route("/logout")
 def logout():
     session.clear()
-    logger.info("Kullanıcı çıkış yaptı.")
     return redirect("/")
 
-# ----- TEMEL ROTALAR -----
+# ----- GÖRÜNÜM & TEMEL İSTATİSTİKLER -----
 
 @app.route("/")
 @app.route("/dashboard")
@@ -142,7 +130,6 @@ def export_csv():
 @app.route("/api/dashboard")
 def api_dashboard():
     if not session.get("logged_in"): return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         headers, rows = load_tumveri()
         if not rows: return jsonify({"error": "Veri yok"})
@@ -229,153 +216,194 @@ def api_dashboard():
         logger.error(f"Dashboard hatası: {e}")
         return jsonify({"error": str(e)}), 500
 
+# ----- DETAY (MODAL) ROTALARI EKLENDİ -----
 
-# ----- DEBUG -----
-
-@app.route("/api/debug/token")
-def debug_token():
-    """Mevcut token scope kontrolü"""
-    if not session.get("logged_in"):
-        return jsonify({"error": "Giris yapilmamis"}), 401
+@app.route("/api/sarki/<path:sarki_adi>")
+def api_sarki_detay(sarki_adi):
+    if not session.get("logged_in"): return jsonify({"error": "Unauthorized"}), 401
     try:
-        token = spotify._get_access_token()
-        headers = {"Authorization": f"Bearer {token}"}
-        scope_tests = {}
-        tests = {
-            "playlist-read-private": "https://api.spotify.com/v1/me/playlists?limit=1",
-            "user-library-read": "https://api.spotify.com/v1/me/tracks?limit=1",
-            "user-read-recently-played": "https://api.spotify.com/v1/me/player/recently-played?limit=1",
-        }
-        for scope, url in tests.items():
-            r = requests.get(url, headers=headers)
-            scope_tests[scope] = "OK" if r.status_code == 200 else f"FAIL ({r.status_code})"
+        if not _cached_rows: load_tumveri()
+        headers, rows = _cached_headers, _cached_rows
+        if not rows: return jsonify({"error": "Veri yok"})
 
-        me = requests.get("https://api.spotify.com/v1/me", headers=headers).json()
-        uid = me.get("id", "")
-        r2 = requests.post(
-            f"https://api.spotify.com/v1/users/{uid}/playlists",
-            headers={**headers, "Content-Type": "application/json"},
-            json={"name": "__scope_test_silinecek__", "public": False}
-        )
-        if r2.status_code in (200, 201):
-            pl_id = r2.json().get("id")
-            requests.delete(f"https://api.spotify.com/v1/playlists/{pl_id}/followers", headers=headers)
-            scope_tests["playlist-modify-private"] = "OK"
-        else:
-            scope_tests["playlist-modify-private"] = f"FAIL ({r2.status_code})"
+        idx_sarki = headers.index("Şarkı Adı")
+        idx_sanatci = headers.index("Sanatçı")
+        idx_sure = headers.index("Süre (sn)")
+        idx_iso = headers.index("_played_at_iso")
+
+        saat_counts = defaultdict(int)
+        vakit_counts = defaultdict(int)
+        toplam_count, toplam_sure = 0, 0
+        sanatci, ilk_dinlenme_iso = "", None 
+
+        for row in rows:
+            if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_iso): continue
+            if row[idx_sarki].strip() != sarki_adi: continue
+            toplam_count += 1
+            sanatci = row[idx_sanatci].strip()
+            try: toplam_sure += int(row[idx_sure])
+            except: pass
+
+            iso = row[idx_iso].strip()
+            if iso and iso != "—":
+                if ilk_dinlenme_iso is None or iso < ilk_dinlenme_iso: ilk_dinlenme_iso = iso
+                try:
+                    dt = datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M")
+                    saat_counts[dt.hour] += 1
+                    vakit_counts[get_vakit(dt.hour)] += 1
+                except: pass
+
+        ilk_tarih_str = "Bilinmiyor"
+        if ilk_dinlenme_iso:
+            try: ilk_tarih_str = datetime.strptime(ilk_dinlenme_iso[:16], "%Y-%m-%dT%H:%M").strftime("%d.%m.%Y")
+            except: pass
 
         return jsonify({
-            "user": me.get("display_name"),
-            "token_source": "session_refresh" if session.get("refresh_token") else "env_var",
-            "scope_tests": scope_tests
+            "sarki": sarki_adi, "sanatci": sanatci, "toplam_count": toplam_count,
+            "toplam_sure": fmt_sure(toplam_sure), "ilk_dinlenme": ilk_tarih_str, 
+            "saatler": [{"saat": f"{h:02d}:00", "count": saat_counts.get(h, 0)} for h in range(24)],
+            "vakitler": [{"vakit": k, "count": v} for k, v in sorted(vakit_counts.items(), key=lambda x: -x[1])],
         })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception as e: return jsonify({"error": str(e)}), 500
 
-# ----- DÜZENLE & SPOTIFY ACTIONS -----
-
-@app.route("/api/playlists")
-def get_playlists():
+@app.route("/api/sanatci/<path:sanatci_adi>")
+def api_sanatci_detay(sanatci_adi):
     if not session.get("logged_in"): return jsonify({"error": "Unauthorized"}), 401
     try:
-        pls = spotify.get_my_playlists()
-        return jsonify(pls)
-    except Exception as e:
-        logger.error(f"Playlist çekme hatası: {e}")
-        return jsonify({"error": str(e)}), 500
+        if not _cached_rows: load_tumveri()
+        headers, rows = _cached_headers, _cached_rows
+        if not rows: return jsonify({"error": "Veri yok"})
 
-@app.route("/api/action/create_playlist", methods=["POST"])
-def create_playlist_action():
+        idx_sarki, idx_sanatci, idx_sure, idx_iso = headers.index("Şarkı Adı"), headers.index("Sanatçı"), headers.index("Süre (sn)"), headers.index("_played_at_iso")
+        sarki_counts = defaultdict(lambda: {"count": 0, "sure": 0})
+        saat_counts, vakit_counts = defaultdict(int), defaultdict(int)
+        toplam_count, toplam_sure = 0, 0
+
+        for row in rows:
+            if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_iso): continue
+            if row[idx_sanatci].strip() != sanatci_adi: continue
+            toplam_count += 1
+            sarki = row[idx_sarki].strip()
+            try:
+                sure = int(row[idx_sure])
+                toplam_sure += sure
+            except: sure = 0
+
+            if sarki:
+                sarki_counts[sarki]["count"] += 1
+                sarki_counts[sarki]["sure"] += sure
+
+            iso = row[idx_iso].strip()
+            if iso and iso != "—":
+                try:
+                    dt = datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M")
+                    saat_counts[dt.hour] += 1
+                    vakit_counts[get_vakit(dt.hour)] += 1
+                except: pass
+
+        top_sarkilar = sorted([{"sarki": k, "count": v["count"], "sure": fmt_sure(v["sure"])} for k, v in sarki_counts.items()], key=lambda x: -x["count"])[:10]
+        return jsonify({
+            "sanatci": sanatci_adi, "toplam_count": toplam_count, "toplam_sure": fmt_sure(toplam_sure),
+            "top_sarkilar": top_sarkilar,
+            "saatler": [{"saat": f"{h:02d}:00", "count": saat_counts.get(h, 0)} for h in range(24)],
+            "vakitler": [{"vakit": k, "count": v} for k, v in sorted(vakit_counts.items(), key=lambda x: -x[1])],
+        })
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/api/tum-sanatcilar')
+def api_tum_sanatcilar():
     if not session.get("logged_in"): return jsonify({"error": "Unauthorized"}), 401
-    req = request.json
-    ptype = req.get("type")
-    
-    headers, rows = load_tumveri()
-    if not rows: return jsonify({"error": "Veri yok"}), 400
-    idx_id = headers.index("Şarkı ID")
-    
-    track_counts = defaultdict(int)
-    for r in rows:
-        if len(r) > idx_id and r[idx_id].strip() != "—":
-            track_counts[r[idx_id].strip()] += 1
-            
-    sorted_ids = [k for k, v in sorted(track_counts.items(), key=lambda x: -x[1])]
-
     try:
-        if ptype == "top_tracks":
-            pl = spotify.create_playlist("Top 50 - En Çok Dinlenenler")
-            spotify.add_to_playlist(pl["id"], sorted_ids[:50])
-            return jsonify({"message": "Playlist başarıyla oluşturuldu!"})
-            
-        elif ptype == "energy":
-            top_100 = sorted_ids[:100]
-            features = spotify.get_audio_features(top_100)
-            energy_sorted = sorted([tid for tid in top_100 if tid in features], key=lambda x: features[x]["energy"], reverse=True)
-            pl = spotify.create_playlist("Yüksek Enerji (Kişisel)")
-            spotify.add_to_playlist(pl["id"], energy_sorted)
-            return jsonify({"message": "Enerji playlisti başarıyla oluşturuldu!"})
-            
-        return jsonify({"error": "Bilinmeyen tip"}), 400
-    except Exception as e:
-        logger.error(f"Playlist oluşturma hatası: {e}")
-        return jsonify({"error": str(e)}), 500
+        if not _cached_rows: load_tumveri()
+        headers, rows = _cached_headers, _cached_rows
+        if not rows: return jsonify({"error": "Veri yok"})
 
-@app.route("/api/action/playlist_edit", methods=["POST"])
-def edit_playlist_action():
+        idx_sanatci, idx_sure = headers.index("Sanatçı"), headers.index("Süre (sn)")
+        artist_counts = defaultdict(lambda: {"count": 0, "sure": 0})
+        for row in rows:
+            if len(row) <= max(idx_sanatci, idx_sure): continue
+            sanatci = row[idx_sanatci].strip()
+            if not sanatci: continue
+            artist_counts[sanatci]["count"] += 1
+            try: artist_counts[sanatci]["sure"] += int(row[idx_sure])
+            except: pass
+
+        sanatcilar = sorted([{"sanatci": k, "count": v["count"], "sure": fmt_sure(v["sure"])} for k, v in artist_counts.items()], key=lambda x: -x["count"])
+        return jsonify({"sanatcilar": sanatcilar, "toplam": len(sanatcilar)})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/api/tum-sarkilar')
+def api_tum_sarkilar():
     if not session.get("logged_in"): return jsonify({"error": "Unauthorized"}), 401
-    req = request.json
-    action = req.get("action")
-    pl_id = req.get("playlist_id")
-    
     try:
-        tracks = spotify.get_playlist_tracks(pl_id)
-        t_ids = [t["id"] for t in tracks if t and t.get("id")]
+        if not _cached_rows: load_tumveri()
+        headers, rows = _cached_headers, _cached_rows
+        if not rows: return jsonify({"error": "Veri yok"})
+
+        idx_sarki, idx_sanatci, idx_sure = headers.index('Şarkı Adı'), headers.index('Sanatçı'), headers.index('Süre (sn)')
+        track_counts = defaultdict(lambda: {"count": 0, "sure": 0, "sanatci": ""})
+        for row in rows:
+            if len(row) <= max(idx_sarki, idx_sanatci, idx_sure): continue
+            sarki = row[idx_sarki].strip()
+            if not sarki: continue
+            track_counts[sarki]["count"] += 1
+            track_counts[sarki]["sanatci"] = row[idx_sanatci].strip()
+            try: track_counts[sarki]["sure"] += int(row[idx_sure])
+            except: pass
+
+        sarkilar = sorted([{"sarki": k, "sanatci": v["sanatci"], "count": v["count"], "sure": fmt_sure(v["sure"])} for k, v in track_counts.items()], key=lambda x: -x["count"])
+        return jsonify({"sarkilar": sarkilar, "toplam": len(sarkilar)})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route("/api/ay/<ay_label>")
+def api_ay_detay(ay_label):
+    if not session.get("logged_in"): return jsonify({"error": "Unauthorized"}), 401
+    try:
+        if not _cached_rows: load_tumveri()
+        headers, rows = _cached_headers, _cached_rows
+        if not rows: return jsonify({"error": "Veri yok"})
+
+        idx_sarki, idx_sanatci, idx_sure, idx_tarih = headers.index("Şarkı Adı"), headers.index("Sanatçı"), headers.index("Süre (sn)"), headers.index("Dinlenme Tarihi")
+        TR_AYLAR_REV = {v: str(k).zfill(2) for k, v in TR_AYLAR.items()}
+        try: ay_tr, yil = ay_label.split(" ")
+        except: return jsonify({"error": "Geçersiz ay formatı"})
+        ay_no = TR_AYLAR_REV.get(ay_tr)
         
-        if action == "random_shuffle":
-            random.shuffle(t_ids)
-            spotify.replace_playlist_tracks(pl_id, t_ids)
-            return jsonify({"message": "Playlist rastgele karıştırıldı!"})
-            
-        elif action == "energy_shuffle":
-            features = spotify.get_audio_features(t_ids)
-            energy_sorted = sorted([tid for tid in t_ids if tid in features], key=lambda x: features[x]["energy"], reverse=True)
-            spotify.replace_playlist_tracks(pl_id, energy_sorted)
-            return jsonify({"message": "Playlist enerjiye göre sıralandı!"})
-            
-        elif action == "follow_artists":
-            artist_ids = [a["id"] for t in tracks for a in t.get("artists", []) if a.get("id")]
-            spotify.modify_following("PUT", artist_ids)
-            return jsonify({"message": f"{len(set(artist_ids))} sanatçı takip edildi!"})
-            
-        elif action == "unfollow_artists":
-            artist_ids = [a["id"] for t in tracks for a in t.get("artists", []) if a.get("id")]
-            spotify.modify_following("DELETE", artist_ids)
-            return jsonify({"message": "Sanatçılar takipten çıkıldı!"})
-            
-        elif action == "like_all":
-            spotify.modify_saved_tracks("PUT", t_ids)
-            return jsonify({"message": "Tüm şarkılar beğenildi!"})
-            
-        elif action == "unlike_all":
-            spotify.modify_saved_tracks("DELETE", t_ids)
-            return jsonify({"message": "Tüm beğeniler kaldırıldı!"})
-            
-        elif action == "remove_liked":
-            saved_status = spotify.check_saved_tracks(t_ids)
-            keep_ids = [tid for tid in t_ids if not saved_status.get(tid, False)]
-            spotify.replace_playlist_tracks(pl_id, keep_ids)
-            return jsonify({"message": "Beğenilen şarkılar playlistten çıkarıldı!"})
-            
-        elif action == "remove_unliked":
-            saved_status = spotify.check_saved_tracks(t_ids)
-            keep_ids = [tid for tid in t_ids if saved_status.get(tid, False)]
-            spotify.replace_playlist_tracks(pl_id, keep_ids)
-            return jsonify({"message": "Beğenilmeyen şarkılar playlistten çıkarıldı!"})
+        track_counts = defaultdict(lambda: {"count": 0, "sure": 0, "sanatci": ""})
+        artist_counts = defaultdict(lambda: {"count": 0, "sure": 0})
+        toplam_kayit, toplam_sure = 0, 0
 
-        return jsonify({"error": "Geçersiz işlem"}), 400
-    except Exception as e:
-        logger.error(f"Playlist düzenleme hatası: {e}")
-        return jsonify({"error": str(e)}), 500
+        for row in rows:
+            if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_tarih): continue
+            tarih = row[idx_tarih].strip()
+            if not tarih: continue
+            try:
+                _, ay, y = tarih.split(".")
+                if y != yil or ay != ay_no: continue
+            except: continue
+
+            sarki, sanatci = row[idx_sarki].strip(), row[idx_sanatci].strip()
+            try: sure = int(row[idx_sure])
+            except: sure = 0
+
+            toplam_kayit += 1
+            toplam_sure += sure
+            if sarki:
+                track_counts[sarki]["count"] += 1
+                track_counts[sarki]["sure"] += sure
+                track_counts[sarki]["sanatci"] = sanatci
+            if sanatci:
+                artist_counts[sanatci]["count"] += 1
+                artist_counts[sanatci]["sure"] += sure
+
+        top_sarkilar = sorted([{"sarki": k, "sanatci": v["sanatci"], "count": v["count"], "sure": fmt_sure(v["sure"])} for k, v in track_counts.items()], key=lambda x: -x["count"])[:10]
+        top_sanatcilar = sorted([{"sanatci": k, "count": v["count"], "sure": fmt_sure(v["sure"])} for k, v in artist_counts.items()], key=lambda x: -x["count"])[:10]
+
+        return jsonify({
+            "ay": ay_label, "toplam_kayit": toplam_kayit, "toplam_sure": fmt_sure(toplam_sure),
+            "top_sarkilar": top_sarkilar, "top_sanatcilar": top_sanatcilar,
+        })
+    except Exception as e: return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     scheduler = BackgroundScheduler()
