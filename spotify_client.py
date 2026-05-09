@@ -21,15 +21,13 @@ class SpotifyClient:
         self._user_id = None
 
     def get_auth_url(self, redirect_uri):
+        # Yetkiler (scopes) URL'ye + ile değil zorunlu olarak %20 ile eklenecek
         scopes = "playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private user-library-modify user-follow-modify user-read-recently-played"
-        params = {
-            "client_id": self.client_id,
-            "response_type": "code",
-            "redirect_uri": redirect_uri,
-            "scope": scopes
-        }
-        url_params = urllib.parse.urlencode(params)
-        return f"https://accounts.spotify.com/authorize?{url_params}"
+        encoded_scopes = urllib.parse.quote(scopes)
+        encoded_redirect = urllib.parse.quote(redirect_uri)
+        
+        # URL'yi bizzat manuel oluşturarak hata payını sıfıra indiriyoruz
+        return f"https://accounts.spotify.com/authorize?client_id={self.client_id}&response_type=code&redirect_uri={encoded_redirect}&scope={encoded_scopes}&show_dialog=true"
 
     def exchange_code(self, code, redirect_uri):
         credentials = base64.b64encode(
@@ -54,7 +52,6 @@ class SpotifyClient:
         new_expires_at = time.time() + data["expires_in"]
         new_refresh_token = data.get("refresh_token")
 
-        # Vercel Serverless durumu için verileri tarayıcı çerezine (session) kaydediyoruz
         if has_request_context():
             session["access_token"] = new_access_token
             session["token_expires_at"] = new_expires_at
@@ -66,32 +63,32 @@ class SpotifyClient:
         if new_refresh_token:
             self.refresh_token = new_refresh_token
             logger.info("✅ YENİ REFRESH TOKEN ALINDI VE SESSION'A KAYDEDİLDİ.")
+            # Render ortamı için ekrana basıyoruz
+            logger.info(f"!!! YENİ REFRESH TOKEN (RENDER'A KAYDEDEBİLİRSİN): {new_refresh_token} !!!")
+            
         return True
 
     def _get_access_token(self):
-        # 1. Ortam kontrolü: Vercel üzerinde Flask isteği içinde miyiz?
         in_req = has_request_context()
         
-        # 2. Tokenları çerezden (session) al. Vercel unutsun, çerez unutmaz.
+        # Kullanıcı istekleriyle arka plan işlemlerini KESİN OLARAK ayırdık
         if in_req:
-            access_token = session.get("access_token", self._access_token)
-            expires_at = session.get("token_expires_at", self._token_expires_at)
+            # Sadece Session token'ları kullanılacak
+            access_token = session.get("access_token")
+            expires_at = session.get("token_expires_at", 0)
             r_token = session.get("refresh_token") or self.refresh_token or os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
         else:
+            # Arka plan işlemleri (sync)
             access_token = self._access_token
             expires_at = self._token_expires_at
             r_token = self.refresh_token or os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
 
-        # 3. Access token süresi geçerli mi?
         if access_token and time.time() < expires_at - 60:
             return access_token
 
-        # 4. Yenilemek için Refresh Token zorunlu
         if not r_token:
-            logger.error("Token yenilemek için Refresh token bulunamadı.")
-            raise Exception("Geçerli bir oturum bulunamadı, lütfen çıkış yapıp tekrar Spotify ile giriş yapın.")
+            raise Exception("Geçerli bir oturum bulunamadı. Lütfen 'Profilin' sekmesinden çıkış yapıp tekrar Spotify ile giriş yapın.")
 
-        # 5. Spotify API'den yeni yetki isteği
         credentials = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
         resp = requests.post(TOKEN_URL, headers={
             "Authorization": f"Basic {credentials}",
@@ -103,7 +100,6 @@ class SpotifyClient:
         
         if resp.status_code != 200:
             logger.error(f"Token Yenileme (Refresh) Hatası: {resp.text}")
-            # Eğer token tamamen patlamışsa kullanıcıyı sistemden çıkartıyoruz ki tekrar giriş yapsın
             if in_req and "invalid_grant" in resp.text:
                 session.clear()
         resp.raise_for_status()
@@ -113,7 +109,6 @@ class SpotifyClient:
         new_expires_at = time.time() + data["expires_in"]
         new_refresh_token = data.get("refresh_token", r_token)
 
-        # 6. Yeni verileri tekrar hafızaya al
         if in_req:
             session["access_token"] = new_access_token
             session["token_expires_at"] = new_expires_at
@@ -123,7 +118,6 @@ class SpotifyClient:
         self._token_expires_at = new_expires_at
         self.refresh_token = new_refresh_token
 
-        logger.info("🔑 Spotify token arka planda yenilendi ve Vercel engeli aşıldı.")
         return new_access_token
 
     def _req(self, method, endpoint, **kwargs):
@@ -134,7 +128,10 @@ class SpotifyClient:
         
         resp = requests.request(method, url, headers=headers, **kwargs)
         
-        if resp.status_code >= 400:
+        if resp.status_code == 403:
+            logger.error(f"403 Forbidden on {url}: {resp.text}")
+            raise Exception("Spotify yetkileriniz eksik kalmış! Lütfen Profil menüsünden 'Sistemden Çıkış Yap'a basıp tekrar giriş yaparak yeni izinleri onaylayın.")
+        elif resp.status_code >= 400:
             logger.error(f"Spotify API Error ({resp.status_code}) on {url}: {resp.text}")
         
         resp.raise_for_status()
@@ -143,10 +140,20 @@ class SpotifyClient:
         return {}
 
     def get_me(self):
-        if not self._user_id:
-            data = self._req("GET", "/me")
-            self._user_id = data["id"]
-        return self._user_id
+        # Kullanıcı ID'sini önbellekte hatalı saklama bug'ı giderildi
+        in_req = has_request_context()
+        if in_req and "user_id" in session:
+            return session["user_id"]
+            
+        data = self._req("GET", "/me")
+        user_id = data["id"]
+        
+        if in_req:
+            session["user_id"] = user_id
+        else:
+            self._user_id = user_id
+            
+        return user_id
 
     def get_recently_played(self, limit=50):
         data = self._req("GET", "/me/player/recently-played", params={"limit": limit})
