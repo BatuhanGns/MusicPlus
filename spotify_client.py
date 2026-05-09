@@ -182,7 +182,16 @@ class SpotifyClient:
 
     def get_my_playlists(self):
         data = self._req("GET", "/me/playlists", params={"limit": 50})
-        return [{"id": p["id"], "name": p["name"], "count": p["tracks"]["total"]} for p in data.get("items", [])]
+        items = []
+        for p in data.get("items", []):
+            if not p:  # bazı türlerde None gelebilir
+                continue
+            items.append({
+                "id": p["id"],
+                "name": p["name"],
+                "count": (p.get("tracks") or {}).get("total", 0)
+            })
+        return items
 
     def create_playlist(self, name, description="Müzik İstatistiklerin tarafından oluşturuldu."):
         user_id = self.get_me()
