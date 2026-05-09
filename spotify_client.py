@@ -21,17 +21,25 @@ class SpotifyClient:
         self._user_id = None
 
     def get_auth_url(self, redirect_uri):
-        # 1. ÇÖZÜM: user-library-read eklendi
+        # FIX: user-library-read eklendi — /me/tracks/contains için zorunlu
         scopes = (
             "playlist-read-private playlist-read-collaborative "
             "playlist-modify-public playlist-modify-private "
             "user-library-read user-library-modify "
-            "user-follow-modify user-read-recently-played"
+            "user-follow-modify "
+            "user-read-recently-played"
         )
         encoded_scopes = urllib.parse.quote(scopes)
         encoded_redirect = urllib.parse.quote(redirect_uri)
-        
-        return f"https://accounts.spotify.com/authorize?client_id={self.client_id}&response_type=code&redirect_uri={encoded_redirect}&scope={encoded_scopes}&show_dialog=true"
+
+        return (
+            f"https://accounts.spotify.com/authorize"
+            f"?client_id={self.client_id}"
+            f"&response_type=code"
+            f"&redirect_uri={encoded_redirect}"
+            f"&scope={encoded_scopes}"
+            f"&show_dialog=true"
+        )
 
     def exchange_code(self, code, redirect_uri):
         credentials = base64.b64encode(
@@ -46,12 +54,12 @@ class SpotifyClient:
             "code": code,
             "redirect_uri": redirect_uri
         })
-        
+
         if resp.status_code != 200:
             logger.error(f"Code Exchange Hatası: {resp.text}")
         resp.raise_for_status()
         data = resp.json()
-        
+
         new_access_token = data["access_token"]
         new_expires_at = time.time() + data["expires_in"]
         new_refresh_token = data.get("refresh_token")
@@ -61,26 +69,24 @@ class SpotifyClient:
             session["token_expires_at"] = new_expires_at
             if new_refresh_token:
                 session["refresh_token"] = new_refresh_token
-        
+
         self._access_token = new_access_token
         self._token_expires_at = new_expires_at
         if new_refresh_token:
             self.refresh_token = new_refresh_token
             logger.info("✅ YENİ REFRESH TOKEN ALINDI VE SESSION'A KAYDEDİLDİ.")
-            logger.info(f"YENİ REFRESH TOKEN (RENDER'A KAYDEDEBİLİRSİN): {new_refresh_token}")
-            
+            logger.info(f"!!! YENİ REFRESH TOKEN (RENDER'A KAYDEDEBİLİRSİN): {new_refresh_token} !!!")
+
         return True
 
     def _get_access_token(self):
         in_req = has_request_context()
-        
+
         if in_req:
             access_token = session.get("access_token")
             expires_at = session.get("token_expires_at", 0)
-            # 2. ÇÖZÜM: Session varsa KESİNLİKLE eski (bayat) .env token'ına düşme!
-            r_token = session.get("refresh_token") 
+            r_token = session.get("refresh_token") or self.refresh_token or os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
         else:
-            # Sadece arka plan işlemleri (sync_job) eski / global token'ı kullanabilir
             access_token = self._access_token
             expires_at = self._token_expires_at
             r_token = self.refresh_token or os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
@@ -99,13 +105,13 @@ class SpotifyClient:
             "grant_type": "refresh_token",
             "refresh_token": r_token
         })
-        
+
         if resp.status_code != 200:
             logger.error(f"Token Yenileme (Refresh) Hatası: {resp.text}")
             if in_req and "invalid_grant" in resp.text:
                 session.clear()
         resp.raise_for_status()
-        
+
         data = resp.json()
         new_access_token = data["access_token"]
         new_expires_at = time.time() + data["expires_in"]
@@ -115,7 +121,7 @@ class SpotifyClient:
             session["access_token"] = new_access_token
             session["token_expires_at"] = new_expires_at
             session["refresh_token"] = new_refresh_token
-        
+
         self._access_token = new_access_token
         self._token_expires_at = new_expires_at
         self.refresh_token = new_refresh_token
@@ -127,15 +133,15 @@ class SpotifyClient:
         headers = kwargs.pop("headers", {})
         headers["Authorization"] = f"Bearer {token}"
         url = f"{API_BASE}{endpoint}" if not endpoint.startswith("http") else endpoint
-        
+
         resp = requests.request(method, url, headers=headers, **kwargs)
-        
+
         if resp.status_code == 403:
             logger.error(f"403 Forbidden on {url}: {resp.text}")
             raise Exception("Spotify yetkileriniz eksik kalmış! Lütfen Profil menüsünden 'Sistemden Çıkış Yap'a basıp tekrar giriş yaparak yeni izinleri onaylayın.")
         elif resp.status_code >= 400:
             logger.error(f"Spotify API Error ({resp.status_code}) on {url}: {resp.text}")
-        
+
         resp.raise_for_status()
         if resp.text:
             return resp.json()
@@ -143,18 +149,17 @@ class SpotifyClient:
 
     def get_me(self):
         in_req = has_request_context()
-        # 3. ÇÖZÜM: Güvenlik için user_id önbelleğini yalnızca aktif session varsa kullanıyoruz
         if in_req and "user_id" in session:
             return session["user_id"]
-            
+
         data = self._req("GET", "/me")
         user_id = data["id"]
-        
+
         if in_req:
             session["user_id"] = user_id
         else:
             self._user_id = user_id
-            
+
         return user_id
 
     def get_recently_played(self, limit=50):
@@ -174,7 +179,7 @@ class SpotifyClient:
         return tracks
 
     # --- PLAYLIST & EDIT İŞLEMLERİ ---
-    
+
     def get_my_playlists(self):
         data = self._req("GET", "/me/playlists", params={"limit": 50})
         return [{"id": p["id"], "name": p["name"], "count": p["tracks"]["total"]} for p in data.get("items", [])]
@@ -238,7 +243,6 @@ class SpotifyClient:
         results = {}
         for i in range(0, len(track_ids), 50):
             chunk = track_ids[i:i+50]
-            # user-library-read izni artık alındığı için burası sorunsuz çalışacak.
             data = self._req("GET", "/me/tracks/contains", params={"ids": ",".join(chunk)})
             for tid, is_saved in zip(chunk, data):
                 results[tid] = is_saved
