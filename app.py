@@ -4,7 +4,7 @@ import csv
 import logging
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
-from flask import Flask, jsonify, render_template, request, Response, stream_with_context
+from flask import Flask, jsonify, render_template, request, Response, stream_with_context, session, redirect, url_for
 from apscheduler.schedulers.background import BackgroundScheduler
 from spotify_client import SpotifyClient
 from sheets_client import SheetsClient
@@ -13,6 +13,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 spotify = SpotifyClient()
 sheets  = SheetsClient()
 
@@ -526,6 +527,61 @@ def api_ay_detay(ay_label):
     except Exception as e:
         logger.error(f"❌ Ay detay hatası: {e}")
         return jsonify({"error": str(e)}), 500
+
+@app.route("/api/logout")
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+@app.route("/login")
+def login_page():
+    redirect_uri = request.host_url.rstrip("/") + "/callback"
+    auth_url = spotify.get_auth_url(redirect_uri)
+    return f"""<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Giriş Yap – Müzik İstatistiklerin</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{{--bg:#0a0a0a;--surface:#111;--border:#222;--green:#1db954;--text:#e8e8e8;--muted:#555;}}
+  *{{margin:0;padding:0;box-sizing:border-box;}}
+  body{{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;display:flex;align-items:center;justify-content:center;}}
+  body::before{{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:48px 48px;opacity:.3;pointer-events:none;}}
+  .card{{position:relative;z-index:1;background:var(--surface);border:1px solid var(--border);padding:56px 48px;max-width:420px;width:100%;text-align:center;}}
+  h1{{font-family:'Syne',sans-serif;font-size:36px;font-weight:800;letter-spacing:-1px;margin-bottom:8px;}}
+  h1 span{{color:var(--green);}}
+  p{{font-size:12px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:40px;}}
+  a.btn{{display:block;background:var(--green);color:#000;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;text-decoration:none;padding:18px 32px;transition:opacity .2s;}}
+  a.btn:hover{{opacity:.85;}}
+  .note{{margin-top:20px;font-size:11px;color:var(--muted);line-height:1.7;}}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>MÜZİK<span>.</span></h1>
+  <p>Kişisel Spotify İstatistiklerin</p>
+  <a class="btn" href="{auth_url}">Spotify ile Giriş Yap</a>
+  <div class="note">Bu uygulama yalnızca dinleme verilerini okur.<br>Hiçbir verin üçüncü taraflarla paylaşılmaz.</div>
+</div>
+</body>
+</html>"""
+
+@app.route("/callback")
+def callback():
+    code = request.args.get("code")
+    error = request.args.get("error")
+    if error or not code:
+        return redirect("/login")
+    redirect_uri = request.host_url.rstrip("/") + "/callback"
+    try:
+        spotify.exchange_code(code, redirect_uri)
+        return redirect("/")
+    except Exception as e:
+        logger.error(f"❌ OAuth callback hatası: {e}")
+        return redirect("/login")
 
 @app.route("/api/sync")
 @app.route("/sync")
