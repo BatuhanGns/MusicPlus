@@ -636,6 +636,15 @@ def debug():
 
 # --- Playlist API endpoints ---
 
+@app.route("/api/now-playing")
+def api_now_playing():
+    try:
+        data = spotify.get_now_playing()
+        return jsonify(data)
+    except Exception as e:
+        logger.error(f"❌ Now playing hatası: {e}")
+        return jsonify({"playing": False}), 200
+
 @app.route("/api/playlists")
 def api_playlists():
     try:

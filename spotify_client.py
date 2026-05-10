@@ -134,6 +134,38 @@ class SpotifyClient:
             return resp.json()
         return {}
 
+    def get_now_playing(self):
+        """Şu an çalan şarkıyı döndürür"""
+        try:
+            data = self._req("GET", "/me/player/currently-playing")
+        except Exception:
+            return {"playing": False}
+
+        if not data or data.get("currently_playing_type") != "track":
+            return {"playing": False}
+
+        item = data.get("item") or data.get("track")
+        if not item:
+            return {"playing": False}
+
+        is_playing  = data.get("is_playing", False)
+        progress_ms = data.get("progress_ms", 0)
+        duration_ms = item.get("duration_ms", 1)
+        images      = item.get("album", {}).get("images", [])
+        art_url     = images[0]["url"] if images else None
+
+        return {
+            "playing":     True,
+            "is_playing":  is_playing,
+            "track_name":  item.get("name", ""),
+            "artist_name": ", ".join(a["name"] for a in item.get("artists", [])),
+            "album_name":  item.get("album", {}).get("name", ""),
+            "art_url":     art_url,
+            "progress_ms": progress_ms,
+            "duration_ms": duration_ms,
+            "progress_pct": round(progress_ms / duration_ms * 100, 1) if duration_ms else 0,
+        }
+
     def get_recently_played(self, limit=50):
         data = self._req("GET", "/me/player/recently-played", params={"limit": limit})
         tracks = []
