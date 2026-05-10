@@ -21,19 +21,15 @@ class SpotifyClient:
         self._user_id = None
 
     def get_auth_url(self, redirect_uri):
-        # Dinleme geçmişi + Playlist yönetim yetkileri
         scopes = " ".join([
             "user-read-recently-played",
+            "user-read-currently-playing",
             "playlist-read-private",
             "playlist-modify-public",
             "playlist-modify-private",
-            "user-follow-modify",
-            "user-library-modify",
-            "user-library-read",
         ])
-        encoded_scopes = urllib.parse.quote(scopes)
+        encoded_scopes   = urllib.parse.quote(scopes)
         encoded_redirect = urllib.parse.quote(redirect_uri)
-        
         return f"https://accounts.spotify.com/authorize?client_id={self.client_id}&response_type=code&redirect_uri={encoded_redirect}&scope={encoded_scopes}&show_dialog=true"
 
     def exchange_code(self, code, redirect_uri):
