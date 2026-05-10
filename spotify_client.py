@@ -21,8 +21,16 @@ class SpotifyClient:
         self._user_id = None
 
     def get_auth_url(self, redirect_uri):
-        # Sadece Dinleme Geçmişi yetkisi istiyoruz (Düzenleme yetkileri kaldırıldı)
-        scopes = "user-read-recently-played"
+        # Dinleme geçmişi + Playlist yönetim yetkileri
+        scopes = " ".join([
+            "user-read-recently-played",
+            "playlist-read-private",
+            "playlist-modify-public",
+            "playlist-modify-private",
+            "user-follow-modify",
+            "user-library-modify",
+            "user-library-read",
+        ])
         encoded_scopes = urllib.parse.quote(scopes)
         encoded_redirect = urllib.parse.quote(redirect_uri)
         
@@ -141,3 +149,163 @@ class SpotifyClient:
                 "duration_sec": round(track["duration_ms"] / 1000),
             })
         return tracks
+
+    def _get_user_id(self):
+        if not self._user_id:
+            data = self._req("GET", "/me")
+            self._user_id = data["id"]
+        return self._user_id
+
+    def get_playlists(self):
+        """Kullanıcının tüm playlistlerini döndürür (resimli)"""
+        all_playlists = []
+        url = "/me/playlists"
+        params = {"limit": 50, "offset": 0}
+        while url:
+            data = self._req("GET", url, params=params)
+            for p in data.get("items", []):
+                if not p:
+                    continue
+                image_url = p["images"][0]["url"] if p.get("images") else None
+                all_playlists.append({
+                    "id": p["id"],
+                    "name": p["name"],
+                    "track_count": p["tracks"]["total"],
+                    "image_url": image_url,
+                    "owner": p["owner"]["display_name"],
+                })
+            if data.get("next"):
+                url = data["next"]
+                params = {}
+            else:
+                url = None
+        return all_playlists
+
+    def _get_playlist_tracks(self, playlist_id):
+        """Bir playlistin tüm parçalarını döndürür"""
+        tracks = []
+        url = f"/playlists/{playlist_id}/tracks"
+        params = {"limit": 100, "offset": 0, "fields": "next,items(track(id,artists(id,name),name))"}
+        while url:
+            data = self._req("GET", url, params=params)
+            for item in data.get("items", []):
+                if item and item.get("track") and item["track"].get("id"):
+                    tracks.append(item["track"])
+            if data.get("next"):
+                url = data["next"]
+                params = {}
+            else:
+                url = None
+        return tracks
+
+    def _search_track(self, track_name):
+        """Şarkı adına göre Spotify'da arama yapar"""
+        data = self._req("GET", "/search", params={"q": track_name, "type": "track", "limit": 1})
+        items = data.get("tracks", {}).get("items", [])
+        return items[0]["id"] if items else None
+
+    def create_playlist_from_track_names(self, name, track_names, description=""):
+        """Şarkı adları listesinden yeni bir playlist oluşturur"""
+        user_id = self._get_user_id()
+        pl = self._req("POST", f"/users/{user_id}/playlists", json={
+            "name": name,
+            "public": False,
+            "description": description
+        })
+        playlist_id = pl["id"]
+
+        track_ids = []
+        for track_name in track_names:
+            tid = self._search_track(track_name)
+            if tid:
+                track_ids.append(f"spotify:track:{tid}")
+
+        for i in range(0, len(track_ids), 100):
+            self._req("POST", f"/playlists/{playlist_id}/tracks", json={
+                "uris": track_ids[i:i+100]
+            })
+        return playlist_id
+
+    def shuffle_playlist(self, playlist_id):
+        """Bir playlistin şarkılarını rastgele karıştırır"""
+        import random
+        tracks = self._get_playlist_tracks(playlist_id)
+        track_uris = [f"spotify:track:{t['id']}" for t in tracks if t.get("id")]
+        random.shuffle(track_uris)
+        # Önce playlist'i boşalt
+        for i in range(0, len(track_uris), 100):
+            self._req("DELETE", f"/playlists/{playlist_id}/tracks", json={
+                "tracks": [{"uri": u} for u in track_uris[i:i+100]]
+            })
+        # Karışık olarak ekle
+        for i in range(0, len(track_uris), 100):
+            self._req("POST", f"/playlists/{playlist_id}/tracks", json={
+                "uris": track_uris[i:i+100]
+            })
+
+    def follow_all_artists_in_playlist(self, playlist_id):
+        """Playlistteki tüm sanatçıları takip eder"""
+        tracks = self._get_playlist_tracks(playlist_id)
+        artist_ids = list({a["id"] for t in tracks for a in t.get("artists", []) if a.get("id")})
+        for i in range(0, len(artist_ids), 50):
+            self._req("PUT", "/me/following", params={"type": "artist"}, json={"ids": artist_ids[i:i+50]})
+        return len(artist_ids)
+
+    def unfollow_all_artists_in_playlist(self, playlist_id):
+        """Playlistteki tüm sanatçıların takibini bırakır"""
+        tracks = self._get_playlist_tracks(playlist_id)
+        artist_ids = list({a["id"] for t in tracks for a in t.get("artists", []) if a.get("id")})
+        for i in range(0, len(artist_ids), 50):
+            self._req("DELETE", "/me/following", params={"type": "artist"}, json={"ids": artist_ids[i:i+50]})
+        return len(artist_ids)
+
+    def _get_liked_track_ids(self, track_ids):
+        """Verilen track_id'lerden beğenilenleri döndürür"""
+        liked = set()
+        for i in range(0, len(track_ids), 50):
+            chunk = track_ids[i:i+50]
+            data = self._req("GET", "/me/tracks/contains", params={"ids": ",".join(chunk)})
+            for j, is_liked in enumerate(data):
+                if is_liked:
+                    liked.add(chunk[j])
+        return liked
+
+    def like_all_tracks_in_playlist(self, playlist_id):
+        """Playlistteki tüm şarkıları beğenir"""
+        tracks = self._get_playlist_tracks(playlist_id)
+        track_ids = [t["id"] for t in tracks if t.get("id")]
+        for i in range(0, len(track_ids), 50):
+            self._req("PUT", "/me/tracks", json={"ids": track_ids[i:i+50]})
+        return len(track_ids)
+
+    def unlike_all_tracks_in_playlist(self, playlist_id):
+        """Playlistteki tüm şarkıların beğenisini kaldırır"""
+        tracks = self._get_playlist_tracks(playlist_id)
+        track_ids = [t["id"] for t in tracks if t.get("id")]
+        for i in range(0, len(track_ids), 50):
+            self._req("DELETE", "/me/tracks", json={"ids": track_ids[i:i+50]})
+        return len(track_ids)
+
+    def remove_liked_tracks_from_playlist(self, playlist_id):
+        """Playlistten beğenilen şarkıları çıkarır"""
+        tracks = self._get_playlist_tracks(playlist_id)
+        track_ids = [t["id"] for t in tracks if t.get("id")]
+        liked_ids = self._get_liked_track_ids(track_ids)
+        liked_uris = [f"spotify:track:{tid}" for tid in liked_ids]
+        for i in range(0, len(liked_uris), 100):
+            self._req("DELETE", f"/playlists/{playlist_id}/tracks", json={
+                "tracks": [{"uri": u} for u in liked_uris[i:i+100]]
+            })
+        return len(liked_uris)
+
+    def remove_unliked_tracks_from_playlist(self, playlist_id):
+        """Playlistten beğenilmeyen şarkıları çıkarır"""
+        tracks = self._get_playlist_tracks(playlist_id)
+        track_ids = [t["id"] for t in tracks if t.get("id")]
+        liked_ids = self._get_liked_track_ids(track_ids)
+        unliked_uris = [f"spotify:track:{tid}" for tid in track_ids if tid not in liked_ids]
+        for i in range(0, len(unliked_uris), 100):
+            self._req("DELETE", f"/playlists/{playlist_id}/tracks", json={
+                "tracks": [{"uri": u} for u in unliked_uris[i:i+100]]
+            })
+        return len(unliked_uris)

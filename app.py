@@ -527,14 +527,170 @@ def api_ay_detay(ay_label):
         logger.error(f"❌ Ay detay hatası: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/sync")
 @app.route("/sync")
 def manual_sync():
     sync_job()
-    return jsonify({"status": "ok", "message": "Manuel sync tamamlandı"})
+    return jsonify({"status": "ok", "message": "Manuel sync tamamlandı", "son_sync": _last_sync})
 
+@app.route("/api/health")
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    return jsonify({
+        "status": "ok",
+        "cached_rows": len(_cached_rows),
+        "son_sync": _last_sync
+    })
+
+@app.route("/api/debug")
+def debug():
+    import traceback
+    try:
+        headers, rows = load_tumveri()
+        return jsonify({
+            "status": "ok",
+            "cached_rows": len(_cached_rows),
+            "cached_headers": _cached_headers,
+            "son_sync": _last_sync,
+            "env_vars": {
+                "SPOTIFY_CLIENT_ID": bool(os.environ.get("SPOTIFY_CLIENT_ID")),
+                "SPOTIFY_CLIENT_SECRET": bool(os.environ.get("SPOTIFY_CLIENT_SECRET")),
+                "SPOTIFY_REFRESH_TOKEN": bool(os.environ.get("SPOTIFY_REFRESH_TOKEN")),
+                "GOOGLE_SHEETS_ID": bool(os.environ.get("GOOGLE_SHEETS_ID")),
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+# --- Playlist API endpoints ---
+
+@app.route("/api/playlists")
+def api_playlists():
+    try:
+        playlists = spotify.get_playlists()
+        return jsonify({"playlists": playlists})
+    except Exception as e:
+        logger.error(f"❌ Playlist hatası: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/playlist/create-top-tracks", methods=["POST"])
+def api_create_top_tracks_playlist():
+    try:
+        if not _cached_rows:
+            load_tumveri()
+        headers, rows = _cached_headers, _cached_rows
+        idx_sarki = headers.index("Şarkı Adı")
+        idx_sure  = headers.index("Süre (sn)")
+
+        from collections import Counter
+        sarki_counts = Counter()
+        for row in rows:
+            if len(row) > idx_sarki:
+                sarki_counts[row[idx_sarki].strip()] += 1
+
+        top_sarkilar = [s for s, _ in sarki_counts.most_common(50) if s]
+        playlist_id = spotify.create_playlist_from_track_names(
+            "En Çok Dinlediklerim", top_sarkilar,
+            description="Spotify İstatistik uygulaması tarafından oluşturuldu"
+        )
+        return jsonify({"status": "ok", "playlist_id": playlist_id})
+    except Exception as e:
+        logger.error(f"❌ Playlist oluşturma hatası: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/playlist/create-top-artists", methods=["POST"])
+def api_create_top_artists_playlist():
+    try:
+        if not _cached_rows:
+            load_tumveri()
+        headers, rows = _cached_headers, _cached_rows
+        idx_sanatci = headers.index("Sanatçı")
+        idx_sarki   = headers.index("Şarkı Adı")
+
+        from collections import Counter, defaultdict
+        sanatci_counts = Counter()
+        sanatci_sarkilar = defaultdict(set)
+        for row in rows:
+            if len(row) > max(idx_sanatci, idx_sarki):
+                s = row[idx_sanatci].strip()
+                t = row[idx_sarki].strip()
+                if s: sanatci_counts[s] += 1
+                if s and t: sanatci_sarkilar[s].add(t)
+
+        top_sanatcilar = [s for s, _ in sanatci_counts.most_common(20) if s]
+        sarkilar = []
+        for s in top_sanatcilar:
+            sarkilar.extend(list(sanatci_sarkilar[s])[:5])
+
+        playlist_id = spotify.create_playlist_from_track_names(
+            "En Çok Dinlediğim Sanatçılar",
+            sarkilar[:50],
+            description="Spotify İstatistik uygulaması tarafından oluşturuldu"
+        )
+        return jsonify({"status": "ok", "playlist_id": playlist_id})
+    except Exception as e:
+        logger.error(f"❌ Sanatçı playlist hatası: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/playlist/<playlist_id>/shuffle", methods=["POST"])
+def api_playlist_shuffle(playlist_id):
+    try:
+        spotify.shuffle_playlist(playlist_id)
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/playlist/<playlist_id>/follow-artists", methods=["POST"])
+def api_follow_artists(playlist_id):
+    try:
+        count = spotify.follow_all_artists_in_playlist(playlist_id)
+        return jsonify({"status": "ok", "followed": count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/playlist/<playlist_id>/unfollow-artists", methods=["POST"])
+def api_unfollow_artists(playlist_id):
+    try:
+        count = spotify.unfollow_all_artists_in_playlist(playlist_id)
+        return jsonify({"status": "ok", "unfollowed": count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/playlist/<playlist_id>/like-all", methods=["POST"])
+def api_like_all(playlist_id):
+    try:
+        count = spotify.like_all_tracks_in_playlist(playlist_id)
+        return jsonify({"status": "ok", "liked": count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/playlist/<playlist_id>/unlike-all", methods=["POST"])
+def api_unlike_all(playlist_id):
+    try:
+        count = spotify.unlike_all_tracks_in_playlist(playlist_id)
+        return jsonify({"status": "ok", "unliked": count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/playlist/<playlist_id>/remove-liked", methods=["POST"])
+def api_remove_liked(playlist_id):
+    try:
+        count = spotify.remove_liked_tracks_from_playlist(playlist_id)
+        return jsonify({"status": "ok", "removed": count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/playlist/<playlist_id>/remove-unliked", methods=["POST"])
+def api_remove_unliked(playlist_id):
+    try:
+        count = spotify.remove_unliked_tracks_from_playlist(playlist_id)
+        return jsonify({"status": "ok", "removed": count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     scheduler = BackgroundScheduler()
