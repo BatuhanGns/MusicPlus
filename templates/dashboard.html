@@ -134,7 +134,18 @@
   .modal-track .mname{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .modal-track .mcnt{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--green);text-align:right;}
 
-  /* PLAYLİST GRID */
+  /* NOW PLAYING */
+  .now-playing-card{display:none;background:var(--surface);border:1px solid var(--border);margin-bottom:32px;overflow:hidden;position:relative;}
+  .now-playing-card.visible{display:flex;align-items:center;gap:0;}
+  .now-playing-card .np-art{width:80px;height:80px;min-width:80px;object-fit:cover;display:block;}
+  .now-playing-card .np-art-placeholder{width:80px;height:80px;min-width:80px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:28px;}
+  .now-playing-card .np-info{padding:16px 20px;flex:1;min-width:0;}
+  .now-playing-card .np-label{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--green);margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+  .now-playing-card .np-label::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s ease-in-out infinite;}
+  .now-playing-card .np-track{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
+  .now-playing-card .np-artist{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .now-playing-card .np-progress{position:absolute;bottom:0;left:0;height:2px;background:var(--green);transition:width 1s linear;}
+  .now-playing-card .np-paused{font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-left:8px;}
   .playlist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
   .playlist-card{background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
   .playlist-card:hover{border-color:var(--green);transform:translateY(-2px);}
@@ -167,7 +178,6 @@
     <button style="background:none;border:none;color:var(--text);font-size:24px;cursor:pointer" onclick="toggleMenu()">✕</button>
   </div>
   <a class="menu-item active" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler">İstatistiklerin</a>
-  <a class="menu-item" onclick="switchView('duzenle');toggleMenu()" id="nav-duzenle">Düzenle</a>
   <a class="menu-item" onclick="switchView('profil');toggleMenu()" id="nav-profil">Profilin</a>
 </div>
 
@@ -185,6 +195,18 @@
   </header>
 
   <div id="view-istatistikler" class="view-section active">
+
+    <!-- NOW PLAYING -->
+    <div class="now-playing-card" id="nowPlayingCard">
+      <img class="np-art" id="npArt" src="" alt="">
+      <div class="np-info">
+        <div class="np-label">Şu an çalıyor <span class="np-paused" id="npPaused"></span></div>
+        <div class="np-track" id="npTrack">—</div>
+        <div class="np-artist" id="npArtist">—</div>
+      </div>
+      <div class="np-progress" id="npProgress" style="width:0%"></div>
+    </div>
+
     <div class="stats-row" id="statsRow">
       <div class="stat-card"><div class="label">Toplam Dinleme</div><div class="value" id="statTotal">—</div><div class="sub">kayıt</div></div>
       <div class="stat-card" onclick="openTumSarkilarModal()" style="cursor:pointer"><div class="label">Farklı Şarkı ↗</div><div class="value" id="statTracks">—</div><div class="sub">tıkla → tümünü gör</div></div>
@@ -224,15 +246,7 @@
     </div>
   </div>
 
-  <div id="view-duzenle" class="view-section">
-    <!-- PLAYLİSTİ DÜZENLE -->
-    <div class="section">
-      <div class="section-title">Playlisti Düzenle</div>
-      <div id="playlistGrid" class="playlist-grid">
-        <div class="loading">Playlistler yükleniyor...</div>
-      </div>
-    </div>
-  </div>
+  <!-- Düzenle sayfası kaldırıldı -->
 
   <div id="view-profil" class="view-section">
     <div class="section-title">Hesap Özetin</div>
@@ -276,21 +290,64 @@ function toggleMenu() {
 function switchView(viewId) {
   document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
   document.getElementById('view-' + viewId).classList.add('active');
-  
   document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
   document.getElementById('nav-' + viewId).classList.add('active');
-  
   const titles = {
     'istatistikler': 'Kişisel Spotify Verileri',
-    'duzenle': 'Playlist Yönetimi',
     'profil': 'Hesap ve Ayarlar'
   };
-  document.getElementById('headerSubtitle').textContent = titles[viewId];
+  document.getElementById('headerSubtitle').textContent = titles[viewId] || '';
+}
 
-  if (viewId === 'duzenle') {
-    loadPlaylists();
+// ===================== NOW PLAYING =====================
+let _npTimer = null;
+let _npProgress = 0;
+let _npDuration = 0;
+let _npPlaying = false;
+
+async function fetchNowPlaying() {
+  try {
+    const res = await fetch('/api/now-playing');
+    const d = await res.json();
+    const card = document.getElementById('nowPlayingCard');
+
+    if (!d.playing) {
+      card.classList.remove('visible');
+      return;
+    }
+
+    card.classList.add('visible');
+    document.getElementById('npTrack').textContent  = d.track_name;
+    document.getElementById('npArtist').textContent = d.artist_name;
+    document.getElementById('npPaused').textContent = d.is_playing ? '' : '· Duraklatıldı';
+    document.getElementById('npProgress').style.width = d.progress_pct + '%';
+
+    const art = document.getElementById('npArt');
+    if (d.art_url) { art.src = d.art_url; art.style.display = 'block'; }
+    else { art.style.display = 'none'; }
+
+    // İlerleme çubuğunu canlı ilerlet
+    clearInterval(_npTimer);
+    _npProgress = d.progress_ms;
+    _npDuration = d.duration_ms;
+    _npPlaying  = d.is_playing;
+
+    if (_npPlaying && _npDuration > 0) {
+      _npTimer = setInterval(() => {
+        _npProgress += 1000;
+        if (_npProgress > _npDuration) { clearInterval(_npTimer); return; }
+        const pct = Math.min(100, _npProgress / _npDuration * 100);
+        document.getElementById('npProgress').style.width = pct + '%';
+      }, 1000);
+    }
+  } catch(e) {
+    // sessizce geç
   }
 }
+
+// 30 saniyede bir güncelle
+fetchNowPlaying();
+setInterval(fetchNowPlaying, 30000);
 
 // YARDIMCI VE RENDER FONKSİYONLARI
 function fmtSure(sn) {
