@@ -15,11 +15,6 @@
   body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:48px 48px;opacity:.3;pointer-events:none;z-index:0;}
   .wrapper{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:48px 24px;}
 
-  /* --- GİRİŞ EKRANI ÖZEL STİLLERİ --- */
-  .login-container { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; text-align:center; padding:24px; }
-  .spotify-btn { background:var(--green); color:#000; border:none; padding:18px 40px; border-radius:50px; font-family:'Syne',sans-serif; font-size:18px; font-weight:800; cursor:pointer; transition:all 0.2s; text-transform:uppercase; letter-spacing:1px; display:inline-flex; align-items:center; gap:12px; }
-  .spotify-btn:hover { transform:scale(1.05); background:#1ed760; }
-
   header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:56px;gap:16px;flex-wrap:wrap;}
   .logo-area h1{font-family:'Syne',sans-serif;font-size:clamp(28px,5vw,48px);font-weight:800;letter-spacing:-1px;line-height:1;}
   .logo-area h1 span{color:var(--green);}
@@ -93,6 +88,7 @@
   .week-day .day-sure.empty{color:var(--muted2);}
   @media(max-width:500px){.week-grid{grid-template-columns:repeat(4,1fr);}}
 
+  /* Aksiyon Butonları (Düzenle ve Profil İçin) */
   .action-btn {display:block; width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); padding:18px 24px; font-family:'Syne',sans-serif; font-size:15px; font-weight:700; text-align:left; cursor:pointer; transition:all 0.2s; margin-bottom:8px; border-left:4px solid transparent;}
   .action-btn:hover {background:var(--surface2); border-left-color:var(--green);}
   .action-btn.danger {color:#ff4444;}
@@ -117,6 +113,7 @@
   .modal-stat{background:var(--surface2);padding:16px;text-align:center;}
   .modal-stat .val{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--green);}
   .modal-stat .lbl{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:4px;}
+
   .modal-section-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;margin-top:24px;}
 
   .hour-chart{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;align-items:end;height:64px;margin-bottom:8px;}
@@ -126,382 +123,450 @@
   .hour-tip{display:none;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);padding:4px 6px;font-size:10px;white-space:nowrap;z-index:5;}
   .hour-labels{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;}
   .hour-label{font-size:8px;color:var(--muted);text-align:center;}
+
   .vakit-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
   .vakit-pill{background:var(--surface2);border:1px solid var(--border);padding:8px 14px;font-size:11px;display:flex;gap:10px;align-items:center;}
   .vakit-pill .vc{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--green);}
+
+  .modal-track-list{display:flex;flex-direction:column;gap:1px;}
+  .modal-track{display:grid;grid-template-columns:28px 1fr auto;gap:12px;align-items:center;background:var(--surface2);padding:10px 14px;}
+  .modal-track .mtn{font-size:10px;color:var(--muted);}
+  .modal-track .mname{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .modal-track .mcnt{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--green);text-align:right;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
-{% if not logged_in %}
-  <!-- GİRİŞ YAP EKRANI -->
-  <div class="login-container">
-    <h1 style="font-family:'Syne';font-size:clamp(32px, 8vw, 64px);font-weight:800;line-height:1;margin-bottom:16px;">MÜZİK<span style="color:var(--green)">.</span><br>İSTATİSTİKLERİN</h1>
-    <p style="color:var(--muted);letter-spacing:3px;font-size:12px;text-transform:uppercase;margin-bottom:48px;">KİŞİSEL SPOTIFY DENEYİMİ</p>
-    <button class="spotify-btn" onclick="window.location.href='/login'">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.659.3 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.02.6-1.14 4.32-1.38 9.72-.72 13.44 1.56.42.24.6.84.3 1.26zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.6.18-1.2.72-1.38 4.2-1.26 11.28-1.02 15.72 1.62.539.3.719 1.02.419 1.56-.299.42-1.02.599-1.559.3z"/></svg>
-      Spotify İle Giriş Yap
-    </button>
+<div class="menu-overlay" id="menuOverlay" onclick="toggleMenu()"></div>
+<div class="side-menu" id="sideMenu">
+  <div class="side-menu-header">
+    <h2>MENÜ</h2>
+    <button style="background:none;border:none;color:var(--text);font-size:24px;cursor:pointer" onclick="toggleMenu()">✕</button>
   </div>
-{% else %}
-  <!-- GİRİŞ YAPILMIŞ DASHBOARD EKRANI -->
-  <div class="menu-overlay" id="menuOverlay" onclick="toggleMenu()"></div>
-  <div class="side-menu" id="sideMenu">
-    <div class="side-menu-header">
-      <h2>MENÜ</h2>
-      <button style="background:none;border:none;color:var(--text);font-size:24px;cursor:pointer" onclick="toggleMenu()">✕</button>
+  <a class="menu-item active" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler">İstatistiklerin</a>
+  <a class="menu-item" onclick="switchView('duzenle');toggleMenu()" id="nav-duzenle">Düzenle</a>
+  <a class="menu-item" onclick="switchView('profil');toggleMenu()" id="nav-profil">Profilin</a>
+</div>
+
+<div class="wrapper">
+  <header>
+    <div class="logo-area">
+      <h1>MÜZİK<span>.</span><br>İSTATİSTİKLERİN</h1>
+      <p id="headerSubtitle">Kişisel Spotify Verileri</p>
     </div>
-    <!-- Düzenle menüsü tamamen kaldırıldı -->
-    <a class="menu-item active" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler">İstatistiklerin</a>
-    <a class="menu-item" onclick="switchView('profil');toggleMenu()" id="nav-profil">Profilin</a>
-  </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="sync-info" id="syncInfo"><span class="dot"></span> Yükleniyor...</div>
+      <button onclick="downloadPNG()" id="dlBtn" title="Görüntüyü İndir" class="hamburger-btn">↓</button>
+      <button onclick="toggleMenu()" class="hamburger-btn">☰</button>
+    </div>
+  </header>
 
-  <div class="wrapper">
-    <header>
-      <div class="logo-area">
-        <h1>MÜZİK<span>.</span><br>İSTATİSTİKLERİN</h1>
-        <p id="headerSubtitle">Kişisel Spotify Verileri</p>
-      </div>
-      <div style="display:flex;align-items:center;gap:12px">
-        <div class="sync-info" id="syncInfo"><span class="dot"></span> Yükleniyor...</div>
-        <button onclick="downloadPNG()" id="dlBtn" title="Görüntüyü İndir" class="hamburger-btn">↓</button>
-        <button onclick="toggleMenu()" class="hamburger-btn">☰</button>
-      </div>
-    </header>
+  <div id="view-istatistikler" class="view-section active">
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card"><div class="label">Toplam Dinleme</div><div class="value" id="statTotal">—</div><div class="sub">kayıt</div></div>
+      <div class="stat-card" onclick="openTumSarkilarModal()" style="cursor:pointer"><div class="label">Farklı Şarkı ↗</div><div class="value" id="statTracks">—</div><div class="sub">tıkla → tümünü gör</div></div>
+      <div class="stat-card" onclick="openTumSanatcilarModal()" style="cursor:pointer"><div class="label">Farklı Sanatçı ↗</div><div class="value" id="statArtists">—</div><div class="sub">tıkla → tümünü gör</div></div>
+      <div class="stat-card"><div class="label">Toplam Süre</div><div class="value" id="statHours">—</div><div class="sub">saat</div></div>
+    </div>
 
-    <!-- İSTATİSTİKLER EKRANI -->
-    <div id="view-istatistikler" class="view-section active">
-      <div class="stats-row" id="statsRow">
-        <div class="stat-card"><div class="label">Toplam Dinleme</div><div class="value" id="statTotal">—</div><div class="sub">kayıt</div></div>
-        <div class="stat-card" onclick="openTumSarkilarModal()" style="cursor:pointer"><div class="label">Farklı Şarkı ↗</div><div class="value" id="statTracks">—</div><div class="sub">tıkla → tümünü gör</div></div>
-        <div class="stat-card" onclick="openTumSanatcilarModal()" style="cursor:pointer"><div class="label">Farklı Sanatçı ↗</div><div class="value" id="statArtists">—</div><div class="sub">tıkla → tümünü gör</div></div>
-        <div class="stat-card"><div class="label">Toplam Süre</div><div class="value" id="statHours">—</div><div class="sub">saat</div></div>
-      </div>
+    <div class="section">
+      <div class="section-title">Son 7 Gün</div>
+      <div class="week-grid" id="weekGrid"><div class="loading">Yükleniyor...</div></div>
+    </div>
 
+    <div class="two-col">
       <div class="section">
-        <div class="section-title">Son 7 Gün</div>
-        <div class="week-grid" id="weekGrid"><div class="loading">Yükleniyor...</div></div>
+        <div class="section-title">En Çok Dinlenen Şarkılar</div>
+        <div class="rank-list" id="topTracks"><div class="loading">Yükleniyor...</div></div>
       </div>
-
-      <div class="two-col">
-        <div class="section">
-          <div class="section-title">En Çok Dinlenen Şarkılar</div>
-          <div class="rank-list" id="topTracks"><div class="loading">Yükleniyor...</div></div>
-        </div>
-        <div class="section">
-          <div class="section-title">En Çok Dinlenen Sanatçılar</div>
-          <div class="rank-list" id="topArtists"><div class="loading">Yükleniyor...</div></div>
-        </div>
-      </div>
-
       <div class="section">
-        <div class="section-title">Tüm Zamanlar Dinleme Alışkanlıkları</div>
-        <div style="background:var(--surface); padding:24px; border:1px solid var(--border);">
-          <div class="modal-section-title" style="margin-top:0">Genel Saat Dağılımı</div>
-          <div id="globalHourChartContainer"><div class="loading">Yükleniyor...</div></div>
-          <div class="modal-section-title" style="margin-top:24px">Genel Vakit Dağılımı</div>
-          <div id="globalVakitContainer"></div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">Aylık Analiz</div>
-        <div id="monthTable"><div class="loading">Yükleniyor...</div></div>
+        <div class="section-title">En Çok Dinlenen Sanatçılar</div>
+        <div class="rank-list" id="topArtists"><div class="loading">Yükleniyor...</div></div>
       </div>
     </div>
 
-    <!-- PROFİL EKRANI -->
-    <div id="view-profil" class="view-section">
-      <div class="section-title">Hesap Özetin</div>
-      <div style="background:var(--surface); padding:32px 24px; border:1px solid var(--border); margin-bottom:24px; text-align:center;">
-        <p style="color:var(--muted); font-size:11px; letter-spacing:2px; margin-bottom:8px;">MÜZİK İSTATİSTİKLERİN'E KATILIM TARİHİN</p>
-        <h3 id="profilKatilimTarihi" style="font-family:'Syne',sans-serif; font-size:32px; color:var(--green); font-weight:800;">—</h3>
+    <div class="section">
+      <div class="section-title">Tüm Zamanlar Dinleme Alışkanlıkları</div>
+      <div style="background:var(--surface); padding:24px; border:1px solid var(--border);">
+        <div class="modal-section-title" style="margin-top:0">Genel Saat Dağılımı</div>
+        <div id="globalHourChartContainer"><div class="loading">Yükleniyor...</div></div>
+        <div class="modal-section-title" style="margin-top:24px">Genel Vakit Dağılımı</div>
+        <div id="globalVakitContainer"></div>
       </div>
-      <div class="section-title">Veri ve Yönetim</div>
-      <button class="action-btn" onclick="window.location.href='/api/export-csv'">Tüm Verilerini İndir (.csv)</button>
-      <button class="action-btn danger" onclick="window.location.href='/logout'">Sistemden Çıkış Yap</button>
     </div>
 
-    <footer>
-      <span>Bu Bir Spotify Ürünü Değildir</span>
-      <span id="footerTime"></span>
-    </footer>
-  </div>
-
-  <!-- MODAL -->
-  <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
-    <div class="modal" id="modal">
-      <div class="modal-header">
-        <h2 id="modalTitle">—</h2>
-        <p id="modalSub">—</p>
-        <button class="modal-close" onclick="closeModalDirect()">✕</button>
-      </div>
-      <div class="modal-body" id="modalBody">
-        <div class="loading">Yükleniyor...</div>
-      </div>
+    <div class="section">
+      <div class="section-title">Aylık Analiz</div>
+      <div id="monthTable"><div class="loading">Yükleniyor...</div></div>
     </div>
   </div>
 
-  <script>
-  function toggleMenu() {
-    document.getElementById('sideMenu').classList.toggle('open');
-    document.getElementById('menuOverlay').classList.toggle('open');
-  }
+  <div id="view-duzenle" class="view-section">
+    <div class="section-title">Hızlı Çalma Listesi İşlemleri</div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <button class="action-btn">En Çok Dinlenen Şarkılara Göre Playlist Oluştur</button>
+      <button class="action-btn">Enerjiye Göre Playlist Oluştur</button>
+      <button class="action-btn">En Çok Dinlenen Sanatçılara Göre Playlist Oluştur</button>
+      <button class="action-btn">Mevcut Playlistleri Enerjiye Göre Karıştır</button>
+      <button class="action-btn">Rastgele Karıştır</button>
+    </div>
+  </div>
+
+  <div id="view-profil" class="view-section">
+    <div class="section-title">Hesap Özetin</div>
+    
+    <div style="background:var(--surface); padding:32px 24px; border:1px solid var(--border); margin-bottom:24px; text-align:center;">
+      <p style="color:var(--muted); font-size:11px; letter-spacing:2px; margin-bottom:8px;">MÜZİK İSTATİSTİKLERİN'E KATILIM TARİHİN</p>
+      <h3 id="profilKatilimTarihi" style="font-family:'Syne',sans-serif; font-size:32px; color:var(--green); font-weight:800;">—</h3>
+    </div>
+
+    <div class="section-title">Veri ve Yönetim</div>
+    <button class="action-btn" onclick="window.location.href='/api/export-csv'">Tüm Verilerini İndir (.csv)</button>
+    <button class="action-btn danger">Sistemden Çıkış Yap</button>
+  </div>
+
+  <footer>
+    <span>Bu Bir Spotify Ürünü Değildir</span>
+    <span id="footerTime"></span>
+  </footer>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">—</h2>
+      <p id="modalSub">—</p>
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <div class="loading">Yükleniyor...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// MENÜ VE EKRAN GEÇİŞ FONKSİYONLARI
+function toggleMenu() {
+  document.getElementById('sideMenu').classList.toggle('open');
+  document.getElementById('menuOverlay').classList.toggle('open');
+}
+
+function switchView(viewId) {
+  document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + viewId).classList.add('active');
   
-  function switchView(viewId) {
-    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-    document.getElementById('view-' + viewId).classList.add('active');
-    document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
-    document.getElementById('nav-' + viewId).classList.add('active');
-    const titles = {'istatistikler': 'Kişisel Spotify Verileri', 'profil': 'Hesap ve Ayarlar'};
-    document.getElementById('headerSubtitle').textContent = titles[viewId];
-  }
+  document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('nav-' + viewId).classList.add('active');
+  
+  const titles = {
+    'istatistikler': 'Kişisel Spotify Verileri',
+    'duzenle': 'Playlist Yönetimi',
+    'profil': 'Hesap ve Ayarlar'
+  };
+  document.getElementById('headerSubtitle').textContent = titles[viewId];
+}
 
-  function fmtSure(sn) {
-    if (!sn) return '—';
-    const s = parseInt(sn);
-    return s > 3600 ? `${Math.floor(s/3600)}s ${Math.floor((s%3600)/60)}dk` : `${Math.floor((s%3600)/60)}dk`;
-  }
-  function openModal() { document.getElementById('modalOverlay').classList.add('open'); }
-  function closeModalDirect() { document.getElementById('modalOverlay').classList.remove('open'); }
-  function closeModal(e) { if (e.target === document.getElementById('modalOverlay')) closeModalDirect(); }
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalDirect(); });
+// YARDIMCI VE RENDER FONKSİYONLARI
+function fmtSure(sn) {
+  if (!sn) return '—';
+  const s = parseInt(sn);
+  const saat = Math.floor(s / 3600);
+  const dk = Math.floor((s % 3600) / 60);
+  return saat > 0 ? `${saat}s ${dk}dk` : `${dk}dk`;
+}
 
-  function renderHourChart(saatler) {
-    const max = Math.max(...saatler.map(s => s.count), 1);
-    return `<div class="hour-chart">${saatler.map(s => `<div class="hour-bar ${s.count > 0 ? 'active' : ''}" style="height:${Math.max((s.count/max)*100, 2)}%"><div class="hour-tip">${s.saat}: ${s.count} kez</div></div>`).join('')}</div>
-            <div class="hour-labels">${saatler.map((s,i) => `<div class="hour-label">${i % 6 === 0 ? s.saat.slice(0,2) : ''}</div>`).join('')}</div>`;
-  }
-  function renderVakitler(vakitler) {
-    return `<div class="vakit-row">${vakitler.map(v => `<div class="vakit-pill"><span class="vc">${v.count}</span><span>${v.vakit}</span></div>`).join('')}</div>`;
-  }
+function openModal() { document.getElementById('modalOverlay').classList.add('open'); }
+function closeModalDirect() { document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModal(e) { if (e.target === document.getElementById('modalOverlay')) closeModalDirect(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalDirect(); });
 
-  async function init() {
-    const res = await fetch('/api/dashboard');
-    if(!res.ok) {
-      if(res.status === 401) window.location.href = '/login';
-      return;
+function renderHourChart(saatler) {
+  const max = Math.max(...saatler.map(s => s.count), 1);
+  return `
+    <div class="hour-chart">
+      ${saatler.map(s => {
+        const h = Math.max(Math.round((s.count / max) * 100), s.count > 0 ? 4 : 2);
+        return `<div class="hour-bar ${s.count > 0 ? 'active' : ''}" style="height:${h}%">
+          <div class="hour-tip">${s.saat}: ${s.count} kez</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="hour-labels">
+      ${saatler.map((s,i) => `<div class="hour-label">${i % 6 === 0 ? s.saat.slice(0,2) : ''}</div>`).join('')}
+    </div>`;
+}
+
+function renderVakitler(vakitler) {
+  if (!vakitler.length) return '';
+  return `<div class="vakit-row">${vakitler.map(v =>
+    `<div class="vakit-pill"><span class="vc">${v.count}</span><span>${v.vakit}</span></div>`
+  ).join('')}</div>`;
+}
+
+async function openSarkiModal(sarki, sanatci) {
+  document.getElementById('modalTitle').textContent = sarki;
+  document.getElementById('modalSub').textContent = sanatci;
+  document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
+  openModal();
+
+  const res  = await fetch(`/api/sarki/${encodeURIComponent(sarki)}`);
+  const data = await res.json();
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="modal-stats" style="grid-template-columns: 1fr 1fr 1fr;">
+      <div class="modal-stat"><div class="val">${data.toplam_count}</div><div class="lbl">Toplam Dinlenme</div></div>
+      <div class="modal-stat"><div class="val">${data.toplam_sure}</div><div class="lbl">Toplam Süre</div></div>
+      <div class="modal-stat"><div class="val" style="font-size:18px; line-height:26px;">${data.ilk_dinlenme}</div><div class="lbl">İlk Dinleme</div></div>
+    </div>
+    <div class="modal-section-title">Dinlenme Saatleri</div>
+    ${renderHourChart(data.saatler)}
+    <div class="modal-section-title" style="margin-top:20px">Vakit Dağılımı</div>
+    ${renderVakitler(data.vakitler)}
+  `;
+}
+
+async function openSanatciModal(sanatci) {
+  document.getElementById('modalTitle').textContent = sanatci;
+  document.getElementById('modalSub').textContent = 'Sanatçı Detayı';
+  document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
+  openModal();
+
+  const res  = await fetch(`/api/sanatci/${encodeURIComponent(sanatci)}`);
+  const data = await res.json();
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="modal-stats">
+      <div class="modal-stat"><div class="val">${data.toplam_count}</div><div class="lbl">Toplam Dinlenme</div></div>
+      <div class="modal-stat"><div class="val">${data.toplam_sure}</div><div class="lbl">Toplam Süre</div></div>
+    </div>
+    <div class="modal-section-title">En Çok Dinlenen Şarkılar</div>
+    <div class="modal-track-list">
+      ${data.top_sarkilar.map((t,i) => `
+        <div class="modal-track">
+          <span class="mtn">${String(i+1).padStart(2,'0')}</span>
+          <span class="mname">${t.sarki}</span>
+          <span class="mcnt">${t.count}</span>
+        </div>`).join('')}
+    </div>
+    <div class="modal-section-title">Dinlenme Saatleri</div>
+    ${renderHourChart(data.saatler)}
+    <div class="modal-section-title" style="margin-top:20px">Vakit Dağılımı</div>
+    ${renderVakitler(data.vakitler)}
+  `;
+}
+
+async function fetchData() {
+  const res = await fetch('/api/dashboard');
+  return res.ok ? res.json() : null;
+}
+
+function renderStats(d) {
+  document.getElementById('statTotal').textContent   = (d.toplam_kayit||0).toLocaleString('tr');
+  document.getElementById('statTracks').textContent  = (d.farkli_sarki||0).toLocaleString('tr');
+  document.getElementById('statArtists').textContent = (d.farkli_sanatci||0).toLocaleString('tr');
+  document.getElementById('statHours').textContent   = Math.floor((d.toplam_sure_sn||0)/3600).toLocaleString('tr');
+  document.getElementById('syncInfo').innerHTML      = `<span class="dot"></span> Aktif &nbsp;|&nbsp; Son sync: ${d.son_sync||'—'}`;
+  
+  if(d.ilk_kayit_tarihi) {
+    document.getElementById('profilKatilimTarihi').textContent = d.ilk_kayit_tarihi;
+  }
+}
+
+function renderWeek(hafta) {
+  document.getElementById('weekGrid').innerHTML = hafta.map(g => `
+    <div class="week-day ${g.sure_sn>0?'has-data':''}">
+      <div class="day-name">${g.gun.slice(0,3)}</div>
+      <div class="day-date">${g.tarih.slice(0,5)}</div>
+      <div class="day-sure ${g.sure_sn===0?'empty':''}">${fmtSure(g.sure_sn)}</div>
+    </div>`).join('');
+}
+
+function renderRankList(id, items, nameKey, subKey, countKey, daysKey, clickFn) {
+  const max = items[0]?.[countKey] || 1;
+  document.getElementById(id).innerHTML = items.slice(0,10).map((item,i) => {
+    let daysHtml = '';
+    if (daysKey && item[daysKey] !== undefined && item[daysKey] !== null) {
+      const d = item[daysKey];
+      daysHtml = `<div class="days">${d === 0 ? 'Bugün keşfedildi' : `<span>${d}</span> gündür`}</div>`;
     }
-    const data = await res.json();
-    
-    document.getElementById('statTotal').textContent = data.toplam_kayit.toLocaleString('tr');
-    document.getElementById('statTracks').textContent = data.farkli_sarki.toLocaleString('tr');
-    document.getElementById('statArtists').textContent = data.farkli_sanatci.toLocaleString('tr');
-    document.getElementById('statHours').textContent = Math.floor(data.toplam_sure_sn/3600).toLocaleString('tr');
-    document.getElementById('syncInfo').innerHTML = `<span class="dot"></span> Aktif | Son sync: ${data.son_sync}`;
-    document.getElementById('profilKatilimTarihi').textContent = data.ilk_kayit_tarihi;
-    
-    document.getElementById('weekGrid').innerHTML = data.hafta.map(g => `<div class="week-day ${g.sure_sn>0?'has-data':''}"><div class="day-name">${g.gun.slice(0,3)}</div><div class="day-date">${g.tarih.slice(0,5)}</div><div class="day-sure ${g.sure_sn===0?'empty':''}">${fmtSure(g.sure_sn)}</div></div>`).join('');
-    
-    const rankTpl = (items) => items.map((item,i) => `
-    <div class="rank-item" data-fn="${item.sanatci && item.sarki ? 'openSarkiModal' : 'openSanatciModal'}" data-name="${(item.sarki||item.sanatci).replace(/"/g,'&quot;')}" data-sub="${item.sanatci && item.sarki ? item.sanatci.replace(/"/g,'&quot;') : ''}">
+    return `
+    <div class="rank-item" data-name="${(item[nameKey]||'').replace(/"/g,'&quot;')}" data-sub="${(item[subKey]||'').replace(/"/g,'&quot;')}" data-fn="${clickFn}">
       <div class="num">${String(i+1).padStart(2,'0')}</div>
       <div class="info">
-        <div class="name">${item.sarki||item.sanatci}</div>
-        ${item.sanatci && item.sarki ? `<div class="sub-info">${item.sanatci}</div>`:''}
-        <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(item.count/items[0].count*100)}%"></div></div>
+        <div class="name">${item[nameKey]||'—'}</div>
+        ${subKey && item[subKey] ? `<div class="sub-info">${item[subKey]}</div>` : ''}
+        <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(item[countKey]/max*100)}%"></div></div>
       </div>
       <div class="count">
-        <div><strong>${item.count}</strong>kez</div>
-        <div class="days">${item.kac_gundur === 0 ? 'Bugün keşfedildi' : `<span>${item.kac_gundur}</span> gündür`}</div>
+        <div><strong>${item[countKey]}</strong>kez</div>
+        ${daysHtml}
       </div>
-    </div>`).join('');
-    
-    document.getElementById('topTracks').innerHTML = rankTpl(data.top_sarkilar);
-    document.getElementById('topArtists').innerHTML = rankTpl(data.top_sanatcilar);
-    
-    if (data.genel_saatler) {
-      document.getElementById('globalHourChartContainer').innerHTML = renderHourChart(data.genel_saatler);
-      document.getElementById('globalVakitContainer').innerHTML = renderVakitler(data.genel_vakitler);
-    }
-    
-    document.getElementById('monthTable').innerHTML = `<table class="month-table"><thead><tr><th>Ay</th><th>Aylık Toplam</th><th>Günlük Ortalama</th><th>Dinleme Sayısı</th></tr></thead><tbody>${[...data.aylar].reverse().map(a => `<tr style="cursor:pointer" onclick="openAyModal('${a.ay}')"><td>${a.ay} ↗</td><td class="green">${a.toplam}</td><td>${a.ortalama}</td><td>${a.kayit_sayisi}</td></tr>`).join('')}</tbody></table>`;
-    document.getElementById('footerTime').textContent = new Date().toLocaleString('tr-TR');
-  }
-  init();
+    </div>`
+  }).join('');
+}
 
-  // --- MODAL DETAY VERİ ÇEKİMİ ---
+function renderMonths(aylar) {
+  document.getElementById('monthTable').innerHTML = `<table class="month-table">
+    <thead><tr><th>Ay</th><th>Aylık Toplam</th><th>Günlük Ortalama</th><th>Dinleme Sayısı</th></tr></thead>
+    <tbody>${[...aylar].reverse().map(a => `
+      <tr style="cursor:pointer" onclick="openAyModal('${a.ay}')">
+        <td>${a.ay} ↗</td>
+        <td class="green">${a.toplam}</td>
+        <td>${a.ortalama}</td>
+        <td>${(a.kayit_sayisi||0).toLocaleString('tr')}</td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function openTumSanatcilarModal() {
+  document.getElementById('modalTitle').textContent = 'Tüm Sanatçılar';
+  document.getElementById('modalSub').textContent = 'Dinlenme sayısına göre sıralı';
+  document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
+  openModal();
+
+  const res  = await fetch('/api/tum-sanatcilar');
+  const data = await res.json();
+  const max  = data.sanatcilar[0]?.count || 1;
+
+  document.getElementById('modalBody').innerHTML = `
+    <div style="margin-bottom:16px;font-size:11px;color:var(--muted)">${data.toplam} farklı sanatçı</div>
+    <div class="modal-track-list">
+      ${data.sanatcilar.map((s,i) => `
+        <div class="modal-track" style="cursor:pointer"
+             data-fn="openSanatciModal" data-name="${s.sanatci.replace(/"/g,'&quot;')}" data-sub="">
+          <span class="mtn">${String(i+1).padStart(2,'0')}</span>
+          <span>
+            <div class="mname">${s.sanatci}</div>
+            <div class="bar-wrap" style="margin-top:4px"><div class="bar-fill" style="width:${Math.round(s.count/max*100)}%"></div></div>
+          </span>
+          <span class="mcnt">${s.count}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+async function downloadPNG() {
+  const btn = document.getElementById('dlBtn');
+  btn.textContent = '⏳';
+  btn.disabled = true;
+  try {
+    const canvas = await html2canvas(document.querySelector('.wrapper'), {
+      backgroundColor: '#0a0a0a',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+    const link = document.createElement('a');
+    link.download = 'muzik-istatistik-' + new Date().toISOString().slice(0,10) + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(e) {
+    alert('İndirme hatası: ' + e.message);
+  }
+  btn.innerHTML = '↓';
+  btn.disabled = false;
+}
+
+async function openTumSarkilarModal() {
+  document.getElementById('modalTitle').textContent = 'Tüm Şarkılar';
+  document.getElementById('modalSub').textContent = 'Dinlenme sayısına göre sıralı';
+  document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
+  openModal();
+
+  const res  = await fetch('/api/tum-sarkilar');
+  const data = await res.json();
+  const max  = data.sarkilar[0]?.count || 1;
+
+  document.getElementById('modalBody').innerHTML = `
+    <div style="margin-bottom:16px;font-size:11px;color:var(--muted)">${data.toplam} farklı şarkı</div>
+    <div class="modal-track-list">
+      ${data.sarkilar.map((t,i) => `
+        <div class="modal-track" style="grid-template-columns:36px 1fr auto auto;gap:10px;cursor:pointer"
+             data-fn="openSarkiModal" data-name="${t.sarki.replace(/"/g,'&quot;')}" data-sub="${t.sanatci.replace(/"/g,'&quot;')}">
+          <span class="mtn">${String(i+1).padStart(2,'0')}</span>
+          <span>
+            <div class="mname">${t.sarki}</div>
+            <div style="font-size:11px;color:var(--muted)">${t.sanatci}</div>
+            <div class="bar-wrap" style="margin-top:4px"><div class="bar-fill" style="width:${Math.round(t.count/max*100)}%"></div></div>
+          </span>
+          <span class="mcnt">${t.count}</span>
+          <span style="font-size:11px;color:var(--muted);text-align:right">${t.sure}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+async function openAyModal(ayLabel) {
+  document.getElementById('modalTitle').textContent = ayLabel;
+  document.getElementById('modalSub').textContent = 'Aylık Detay';
+  document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
+  openModal();
+
+  const res  = await fetch(`/api/ay/${encodeURIComponent(ayLabel)}`);
+  const data = await res.json();
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="modal-stats">
+      <div class="modal-stat"><div class="val">${data.toplam_kayit}</div><div class="lbl">Toplam Dinlenme</div></div>
+      <div class="modal-stat"><div class="val">${data.toplam_sure}</div><div class="lbl">Toplam Süre</div></div>
+    </div>
+
+    <div class="modal-section-title">En Çok Dinlenen Şarkılar</div>
+    <div class="modal-track-list">
+      ${data.top_sarkilar.map((t,i) => `
+        <div class="modal-track" style="cursor:pointer"
+             data-fn="openSarkiModal" data-name="${t.sarki.replace(/"/g,'&quot;')}" data-sub="${t.sanatci.replace(/"/g,'&quot;')}">
+          <span class="mtn">${String(i+1).padStart(2,'0')}</span>
+          <span>
+            <div class="mname">${t.sarki}</div>
+            <div style="font-size:11px;color:var(--muted)">${t.sanatci}</div>
+          </span>
+          <span class="mcnt">${t.count}</span>
+        </div>`).join('')}
+    </div>
+
+    <div class="modal-section-title">En Çok Dinlenen Sanatçılar</div>
+    <div class="modal-track-list">
+      ${data.top_sanatcilar.map((s,i) => `
+        <div class="modal-track" style="cursor:pointer"
+             data-fn="openSanatciModal" data-name="${s.sanatci.replace(/"/g,'&quot;')}" data-sub="">
+          <span class="mtn">${String(i+1).padStart(2,'0')}</span>
+          <span class="mname">${s.sanatci}</span>
+          <span class="mcnt">${s.count}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+async function init() {
+  const data = await fetchData();
+  if (!data) return;
+  renderStats(data);
+  renderWeek(data.hafta);
   
-  async function openTumSarkilarModal() {
-    document.getElementById('modalTitle').textContent = 'Tüm Şarkılar';
-    document.getElementById('modalSub').textContent = 'Dinlenme sayısına göre sıralı';
-    document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
-    openModal();
-    const res = await fetch('/api/tum-sarkilar');
-    const data = await res.json();
-    const max = data.sarkilar[0]?.count || 1;
-    document.getElementById('modalBody').innerHTML = `
-      <div style="margin-bottom:16px;font-size:11px;color:var(--muted)">${data.toplam} farklı şarkı</div>
-      <div class="modal-track-list">
-        ${data.sarkilar.map((t,i) => `
-          <div class="modal-track" style="grid-template-columns:36px 1fr auto auto;gap:10px;cursor:pointer"
-               data-fn="openSarkiModal" data-name="${t.sarki.replace(/"/g,'&quot;')}" data-sub="${t.sanatci.replace(/"/g,'&quot;')}">
-            <span class="mtn">${String(i+1).padStart(2,'0')}</span>
-            <span>
-              <div class="mname">${t.sarki}</div>
-              <div style="font-size:11px;color:var(--muted)">${t.sanatci}</div>
-              <div class="bar-wrap" style="margin-top:4px"><div class="bar-fill" style="width:${Math.round(t.count/max*100)}%"></div></div>
-            </span>
-            <span class="mcnt">${t.count}</span>
-            <span style="font-size:11px;color:var(--muted);text-align:right">${t.sure}</span>
-          </div>`).join('')}
-      </div>`;
+  renderRankList('topTracks',   data.top_sarkilar,   'sarki',   'sanatci', 'count', 'kac_gundur', 'openSarkiModal');
+  renderRankList('topArtists',  data.top_sanatcilar, 'sanatci', null,      'count', 'kac_gundur', 'openSanatciModal');
+  
+  // YENİ: GENEL GRAFİKLERİ ÇİZ
+  if (data.genel_saatler && data.genel_vakitler) {
+    document.getElementById('globalHourChartContainer').innerHTML = renderHourChart(data.genel_saatler);
+    document.getElementById('globalVakitContainer').innerHTML = renderVakitler(data.genel_vakitler);
   }
+  
+  renderMonths(data.aylar);
+  document.getElementById('footerTime').textContent = new Date().toLocaleString('tr-TR');
+}
 
-  async function openTumSanatcilarModal() {
-    document.getElementById('modalTitle').textContent = 'Tüm Sanatçılar';
-    document.getElementById('modalSub').textContent = 'Dinlenme sayısına göre sıralı';
-    document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
-    openModal();
-    const res = await fetch('/api/tum-sanatcilar');
-    const data = await res.json();
-    const max = data.sanatcilar[0]?.count || 1;
-    document.getElementById('modalBody').innerHTML = `
-      <div style="margin-bottom:16px;font-size:11px;color:var(--muted)">${data.toplam} farklı sanatçı</div>
-      <div class="modal-track-list">
-        ${data.sanatcilar.map((s,i) => `
-          <div class="modal-track" style="cursor:pointer" data-fn="openSanatciModal" data-name="${s.sanatci.replace(/"/g,'&quot;')}" data-sub="">
-            <span class="mtn">${String(i+1).padStart(2,'0')}</span>
-            <span>
-              <div class="mname">${s.sanatci}</div>
-              <div class="bar-wrap" style="margin-top:4px"><div class="bar-fill" style="width:${Math.round(s.count/max*100)}%"></div></div>
-            </span>
-            <span class="mcnt">${s.count}</span>
-          </div>`).join('')}
-      </div>`;
-  }
+init();
 
-  async function openSarkiModal(sarki, sanatci) {
-    document.getElementById('modalTitle').textContent = sarki;
-    document.getElementById('modalSub').textContent = sanatci;
-    document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
-    openModal();
-    const res  = await fetch(`/api/sarki/${encodeURIComponent(sarki)}`);
-    const data = await res.json();
-    document.getElementById('modalBody').innerHTML = `
-      <div class="modal-stats" style="grid-template-columns: 1fr 1fr 1fr;">
-        <div class="modal-stat"><div class="val">${data.toplam_count}</div><div class="lbl">Toplam Dinlenme</div></div>
-        <div class="modal-stat"><div class="val">${data.toplam_sure}</div><div class="lbl">Toplam Süre</div></div>
-        <div class="modal-stat"><div class="val" style="font-size:18px; line-height:26px;">${data.ilk_dinlenme}</div><div class="lbl">İlk Dinleme</div></div>
-      </div>
-      <div class="modal-section-title">Dinlenme Saatleri</div>
-      ${renderHourChart(data.saatler)}
-      <div class="modal-section-title" style="margin-top:20px">Vakit Dağılımı</div>
-      ${renderVakitler(data.vakitler)}
-    `;
-  }
-
-  async function openSanatciModal(sanatci) {
-    document.getElementById('modalTitle').textContent = sanatci;
-    document.getElementById('modalSub').textContent = 'Sanatçı Detayı';
-    document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
-    openModal();
-    const res  = await fetch(`/api/sanatci/${encodeURIComponent(sanatci)}`);
-    const data = await res.json();
-    document.getElementById('modalBody').innerHTML = `
-      <div class="modal-stats">
-        <div class="modal-stat"><div class="val">${data.toplam_count}</div><div class="lbl">Toplam Dinlenme</div></div>
-        <div class="modal-stat"><div class="val">${data.toplam_sure}</div><div class="lbl">Toplam Süre</div></div>
-      </div>
-      <div class="modal-section-title">En Çok Dinlenen Şarkılar</div>
-      <div class="modal-track-list">
-        ${data.top_sarkilar.map((t,i) => `
-          <div class="modal-track">
-            <span class="mtn">${String(i+1).padStart(2,'0')}</span>
-            <span class="mname">${t.sarki}</span>
-            <span class="mcnt">${t.count}</span>
-          </div>`).join('')}
-      </div>
-      <div class="modal-section-title">Dinlenme Saatleri</div>
-      ${renderHourChart(data.saatler)}
-      <div class="modal-section-title" style="margin-top:20px">Vakit Dağılımı</div>
-      ${renderVakitler(data.vakitler)}
-    `;
-  }
-
-  async function openAyModal(ayLabel) {
-    document.getElementById('modalTitle').textContent = ayLabel;
-    document.getElementById('modalSub').textContent = 'Aylık Detay';
-    document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
-    openModal();
-    const res  = await fetch(`/api/ay/${encodeURIComponent(ayLabel)}`);
-    const data = await res.json();
-    document.getElementById('modalBody').innerHTML = `
-      <div class="modal-stats">
-        <div class="modal-stat"><div class="val">${data.toplam_kayit}</div><div class="lbl">Toplam Dinlenme</div></div>
-        <div class="modal-stat"><div class="val">${data.toplam_sure}</div><div class="lbl">Toplam Süre</div></div>
-      </div>
-      <div class="modal-section-title">En Çok Dinlenen Şarkılar</div>
-      <div class="modal-track-list">
-        ${data.top_sarkilar.map((t,i) => `
-          <div class="modal-track" style="cursor:pointer" data-fn="openSarkiModal" data-name="${t.sarki.replace(/"/g,'&quot;')}" data-sub="${t.sanatci.replace(/"/g,'&quot;')}">
-            <span class="mtn">${String(i+1).padStart(2,'0')}</span>
-            <span>
-              <div class="mname">${t.sarki}</div>
-              <div style="font-size:11px;color:var(--muted)">${t.sanatci}</div>
-            </span>
-            <span class="mcnt">${t.count}</span>
-          </div>`).join('')}
-      </div>
-      <div class="modal-section-title">En Çok Dinlenen Sanatçılar</div>
-      <div class="modal-track-list">
-        ${data.top_sanatcilar.map((s,i) => `
-          <div class="modal-track" style="cursor:pointer" data-fn="openSanatciModal" data-name="${s.sanatci.replace(/"/g,'&quot;')}" data-sub="">
-            <span class="mtn">${String(i+1).padStart(2,'0')}</span>
-            <span class="mname">${s.sanatci}</span>
-            <span class="mcnt">${s.count}</span>
-          </div>`).join('')}
-      </div>`;
-  }
-
-  // Tıklamaları Dinleyen Ana Mekanizma (Delegated Click)
-  document.addEventListener('click', function(e) {
-    const item = e.target.closest('[data-fn]');
-    if (!item) return;
-    const fn = item.dataset.fn;
-    const name = item.dataset.name;
-    const sub = item.dataset.sub;
-    if (fn === 'openSarkiModal') openSarkiModal(name, sub);
-    if (fn === 'openSanatciModal') openSanatciModal(name);
-  });
-
-  async function downloadPNG() {
-    const btn = document.getElementById('dlBtn');
-    btn.textContent = '⏳';
-    btn.disabled = true;
-    
-    const modalOverlay = document.getElementById('modalOverlay');
-    const menuOverlay = document.getElementById('menuOverlay');
-    const oldModalDisplay = modalOverlay.style.display;
-    const oldMenuDisplay = menuOverlay.style.display;
-    
-    modalOverlay.style.display = 'none';
-    menuOverlay.style.display = 'none';
-
-    try {
-      const canvas = await html2canvas(document.querySelector('.wrapper'), {
-        backgroundColor: '#0a0a0a',
-        scale: 3,
-        useCORS: true,
-        logging: false,
-      });
-      const link = document.createElement('a');
-      link.download = 'muzik-istatistik-' + new Date().toISOString().slice(0,10) + '.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    } catch(e) {
-      alert('İndirme hatası: ' + e.message);
-    } finally {
-      modalOverlay.style.display = oldModalDisplay;
-      menuOverlay.style.display = oldMenuDisplay;
-      btn.innerHTML = '↓';
-      btn.disabled = false;
-    }
-  }
-  </script>
-{% endif %}
+// Delegated click
+document.addEventListener('click', function(e) {
+  const item = e.target.closest('.rank-item[data-fn]');
+  if (!item) return;
+  const fn   = item.dataset.fn;
+  const name = item.dataset.name;
+  const sub  = item.dataset.sub;
+  if (fn === 'openSarkiModal')  openSarkiModal(name, sub);
+  if (fn === 'openSanatciModal') openSanatciModal(name);
+});
+</script>
 </body>
 </html>
-
-
