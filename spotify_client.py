@@ -184,7 +184,7 @@ class SpotifyClient:
     def _get_playlist_tracks(self, playlist_id):
         """Bir playlistin tüm parçalarını döndürür"""
         tracks = []
-        url = f"/playlists/{playlist_id}/tracks"
+        url = f"/playlists/{playlist_id}/items"
         params = {"limit": 100, "offset": 0, "fields": "next,items(track(id,artists(id,name),name))"}
         while url:
             data = self._req("GET", url, params=params)
@@ -221,7 +221,7 @@ class SpotifyClient:
                 track_ids.append(f"spotify:track:{tid}")
 
         for i in range(0, len(track_ids), 100):
-            self._req("POST", f"/playlists/{playlist_id}/tracks", json={
+            self._req("POST", f"/playlists/{playlist_id}/items", json={
                 "uris": track_ids[i:i+100]
             })
         return playlist_id
@@ -234,12 +234,12 @@ class SpotifyClient:
         random.shuffle(track_uris)
         # Önce playlist'i boşalt
         for i in range(0, len(track_uris), 100):
-            self._req("DELETE", f"/playlists/{playlist_id}/tracks", json={
+            self._req("DELETE", f"/playlists/{playlist_id}/items", json={
                 "tracks": [{"uri": u} for u in track_uris[i:i+100]]
             })
         # Karışık olarak ekle
         for i in range(0, len(track_uris), 100):
-            self._req("POST", f"/playlists/{playlist_id}/tracks", json={
+            self._req("POST", f"/playlists/{playlist_id}/items", json={
                 "uris": track_uris[i:i+100]
             })
 
@@ -293,7 +293,7 @@ class SpotifyClient:
         liked_ids = self._get_liked_track_ids(track_ids)
         liked_uris = [f"spotify:track:{tid}" for tid in liked_ids]
         for i in range(0, len(liked_uris), 100):
-            self._req("DELETE", f"/playlists/{playlist_id}/tracks", json={
+            self._req("DELETE", f"/playlists/{playlist_id}/items", json={
                 "tracks": [{"uri": u} for u in liked_uris[i:i+100]]
             })
         return len(liked_uris)
@@ -305,7 +305,7 @@ class SpotifyClient:
         liked_ids = self._get_liked_track_ids(track_ids)
         unliked_uris = [f"spotify:track:{tid}" for tid in track_ids if tid not in liked_ids]
         for i in range(0, len(unliked_uris), 100):
-            self._req("DELETE", f"/playlists/{playlist_id}/tracks", json={
+            self._req("DELETE", f"/playlists/{playlist_id}/items", json={
                 "tracks": [{"uri": u} for u in unliked_uris[i:i+100]]
             })
         return len(unliked_uris)
