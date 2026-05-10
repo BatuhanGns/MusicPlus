@@ -452,86 +452,83 @@ async function loadTopluluk() {
 }
 
 function buildToplulukHTML(d) {
-  const fmtSure = (sn) => {
-    const s = parseInt(sn) || 0;
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    return h > 0 ? `${h} Saat ${m} Dakika` : `${m} Dakika`;
-  };
-
-  const topSarkilar = (d.top_sarkilar || []).map((s, i) => `
+  // Şarkı listesi ve yeşil barlar
+  const topSarkilar = (d.top_sarkilar || []).map((s, i) => {
+    const max = d.top_sarkilar[0]?.count || 1;
+    return `
     <div class="rank-item" style="cursor:default">
-      <div class="rank-num">${String(i+1).padStart(2,'0')}</div>
-      <div class="rank-info">
-        <div class="rank-name">${s.sarki}</div>
-        <div class="rank-sub">${s.sanatci}</div>
+      <div class="num">${String(i+1).padStart(2,'0')}</div>
+      <div class="info">
+        <div class="name">${s.sarki}</div>
+        <div class="sub-info">${s.sanatci}</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(s.count/max*100)}%"></div></div>
       </div>
-      <div class="rank-count"><span>${s.count}</span><small>kez</small></div>
-    </div>`).join('');
-
-  const topSanatcilar = (d.top_sanatcilar || []).map((s, i) => `
-    <div class="rank-item" style="cursor:default">
-      <div class="rank-num">${String(i+1).padStart(2,'0')}</div>
-      <div class="rank-info">
-        <div class="rank-name">${s.sanatci}</div>
+      <div class="count">
+        <div style="display:flex; align-items:flex-end;"><strong>${s.count}</strong>kez</div>
       </div>
-      <div class="rank-count"><span>${s.count}</span><small>kez</small></div>
-    </div>`).join('');
-
-  // Hafta
-  const haftaHTML = (d.hafta || []).map(g => {
-    const dk = Math.round((g.sure_sn || 0) / 60);
-    const barH = dk > 0 ? Math.max(4, Math.round(dk / Math.max(...(d.hafta||[]).map(x=>Math.round((x.sure_sn||0)/60)), 1) * 60)) : 4;
-    return `<div class="gun-card ${dk===0?'empty':''}">
-      <div class="gun-label">${g.gun?.slice(0,3)}</div>
-      <div class="gun-bar-wrap"><div class="gun-bar" style="height:${barH}px"></div></div>
-      <div class="gun-sure">${dk > 0 ? (dk >= 60 ? Math.round(dk/60)+'s' : dk+'dk') : '—'}</div>
     </div>`;
   }).join('');
 
-  // Saat dağılımı
-  const maxSaat = Math.max(...(d.genel_saatler||[]).map(x=>x.count), 1);
-  const saatBars = (d.genel_saatler||[]).map(s => {
-    const h = Math.max(2, Math.round(s.count / maxSaat * 80));
-    return `<div class="saat-bar-wrap" title="${s.saat}: ${s.count}">
-      <div class="saat-bar" style="height:${h}px"></div>
-      <div class="saat-label">${s.saat.split(':')[0]}</div>
+  // Sanatçı listesi ve yeşil barlar
+  const topSanatcilar = (d.top_sanatcilar || []).map((s, i) => {
+    const max = d.top_sanatcilar[0]?.count || 1;
+    return `
+    <div class="rank-item" style="cursor:default">
+      <div class="num">${String(i+1).padStart(2,'0')}</div>
+      <div class="info">
+        <div class="name">${s.sanatci}</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(s.count/max*100)}%"></div></div>
+      </div>
+      <div class="count">
+        <div style="display:flex; align-items:flex-end;"><strong>${s.count}</strong>kez</div>
+      </div>
     </div>`;
   }).join('');
 
-  // Vakit dağılımı
-  const vakitHTML = (d.genel_vakitler||[]).map(v =>
-    `<div class="vakit-tag">${v.vakit} <strong>${v.count.toLocaleString('tr')}</strong></div>`
-  ).join('');
-
-  // Aylık analiz
-  const aylarHTML = (d.aylar||[]).slice().reverse().map(a => `
-    <div class="ay-row">
-      <div class="ay-label">${a.ay}</div>
-      <div class="ay-toplam">${a.toplam}</div>
-      <div class="ay-ort">${a.ortalama}</div>
-      <div class="ay-kayit">${a.kayit_sayisi?.toLocaleString('tr')}</div>
+  // 7 Günlük Tablo
+  const haftaHTML = (d.hafta || []).map(g => `
+    <div class="week-day ${g.sure_sn>0?'has-data':''}">
+      <div class="day-name">${g.gun?.slice(0,3)}</div>
+      <div class="day-date">${g.tarih?.slice(0,5)}</div>
+      <div class="day-sure ${g.sure_sn===0?'empty':''}">${fmtSure(g.sure_sn)}</div>
     </div>`).join('');
 
+  // Mevcut grafik fonksiyonlarını topluluk için yeniden kullanıyoruz
+  const saatBars = renderHourChart(d.genel_saatler || []);
+  const vakitHTML = renderVakitler(d.genel_vakitler || []);
+
+  // Aylık Tablo
+  const aylarHTML = `<table class="month-table">
+    <thead><tr><th>Ay</th><th>Aylık Toplam</th><th>Günlük Ortalama</th><th>Dinleme Sayısı</th></tr></thead>
+    <tbody>${(d.aylar||[]).slice().reverse().map(a => `
+      <tr>
+        <td>${a.ay}</td>
+        <td class="green">${a.toplam}</td>
+        <td>${a.ortalama}</td>
+        <td>${(a.kayit_sayisi||0).toLocaleString('tr')}</td>
+      </tr>`).join('')}
+    </tbody></table>`;
+
+  // Ana HTML iskeletini birleştir
   return `
     <div class="stats-row">
       <div class="stat-card"><div class="label">Toplam Dinlenme</div><div class="value">${(d.toplam_kayit||0).toLocaleString('tr')}</div><div class="sub">kayıt · ${d.katilimci_sayisi||0} kişi</div></div>
       <div class="stat-card"><div class="label">Farklı Şarkı</div><div class="value">${(d.farkli_sarki||0).toLocaleString('tr')}</div></div>
       <div class="stat-card"><div class="label">Farklı Sanatçı</div><div class="value">${(d.farkli_sanatci||0).toLocaleString('tr')}</div></div>
-      <div class="stat-card"><div class="label">Toplam Süre</div><div class="value">${Math.floor((d.toplam_sure_sn||0)/3600)}</div><div class="sub">saat</div></div>
+      <div class="stat-card"><div class="label">Toplam Süre</div><div class="value">${Math.floor((d.toplam_sure_sn||0)/3600).toLocaleString('tr')}</div><div class="sub">saat</div></div>
     </div>
 
     <div class="section">
       <div class="section-title">Son 7 Gün</div>
-      <div class="gun-grid">${haftaHTML}</div>
+      <div class="week-grid">${haftaHTML}</div>
     </div>
 
     <div class="two-col">
-      <div>
+      <div class="section">
         <div class="section-title">En Çok Dinlenen Şarkılar</div>
         <div class="rank-list">${topSarkilar}</div>
       </div>
-      <div>
+      <div class="section">
         <div class="section-title">En Çok Dinlenen Sanatçılar</div>
         <div class="rank-list">${topSanatcilar}</div>
       </div>
@@ -539,23 +536,17 @@ function buildToplulukHTML(d) {
 
     <div class="section">
       <div class="section-title">Tüm Zamanlar Dinleme Alışkanlıkları</div>
-      <div class="modal-section-title" style="margin-top:0">Genel Saat Dağılımı</div>
-      <div class="saat-chart">${saatBars}</div>
-      <div class="modal-section-title" style="margin-top:24px">Genel Vakit Dağılımı</div>
-      <div class="vakit-row">${vakitHTML}</div>
+      <div style="background:var(--surface); padding:24px; border:1px solid var(--border);">
+        <div class="modal-section-title" style="margin-top:0">Genel Saat Dağılımı</div>
+        ${saatBars}
+        <div class="modal-section-title" style="margin-top:24px">Genel Vakit Dağılımı</div>
+        ${vakitHTML}
+      </div>
     </div>
 
     <div class="section">
       <div class="section-title">Aylık Analiz</div>
-      <div class="ay-table">
-        <div class="ay-row ay-header">
-          <div class="ay-label">Ay</div>
-          <div class="ay-toplam">Aylık Toplam</div>
-          <div class="ay-ort">Günlük Ortalama</div>
-          <div class="ay-kayit">Dinlenme Sayısı</div>
-        </div>
-        ${aylarHTML}
-      </div>
+      ${aylarHTML}
     </div>`;
 }
 
@@ -1346,3 +1337,4 @@ document.addEventListener('click', function(e) {
 </script>
 </body>
 </html>
+
