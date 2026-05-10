@@ -133,6 +133,28 @@
   .modal-track .mtn{font-size:10px;color:var(--muted);}
   .modal-track .mname{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .modal-track .mcnt{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--green);text-align:right;}
+
+  /* PLAYLİST GRID */
+  .playlist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
+  .playlist-card{background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+  .playlist-card:hover{border-color:var(--green);transform:translateY(-2px);}
+  .playlist-card img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:var(--surface2);}
+  .playlist-card .pl-no-img{width:100%;aspect-ratio:1;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:36px;}
+  .playlist-card .pl-info{padding:10px 12px;}
+  .playlist-card .pl-name{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
+  .playlist-card .pl-count{font-size:10px;color:var(--muted);}
+
+  /* PLAYLİST AKSİYON MODAL */
+  .pl-action-list{display:flex;flex-direction:column;gap:6px;}
+  .pl-action-btn{display:flex;align-items:center;gap:14px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:16px 20px;font-family:'DM Mono',monospace;font-size:13px;cursor:pointer;transition:all .2s;text-align:left;border-left:3px solid transparent;width:100%;}
+  .pl-action-btn:hover:not(:disabled){background:var(--surface);border-left-color:var(--green);}
+  .pl-action-btn:disabled{opacity:.45;cursor:not-allowed;}
+  .pl-action-btn .pl-icon{font-size:18px;min-width:24px;text-align:center;}
+  .pl-action-btn.danger{color:#ff6b6b;}
+  .pl-action-btn.danger:hover:not(:disabled){border-left-color:#ff6b6b;background:#ff6b6b0d;}
+  .pl-action-result{font-size:11px;color:var(--green);margin-top:12px;padding:10px 14px;background:var(--green-dim);border:1px solid var(--green);display:none;}
+  .pl-action-result.error{color:#ff6b6b;background:#ff6b6b11;border-color:#ff6b6b;}
+  .pl-action-result.show{display:block;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -203,13 +225,25 @@
   </div>
 
   <div id="view-duzenle" class="view-section">
-    <div class="section-title">Hızlı Çalma Listesi İşlemleri</div>
-    <div style="display:flex; flex-direction:column; gap:8px;">
-      <button class="action-btn">En Çok Dinlenen Şarkılara Göre Playlist Oluştur</button>
-      <button class="action-btn">Enerjiye Göre Playlist Oluştur</button>
-      <button class="action-btn">En Çok Dinlenen Sanatçılara Göre Playlist Oluştur</button>
-      <button class="action-btn">Mevcut Playlistleri Enerjiye Göre Karıştır</button>
-      <button class="action-btn">Rastgele Karıştır</button>
+    <!-- YENİ PLAYLIST OLUŞTUR -->
+    <div class="section">
+      <div class="section-title">Yeni Playlist Oluştur</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <button class="action-btn" id="btnCreateTopTracks" onclick="createPlaylist('top-tracks')">
+          <span style="font-size:18px;margin-right:12px">🎵</span> En Çok Dinlenen Şarkılara Göre
+        </button>
+        <button class="action-btn" id="btnCreateTopArtists" onclick="createPlaylist('top-artists')">
+          <span style="font-size:18px;margin-right:12px">🎤</span> En Çok Dinlenen Sanatçılara Göre
+        </button>
+      </div>
+    </div>
+
+    <!-- PLAYLİSTİ DÜZENLE -->
+    <div class="section">
+      <div class="section-title">Playlisti Düzenle</div>
+      <div id="playlistGrid" class="playlist-grid">
+        <div class="loading">Playlistler yükleniyor...</div>
+      </div>
     </div>
   </div>
 
@@ -265,6 +299,10 @@ function switchView(viewId) {
     'profil': 'Hesap ve Ayarlar'
   };
   document.getElementById('headerSubtitle').textContent = titles[viewId];
+
+  if (viewId === 'duzenle') {
+    loadPlaylists();
+  }
 }
 
 // YARDIMCI VE RENDER FONKSİYONLARI
@@ -555,17 +593,152 @@ async function init() {
   document.getElementById('footerTime').textContent = new Date().toLocaleString('tr-TR');
 }
 
+// ===================== PLAYLİST YÖNETİMİ =====================
+
+async function loadPlaylists() {
+  const grid = document.getElementById('playlistGrid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="loading">Yükleniyor...</div>';
+  try {
+    const res = await fetch('/api/playlists');
+    const data = await res.json();
+    if (data.error) {
+      grid.innerHTML = `<div class="loading" style="color:#ff6b6b">Hata: ${data.error}</div>`;
+      return;
+    }
+    if (!data.playlists || data.playlists.length === 0) {
+      grid.innerHTML = '<div class="loading">Playlist bulunamadı.</div>';
+      return;
+    }
+    grid.innerHTML = data.playlists.map(p => `
+      <div class="playlist-card" onclick="openPlaylistActionModal('${p.id}', ${JSON.stringify(p.name).replace(/'/g,"&#39;")}, ${p.track_count})">
+        ${p.image_url
+          ? `<img src="${p.image_url}" alt="${p.name}" loading="lazy">`
+          : `<div class="pl-no-img">🎵</div>`}
+        <div class="pl-info">
+          <div class="pl-name">${p.name}</div>
+          <div class="pl-count">${p.track_count} şarkı</div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    grid.innerHTML = `<div class="loading" style="color:#ff6b6b">Bağlantı hatası: ${e.message}</div>`;
+  }
+}
+
+function openPlaylistActionModal(playlistId, playlistName, trackCount) {
+  document.getElementById('modalTitle').textContent = playlistName;
+  document.getElementById('modalSub').textContent = `${trackCount} şarkı · Playlist Yönetimi`;
+  document.getElementById('modalBody').innerHTML = `
+    <div id="plActionResult" class="pl-action-result"></div>
+    <div class="pl-action-list">
+      <button class="pl-action-btn" onclick="plAction('${playlistId}', 'shuffle', this)">
+        <span class="pl-icon">🔀</span> Rastgele Karıştır
+      </button>
+      <button class="pl-action-btn" onclick="plAction('${playlistId}', 'follow-artists', this)">
+        <span class="pl-icon">➕</span> Tüm Sanatçıları Takip Et
+      </button>
+      <button class="pl-action-btn" onclick="plAction('${playlistId}', 'unfollow-artists', this)">
+        <span class="pl-icon">➖</span> Tüm Sanatçıları Takip Etme
+      </button>
+      <button class="pl-action-btn" onclick="plAction('${playlistId}', 'like-all', this)">
+        <span class="pl-icon">💚</span> Tüm Şarkıları Beğen
+      </button>
+      <button class="pl-action-btn" onclick="plAction('${playlistId}', 'unlike-all', this)">
+        <span class="pl-icon">🩶</span> Tüm Şarkıların Beğenisini Kaldır
+      </button>
+      <button class="pl-action-btn danger" onclick="plAction('${playlistId}', 'remove-liked', this)">
+        <span class="pl-icon">🗑️</span> Beğenilen Şarkıları Çıkar
+      </button>
+      <button class="pl-action-btn danger" onclick="plAction('${playlistId}', 'remove-unliked', this)">
+        <span class="pl-icon">🗑️</span> Beğenilmeyen Şarkıları Çıkar
+      </button>
+    </div>
+  `;
+  openModal();
+}
+
+async function plAction(playlistId, action, btn) {
+  const resultEl = document.getElementById('plActionResult');
+  const allBtns = document.querySelectorAll('.pl-action-btn');
+  allBtns.forEach(b => b.disabled = true);
+  const origText = btn.innerHTML;
+  btn.innerHTML = `<span class="pl-icon">⏳</span> İşleniyor...`;
+
+  const messages = {
+    'shuffle': ['Karıştırılıyor...', (d) => '✅ Playlist karıştırıldı'],
+    'follow-artists': ['Takip ediliyor...', (d) => `✅ ${d.followed} sanatçı takip edildi`],
+    'unfollow-artists': ['Kaldırılıyor...', (d) => `✅ ${d.unfollowed} sanatçının takibi bırakıldı`],
+    'like-all': ['Beğeniliyor...', (d) => `✅ ${d.liked} şarkı beğenildi`],
+    'unlike-all': ['Kaldırılıyor...', (d) => `✅ ${d.unliked} şarkının beğenisi kaldırıldı`],
+    'remove-liked': ['Kaldırılıyor...', (d) => `✅ ${d.removed} beğenilen şarkı çıkarıldı`],
+    'remove-unliked': ['Kaldırılıyor...', (d) => `✅ ${d.removed} beğenilmeyen şarkı çıkarıldı`],
+  };
+
+  try {
+    const res = await fetch(`/api/playlist/${playlistId}/${action}`, {method: 'POST'});
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    resultEl.textContent = messages[action][1](data);
+    resultEl.className = 'pl-action-result show';
+  } catch(e) {
+    resultEl.textContent = '❌ Hata: ' + e.message;
+    resultEl.className = 'pl-action-result error show';
+  }
+
+  btn.innerHTML = origText;
+  allBtns.forEach(b => b.disabled = false);
+}
+
+async function createPlaylist(type) {
+  const btnId = type === 'top-tracks' ? 'btnCreateTopTracks' : 'btnCreateTopArtists';
+  const btn = document.getElementById(btnId);
+  const origHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = btn.innerHTML.replace(/(🎵|🎤)/, '⏳') + ' — Oluşturuluyor...';
+  try {
+    const res = await fetch(`/api/playlist/create-${type}`, {method: 'POST'});
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    btn.innerHTML = btn.innerHTML.replace('⏳', '✅');
+    btn.innerHTML = origHTML.replace(/(🎵|🎤)/, '✅') + ' — Oluşturuldu!';
+    setTimeout(() => {
+      btn.innerHTML = origHTML;
+      btn.disabled = false;
+      loadPlaylists();
+    }, 3000);
+  } catch(e) {
+    alert('Hata: ' + e.message);
+    btn.innerHTML = origHTML;
+    btn.disabled = false;
+  }
+}
+
+// Düzenle ekranına geçilince playlistleri yükle
+const _origSwitchView = switchView;
+// Override edilecek (aşağıda)
+
 init();
 
 // Delegated click
 document.addEventListener('click', function(e) {
   const item = e.target.closest('.rank-item[data-fn]');
-  if (!item) return;
-  const fn   = item.dataset.fn;
-  const name = item.dataset.name;
-  const sub  = item.dataset.sub;
-  if (fn === 'openSarkiModal')  openSarkiModal(name, sub);
-  if (fn === 'openSanatciModal') openSanatciModal(name);
+  if (item) {
+    const fn   = item.dataset.fn;
+    const name = item.dataset.name;
+    const sub  = item.dataset.sub;
+    if (fn === 'openSarkiModal')  openSarkiModal(name, sub);
+    if (fn === 'openSanatciModal') openSanatciModal(name);
+    return;
+  }
+  const mtrack = e.target.closest('.modal-track[data-fn]');
+  if (mtrack) {
+    const fn   = mtrack.dataset.fn;
+    const name = mtrack.dataset.name;
+    const sub  = mtrack.dataset.sub;
+    if (fn === 'openSarkiModal')  openSarkiModal(name, sub);
+    if (fn === 'openSanatciModal') openSanatciModal(name);
+  }
 });
 </script>
 </body>
