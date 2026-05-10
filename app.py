@@ -12,15 +12,6 @@ from sheets_client import SheetsClient
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
-spotify = SpotifyClient()
-sheets  = SheetsClient()
-
-_last_sync = "Henüz sync yapılmadı"
-_cached_rows = []
-_cached_headers = []
-
 TR_GUNLER = {0:"Pazartesi",1:"Salı",2:"Çarşamba",3:"Perşembe",4:"Cuma",5:"Cumartesi",6:"Pazar"}
 TR_AYLAR  = {1:"Ocak",2:"Şubat",3:"Mart",4:"Nisan",5:"Mayıs",6:"Haziran",
              7:"Temmuz",8:"Ağustos",9:"Eylül",10:"Ekim",11:"Kasım",12:"Aralık"}
@@ -43,31 +34,61 @@ def fmt_sure(sn):
     dk   = (s % 3600) // 60
     return f"{saat} Saat {dk} Dakika" if saat > 0 else f"{dk} Dakika"
 
-def load_tumveri():
-    global _cached_rows, _cached_headers
-    ws = sheets._find_sheet("TümVeri")
-    all_values = ws.get_all_values()
-    if len(all_values) < 2:
-        return [], []
-    _cached_headers = all_values[0]
-    _cached_rows    = all_values[1:]
-    return _cached_headers, _cached_rows
+app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+spotify = SpotifyClient()
+sheets  = SheetsClient()
 
-def sync_job():
+def get_current_user_id():
+    """Session'dan mevcut kullanıcının Spotify ID'sini döndürür"""
+    return session.get("user_id")
+
+def get_current_user_name():
+    return session.get("display_name", "Kullanıcı")
+
+# Cache: her kullanıcı için ayrı
+_user_cache = {}  # user_id -> {"headers": [], "rows": [], "last_sync": ""}
+
+def load_user_data(user_id: str):
+    """Kullanıcının verisini Sheets'ten yükler ve cache'ler"""
+    headers, rows = sheets.get_user_data(user_id)
+    _user_cache[user_id] = {"headers": headers, "rows": rows}
+    return headers, rows
+
+def get_cached_data(user_id: str):
+    if user_id not in _user_cache:
+        return load_user_data(user_id)
+    return _user_cache[user_id]["headers"], _user_cache[user_id]["rows"]
+
+# Geriye dönük uyumluluk için
+def load_tumveri():
+    uid = get_current_user_id()
+    if uid:
+        return load_user_data(uid)
+    return [], []
+
+_last_sync = "Henüz sync yapılmadı"
+_cached_rows = []
+_cached_headers = []
+
+def sync_job(user_id: str = None):
     global _last_sync
-    logger.info("🎵 Sync başladı...")
+    uid = user_id or get_current_user_id()
+    if not uid:
+        logger.warning("⚠️ Sync: user_id yok, atlanıyor")
+        return
+    logger.info(f"🎵 Sync başladı: {uid}")
     try:
         tracks = spotify.get_recently_played()
         if tracks:
-            new_count = sheets.append_ham(tracks)
-            logger.info(f"✅ {new_count} yeni kayıt eklendi.")
+            new_count = sheets.append_tracks(uid, tracks)
+            logger.info(f"✅ {new_count} yeni kayıt eklendi ({uid})")
         else:
             logger.info("Yeni dinleme yok.")
-        sheets.update_ozet()
-        sheets.update_analiz()
+        sheets.update_last_sync(uid)
         _last_sync = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M") + " UTC"
-        load_tumveri()
-        logger.info("📊 Sync tamamlandı.")
+        load_user_data(uid)
+        logger.info(f"📊 Sync tamamlandı: {uid}")
     except Exception as e:
         logger.error(f"❌ Sync hatası: {e}")
 
@@ -78,168 +99,220 @@ def dashboard():
 
 @app.route("/api/export-csv")
 def export_csv():
-    headers, rows = load_tumveri()
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giriş yapılmamış"}), 401
+    headers, rows = get_cached_data(uid)
     def generate():
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(headers)
         yield output.getvalue()
-        
         for row in rows:
             output = io.StringIO()
             writer = csv.writer(output)
             writer.writerow(row)
             yield output.getvalue()
+    return Response(stream_with_context(generate()), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=spotify_verilerim.csv"})
 
-    return Response(stream_with_context(generate()), mimetype="text/csv", headers={"Content-Disposition": "attachment; filename=spotify_verilerim.csv"})
+def compute_stats(headers, rows):
+    """Verilen satırlardan istatistik hesaplar — hem kişisel hem birleşik için kullanılır"""
+    if not rows:
+        return None
+
+    idx_sarki   = headers.index("Şarkı Adı")
+    idx_sanatci = headers.index("Sanatçı")
+    idx_sure    = headers.index("Süre (sn)")
+    idx_tarih   = headers.index("Dinlenme Tarihi")
+    idx_iso     = headers.index("_played_at_iso") if "_played_at_iso" in headers else -1
+
+    track_counts  = defaultdict(lambda: {"count": 0, "sanatci": "", "sure": 0, "ilk_iso": None})
+    artist_counts = defaultdict(lambda: {"count": 0, "sure": 0, "ilk_iso": None})
+    gun_sure      = defaultdict(int)
+    ay_stats      = defaultdict(lambda: {"sure": 0, "kayit": 0, "gunler": set()})
+    toplam_sure   = 0
+    global_saat_counts  = defaultdict(int)
+    global_vakit_counts = defaultdict(int)
+    ilk_kayit_iso = None
+
+    bugun_date = datetime.now(timezone.utc).date()
+
+    for row in rows:
+        if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_tarih):
+            continue
+        sarki   = row[idx_sarki].strip()
+        sanatci = row[idx_sanatci].strip()
+        tarih   = row[idx_tarih].strip()
+        try: sure = int(row[idx_sure])
+        except: sure = 0
+
+        iso = row[idx_iso].strip() if idx_iso != -1 and len(row) > idx_iso else ""
+        toplam_sure += sure
+
+        if iso and iso != "—":
+            try:
+                dt = datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M")
+                global_saat_counts[dt.hour] += 1
+                global_vakit_counts[get_vakit(dt.hour)] += 1
+                if ilk_kayit_iso is None or iso < ilk_kayit_iso:
+                    ilk_kayit_iso = iso
+            except: pass
+
+        if sarki:
+            track_counts[sarki]["count"]  += 1
+            track_counts[sarki]["sure"]   += sure
+            track_counts[sarki]["sanatci"] = sanatci
+            if iso and iso != "—":
+                if track_counts[sarki]["ilk_iso"] is None or iso < track_counts[sarki]["ilk_iso"]:
+                    track_counts[sarki]["ilk_iso"] = iso
+
+        if sanatci:
+            artist_counts[sanatci]["count"] += 1
+            artist_counts[sanatci]["sure"]  += sure
+            if iso and iso != "—":
+                if artist_counts[sanatci]["ilk_iso"] is None or iso < artist_counts[sanatci]["ilk_iso"]:
+                    artist_counts[sanatci]["ilk_iso"] = iso
+
+        if tarih:
+            gun_sure[tarih] += sure
+            try:
+                g, ay, yil = tarih.split(".")
+                ak = f"{yil}-{ay}"
+                ay_stats[ak]["sure"]  += sure
+                ay_stats[ak]["kayit"] += 1
+                ay_stats[ak]["gunler"].add(tarih)
+            except: pass
+
+    def calc_days(iso_str):
+        if not iso_str: return None
+        try:
+            dt = datetime.strptime(iso_str[:10], "%Y-%m-%d").date()
+            return max(0, (bugun_date - dt).days)
+        except: return None
+
+    top_sarkilar = sorted(
+        [{"sarki": k, "sanatci": v["sanatci"], "count": v["count"], "sure": v["sure"], "kac_gundur": calc_days(v["ilk_iso"])}
+         for k, v in track_counts.items()],
+        key=lambda x: -x["count"]
+    )[:10]
+
+    top_sanatcilar = sorted(
+        [{"sanatci": k, "count": v["count"], "sure": v["sure"], "kac_gundur": calc_days(v["ilk_iso"])}
+         for k, v in artist_counts.items()],
+        key=lambda x: -x["count"]
+    )[:10]
+
+    hafta = []
+    for i in range(6, -1, -1):
+        gun = bugun_date - timedelta(days=i)
+        ts  = gun.strftime("%d.%m.%Y")
+        hafta.append({"tarih": ts, "gun": TR_GUNLER[gun.weekday()], "sure_sn": gun_sure.get(ts, 0)})
+
+    aylar = []
+    for ak in sorted(ay_stats.keys()):
+        yil, ay_no = ak.split("-")
+        st = ay_stats[ak]
+        gs = len(st["gunler"])
+        aylar.append({
+            "ay": f"{TR_AYLAR[int(ay_no)]} {yil}",
+            "toplam": fmt_sure(st["sure"]),
+            "ortalama": fmt_sure(st["sure"] // gs if gs else 0),
+            "kayit_sayisi": st["kayit"]
+        })
+
+    ilk_tarih_str = "Bilinmiyor"
+    if ilk_kayit_iso:
+        try: ilk_tarih_str = datetime.strptime(ilk_kayit_iso[:10], "%Y-%m-%d").strftime("%d.%m.%Y")
+        except: pass
+
+    return {
+        "toplam_kayit":   len(rows),
+        "farkli_sarki":   len(track_counts),
+        "farkli_sanatci": len(artist_counts),
+        "toplam_sure_sn": toplam_sure,
+        "ilk_kayit_tarihi": ilk_tarih_str,
+        "top_sarkilar":   top_sarkilar,
+        "top_sanatcilar": top_sanatcilar,
+        "hafta":          hafta,
+        "aylar":          aylar,
+        "genel_saatler":  [{"saat": f"{h:02d}:00", "count": global_saat_counts.get(h, 0)} for h in range(24)],
+        "genel_vakitler": [{"vakit": k, "count": v} for k, v in sorted(global_vakit_counts.items(), key=lambda x: -x[1])],
+    }
 
 @app.route("/api/dashboard")
 def api_dashboard():
     try:
-        headers, rows = load_tumveri()
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+        headers, rows = get_cached_data(uid)
         if not rows:
+            load_user_data(uid)
+            headers, rows = get_cached_data(uid)
+        stats = compute_stats(headers, rows)
+        if not stats:
             return jsonify({"error": "Veri yok"})
-
-        idx_sarki   = headers.index("Şarkı Adı")
-        idx_sanatci = headers.index("Sanatçı")
-        idx_sure    = headers.index("Süre (sn)")
-        idx_tarih   = headers.index("Dinlenme Tarihi")
-        idx_iso     = headers.index("_played_at_iso") if "_played_at_iso" in headers else -1
-
-        track_counts  = defaultdict(lambda: {"count": 0, "sanatci": "", "sure": 0, "ilk_iso": None})
-        artist_counts = defaultdict(lambda: {"count": 0, "sure": 0, "ilk_iso": None})
-        gun_sure      = defaultdict(int)
-        ay_stats      = defaultdict(lambda: {"sure": 0, "kayit": 0, "gunler": set()})
-        toplam_sure   = 0
-
-        global_saat_counts = defaultdict(int)
-        global_vakit_counts = defaultdict(int)
-        ilk_kayit_iso = None
-
-        for row in rows:
-            if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_tarih):
-                continue
-            sarki   = row[idx_sarki].strip()
-            sanatci = row[idx_sanatci].strip()
-            tarih   = row[idx_tarih].strip()
-            try:
-                sure = int(row[idx_sure])
-            except:
-                sure = 0
-
-            iso = row[idx_iso].strip() if idx_iso != -1 and len(row) > idx_iso else ""
-            toplam_sure += sure
-
-            if iso and iso != "—":
-                try:
-                    dt = datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M")
-                    global_saat_counts[dt.hour] += 1
-                    global_vakit_counts[get_vakit(dt.hour)] += 1
-                    if ilk_kayit_iso is None or iso < ilk_kayit_iso:
-                        ilk_kayit_iso = iso
-                except:
-                    pass
-
-            if sarki:
-                track_counts[sarki]["count"]  += 1
-                track_counts[sarki]["sure"]   += sure
-                track_counts[sarki]["sanatci"] = sanatci
-                if iso and iso != "—":
-                    if track_counts[sarki]["ilk_iso"] is None or iso < track_counts[sarki]["ilk_iso"]:
-                        track_counts[sarki]["ilk_iso"] = iso
-
-            if sanatci:
-                artist_counts[sanatci]["count"] += 1
-                artist_counts[sanatci]["sure"]  += sure
-                if iso and iso != "—":
-                    if artist_counts[sanatci]["ilk_iso"] is None or iso < artist_counts[sanatci]["ilk_iso"]:
-                        artist_counts[sanatci]["ilk_iso"] = iso
-
-            if tarih:
-                gun_sure[tarih] += sure
-                try:
-                    g, ay, yil = tarih.split(".")
-                    ak = f"{yil}-{ay}"
-                    ay_stats[ak]["sure"]  += sure
-                    ay_stats[ak]["kayit"] += 1
-                    ay_stats[ak]["gunler"].add(tarih)
-                except:
-                    pass
-
-        bugun_date = datetime.now(timezone.utc).date()
-        def calc_days(iso_str):
-            if not iso_str: return None
-            try:
-                dt = datetime.strptime(iso_str[:10], "%Y-%m-%d").date()
-                diff = (bugun_date - dt).days
-                return diff if diff >= 0 else 0
-            except:
-                return None
-
-        top_sarkilar = sorted(
-            [{"sarki": k, "sanatci": v["sanatci"], "count": v["count"], "sure": v["sure"], "kac_gundur": calc_days(v["ilk_iso"])}
-             for k, v in track_counts.items()],
-            key=lambda x: -x["count"]
-        )[:10]
-
-        top_sanatcilar = sorted(
-            [{"sanatci": k, "count": v["count"], "sure": v["sure"], "kac_gundur": calc_days(v["ilk_iso"])}
-             for k, v in artist_counts.items()],
-            key=lambda x: -x["count"]
-        )[:10]
-
-        hafta = []
-        for i in range(6, -1, -1):
-            gun = bugun_date - timedelta(days=i)
-            ts  = gun.strftime("%d.%m.%Y")
-            hafta.append({"tarih": ts, "gun": TR_GUNLER[gun.weekday()], "sure_sn": gun_sure.get(ts, 0)})
-
-        aylar = []
-        for ak in sorted(ay_stats.keys()):
-            yil, ay_no = ak.split("-")
-            st = ay_stats[ak]
-            gs = len(st["gunler"])
-            aylar.append({
-                "ay": f"{TR_AYLAR[int(ay_no)]} {yil}",
-                "toplam": fmt_sure(st["sure"]),
-                "ortalama": fmt_sure(st["sure"] // gs if gs else 0),
-                "kayit_sayisi": st["kayit"]
-            })
-
-        genel_saatler = [{"saat": f"{h:02d}:00", "count": global_saat_counts.get(h, 0)} for h in range(24)]
-        genel_vakitler = [{"vakit": k, "count": v} for k, v in sorted(global_vakit_counts.items(), key=lambda x: -x[1])]
-        
-        ilk_tarih_str = "Bilinmiyor"
-        if ilk_kayit_iso:
-            try:
-                ilk_tarih_str = datetime.strptime(ilk_kayit_iso[:10], "%Y-%m-%d").strftime("%d.%m.%Y")
-            except:
-                pass
-
-        return jsonify({
-            "toplam_kayit":   len(rows),
-            "farkli_sarki":   len(track_counts),
-            "farkli_sanatci": len(artist_counts),
-            "toplam_sure_sn": toplam_sure,
-            "son_sync":       _last_sync,
-            "ilk_kayit_tarihi": ilk_tarih_str,
-            "top_sarkilar":   top_sarkilar,
-            "top_sanatcilar": top_sanatcilar,
-            "hafta":          hafta,
-            "aylar":          aylar,
-            "genel_saatler":  genel_saatler,
-            "genel_vakitler": genel_vakitler
-        })
+        stats["son_sync"] = _last_sync
+        return jsonify(stats)
     except Exception as e:
         logger.error(f"❌ Dashboard API hatası: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/istatistikler")
+def api_istatistikler():
+    """Tüm izin veren kullanıcıların birleşik istatistiği"""
+    try:
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+        permitted = sheets.get_all_permitted_users()
+        if not permitted:
+            return jsonify({"error": "Henüz kimse izin vermemiş"})
+        headers, rows = sheets.get_combined_data(permitted)
+        stats = compute_stats(headers, rows)
+        if not stats:
+            return jsonify({"error": "Veri yok"})
+        stats["katilimci_sayisi"] = len(permitted)
+        stats["son_sync"] = _last_sync
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"❌ İstatistikler API hatası: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/izin", methods=["POST"])
+def api_izin():
+    """Kullanıcının istatistikler sayfası iznini günceller"""
+    try:
+        uid  = get_current_user_id()
+        name = get_current_user_name()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+        data    = request.get_json()
+        allowed = bool(data.get("allowed", False))
+        sheets.set_user_permission(uid, name, allowed)
+        return jsonify({"status": "ok", "allowed": allowed})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/izin")
+def api_izin_get():
+    """Mevcut kullanıcının izin durumunu döndürür"""
+    try:
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"allowed": False})
+        return jsonify({"allowed": sheets.get_user_permission(uid)})
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/sarki/<path:sarki_adi>")
 def api_sarki_detay(sarki_adi):
     try:
-        if not _cached_rows:
-            load_tumveri()
-        headers, rows = _cached_headers, _cached_rows
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+        headers, rows = get_cached_data(uid)
         if not rows:
             return jsonify({"error": "Veri yok"})
 
@@ -309,9 +382,10 @@ def api_sarki_detay(sarki_adi):
 @app.route("/api/sanatci/<path:sanatci_adi>")
 def api_sanatci_detay(sanatci_adi):
     try:
-        if not _cached_rows:
-            load_tumveri()
-        headers, rows = _cached_headers, _cached_rows
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+        headers, rows = get_cached_data(uid)
         if not rows:
             return jsonify({"error": "Veri yok"})
 
@@ -590,6 +664,16 @@ def callback():
         redirect_uri += "/callback"
     try:
         spotify.exchange_code(code, redirect_uri)
+        # Kullanıcı bilgilerini session'a kaydet
+        me = spotify._req("GET", "/me")
+        session["user_id"]      = me.get("id", "")
+        session["display_name"] = me.get("display_name", me.get("id", "Kullanıcı"))
+        # Sheets'te kullanıcı kaydını oluştur (izin yoksa false olarak)
+        uid  = session["user_id"]
+        name = session["display_name"]
+        if uid and not sheets._find_sheet(uid):
+            sheets._ensure_user_sheet(uid)
+            sheets.set_user_permission(uid, name, False)
         return redirect("/")
     except Exception as e:
         logger.error(f"❌ OAuth callback hatası: {e}")
