@@ -257,7 +257,7 @@
 
     <div class="section-title">Veri ve Yönetim</div>
     <button class="action-btn" onclick="window.location.href='/api/export-csv'">Tüm Verilerini İndir (.csv)</button>
-    <button class="action-btn danger">Sistemden Çıkış Yap</button>
+    <button class="action-btn danger" onclick="if(confirm('Çıkış yapmak istediğine emin misin?')) window.location.href='/logout'">Sistemden Çıkış Yap</button>
   </div>
 
   <footer>
