@@ -35,11 +35,7 @@ def fmt_sure(sn):
     return f"{saat} Saat {dk} Dakika" if saat > 0 else f"{dk} Dakika"
 
 app = Flask(__name__)
-# 1. FIX: Sabit bir SECRET_KEY belirliyoruz. Çerezler sunucu kapansa da güvende kalacak.
-app.secret_key = os.environ.get("SECRET_KEY", "cok-gizli-ve-sabit-sifre-12345!")
-# 2. FIX: Oturumları 30 gün boyunca kalıcı yapıyoruz. Sürekli çıkış yapma sorunu çözüldü.
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
-
+app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 spotify = SpotifyClient()
 sheets  = SheetsClient()
 
@@ -50,32 +46,33 @@ def get_current_user_id():
 def get_current_user_name():
     return session.get("display_name", "Kullanıcı")
 
-# 3. FIX: Global değişkenleri kaldırıp, verileri KİŞİYE ÖZEL (uid) belleğe alıyoruz.
-_user_cache = {}  # user_id -> {"headers": [], "rows": [], "last_sync": "Tarih"}
+# Cache: her kullanıcı için ayrı
+_user_cache = {}  # user_id -> {"headers": [], "rows": [], "last_sync": ""}
 
 def load_user_data(user_id: str):
     """Kullanıcının verisini Sheets'ten yükler ve cache'ler"""
     headers, rows = sheets.get_user_data(user_id)
-    if user_id not in _user_cache:
-        _user_cache[user_id] = {}
-    _user_cache[user_id]["headers"] = headers
-    _user_cache[user_id]["rows"] = rows
-    if "last_sync" not in _user_cache[user_id]:
-        _user_cache[user_id]["last_sync"] = "Henüz sync yapılmadı"
+    _user_cache[user_id] = {"headers": headers, "rows": rows}
     return headers, rows
 
 def get_cached_data(user_id: str):
-    if user_id not in _user_cache or "rows" not in _user_cache[user_id]:
+    if user_id not in _user_cache:
         return load_user_data(user_id)
     return _user_cache[user_id]["headers"], _user_cache[user_id]["rows"]
 
-def get_last_sync(user_id: str):
-    if user_id in _user_cache and "last_sync" in _user_cache[user_id]:
-        return _user_cache[user_id]["last_sync"]
-    return "Henüz sync yapılmadı"
+# Geriye dönük uyumluluk için
+def load_tumveri():
+    uid = get_current_user_id()
+    if uid:
+        return load_user_data(uid)
+    return [], []
 
+_last_sync = "Henüz sync yapılmadı"
+_cached_rows = []
+_cached_headers = []
 
 def sync_job(user_id: str = None):
+    global _last_sync
     uid = user_id or get_current_user_id()
     if not uid:
         logger.warning("⚠️ Sync: user_id yok, atlanıyor")
@@ -88,12 +85,9 @@ def sync_job(user_id: str = None):
             logger.info(f"✅ {new_count} yeni kayıt eklendi ({uid})")
         else:
             logger.info("Yeni dinleme yok.")
-            
         sheets.update_last_sync(uid)
-        
-        # Sadece bu kullanıcının sync verisini ve belleğini güncelle
+        _last_sync = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M") + " UTC"
         load_user_data(uid)
-        _user_cache[uid]["last_sync"] = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M") + " UTC"
         logger.info(f"📊 Sync tamamlandı: {uid}")
     except Exception as e:
         logger.error(f"❌ Sync hatası: {e}")
@@ -123,7 +117,7 @@ def export_csv():
                     headers={"Content-Disposition": "attachment; filename=spotify_verilerim.csv"})
 
 def compute_stats(headers, rows):
-    """Verilen satırlardan istatistik hesaplar"""
+    """Verilen satırlardan istatistik hesaplar — hem kişisel hem birleşik için kullanılır"""
     if not rows:
         return None
 
@@ -253,10 +247,13 @@ def api_dashboard():
         if not uid:
             return jsonify({"error": "Giriş yapılmamış"}), 401
         headers, rows = get_cached_data(uid)
+        if not rows:
+            load_user_data(uid)
+            headers, rows = get_cached_data(uid)
         stats = compute_stats(headers, rows)
         if not stats:
             return jsonify({"error": "Veri yok"})
-        stats["son_sync"] = get_last_sync(uid)
+        stats["son_sync"] = _last_sync
         return jsonify(stats)
     except Exception as e:
         logger.error(f"❌ Dashboard API hatası: {e}")
@@ -277,7 +274,7 @@ def api_istatistikler():
         if not stats:
             return jsonify({"error": "Veri yok"})
         stats["katilimci_sayisi"] = len(permitted)
-        stats["son_sync"] = get_last_sync(uid)
+        stats["son_sync"] = _last_sync
         return jsonify(stats)
     except Exception as e:
         logger.error(f"❌ İstatistikler API hatası: {e}")
@@ -285,6 +282,7 @@ def api_istatistikler():
 
 @app.route("/api/izin", methods=["POST"])
 def api_izin():
+    """Kullanıcının istatistikler sayfası iznini günceller"""
     try:
         uid  = get_current_user_id()
         name = get_current_user_name()
@@ -299,6 +297,7 @@ def api_izin():
 
 @app.route("/api/izin")
 def api_izin_get():
+    """Mevcut kullanıcının izin durumunu döndürür"""
     try:
         uid = get_current_user_id()
         if not uid:
@@ -327,6 +326,7 @@ def api_sarki_detay(sarki_adi):
         toplam_count = 0
         toplam_sure  = 0
         sanatci      = ""
+        
         ilk_dinlenme_iso = None 
 
         for row in rows:
@@ -340,24 +340,28 @@ def api_sarki_detay(sarki_adi):
             try:
                 sure = int(row[idx_sure])
                 toplam_sure += sure
-            except: pass
+            except:
+                pass
 
             iso = row[idx_iso].strip()
             if iso and iso != "—":
                 if ilk_dinlenme_iso is None or iso < ilk_dinlenme_iso:
                     ilk_dinlenme_iso = iso
+
                 try:
                     dt = datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M")
                     saat_counts[dt.hour] += 1
                     vakit_counts[get_vakit(dt.hour)] += 1
-                except: pass
+                except:
+                    pass
 
         ilk_tarih_str = "Bilinmiyor"
         if ilk_dinlenme_iso:
             try:
                 dt = datetime.strptime(ilk_dinlenme_iso[:16], "%Y-%m-%dT%H:%M")
                 ilk_tarih_str = dt.strftime("%d.%m.%Y")
-            except: pass
+            except:
+                pass
 
         saatler = [{"saat": f"{h:02d}:00", "count": saat_counts.get(h, 0)} for h in range(24)]
         vakitler = [{"vakit": k, "count": v} for k, v in sorted(vakit_counts.items(), key=lambda x: -x[1])]
@@ -407,7 +411,8 @@ def api_sanatci_detay(sanatci_adi):
             try:
                 sure = int(row[idx_sure])
                 toplam_sure += sure
-            except: sure = 0
+            except:
+                sure = 0
 
             if sarki:
                 sarki_counts[sarki]["count"] += 1
@@ -419,7 +424,8 @@ def api_sanatci_detay(sanatci_adi):
                     dt = datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M")
                     saat_counts[dt.hour] += 1
                     vakit_counts[get_vakit(dt.hour)] += 1
-                except: pass
+                except:
+                    pass
 
         top_sarkilar = sorted(
             [{"sarki": k, "count": v["count"], "sure": fmt_sure(v["sure"])}
@@ -445,10 +451,9 @@ def api_sanatci_detay(sanatci_adi):
 @app.route('/api/tum-sanatcilar')
 def api_tum_sanatcilar():
     try:
-        uid = get_current_user_id()
-        if not uid: return jsonify({"error": "Giriş yapılmamış"}), 401
-        
-        headers, rows = get_cached_data(uid)
+        if not _cached_rows:
+            load_tumveri()
+        headers, rows = _cached_headers, _cached_rows
         if not rows:
             return jsonify({"error": "Veri yok"})
 
@@ -463,8 +468,10 @@ def api_tum_sanatcilar():
             if not sanatci:
                 continue
             artist_counts[sanatci]["count"] += 1
-            try: artist_counts[sanatci]["sure"] += int(row[idx_sure])
-            except: pass
+            try:
+                artist_counts[sanatci]["sure"] += int(row[idx_sure])
+            except:
+                pass
 
         sanatcilar = sorted(
             [{"sanatci": k, "count": v["count"], "sure": fmt_sure(v["sure"])}
@@ -479,10 +486,9 @@ def api_tum_sanatcilar():
 @app.route('/api/tum-sarkilar')
 def api_tum_sarkilar():
     try:
-        uid = get_current_user_id()
-        if not uid: return jsonify({"error": "Giriş yapılmamış"}), 401
-        
-        headers, rows = get_cached_data(uid)
+        if not _cached_rows:
+            load_tumveri()
+        headers, rows = _cached_headers, _cached_rows
         if not rows:
             return jsonify({"error": "Veri yok"})
 
@@ -499,8 +505,10 @@ def api_tum_sarkilar():
                 continue
             track_counts[sarki]["count"] += 1
             track_counts[sarki]["sanatci"] = row[idx_sanatci].strip()
-            try: track_counts[sarki]["sure"] += int(row[idx_sure])
-            except: pass
+            try:
+                track_counts[sarki]["sure"] += int(row[idx_sure])
+            except:
+                pass
 
         sarkilar = sorted(
             [{"sarki": k, "sanatci": v["sanatci"], "count": v["count"], "sure": fmt_sure(v["sure"])}
@@ -515,10 +523,9 @@ def api_tum_sarkilar():
 @app.route("/api/ay/<ay_label>")
 def api_ay_detay(ay_label):
     try:
-        uid = get_current_user_id()
-        if not uid: return jsonify({"error": "Giriş yapılmamış"}), 401
-        
-        headers, rows = get_cached_data(uid)
+        if not _cached_rows:
+            load_tumveri()
+        headers, rows = _cached_headers, _cached_rows
         if not rows:
             return jsonify({"error": "Veri yok"})
 
@@ -529,10 +536,12 @@ def api_ay_detay(ay_label):
 
         TR_AYLAR_REV = {v: str(k).zfill(2) for k, v in TR_AYLAR.items()}
         parca = ay_label.split(" ")
-        if len(parca) != 2: return jsonify({"error": "Geçersiz ay formatı"})
+        if len(parca) != 2:
+            return jsonify({"error": "Geçersiz ay formatı"})
         ay_tr, yil = parca
         ay_no = TR_AYLAR_REV.get(ay_tr)
-        if not ay_no: return jsonify({"error": "Ay bulunamadı"})
+        if not ay_no:
+            return jsonify({"error": "Ay bulunamadı"})
         
         track_counts  = defaultdict(lambda: {"count": 0, "sure": 0, "sanatci": ""})
         artist_counts = defaultdict(lambda: {"count": 0, "sure": 0})
@@ -540,18 +549,24 @@ def api_ay_detay(ay_label):
         toplam_sure   = 0
 
         for row in rows:
-            if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_tarih): continue
+            if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_tarih):
+                continue
             tarih = row[idx_tarih].strip()
-            if not tarih: continue
+            if not tarih:
+                continue
             try:
                 g, ay, y = tarih.split(".")
-                if y != yil or ay != ay_no: continue
-            except: continue
+                if y != yil or ay != ay_no:
+                    continue
+            except:
+                continue
 
             sarki   = row[idx_sarki].strip()
             sanatci = row[idx_sanatci].strip()
-            try: sure = int(row[idx_sure])
-            except: sure = 0
+            try:
+                sure = int(row[idx_sure])
+            except:
+                sure = 0
 
             toplam_kayit += 1
             toplam_sure  += sure
@@ -595,7 +610,11 @@ def logout():
 
 @app.route("/login")
 def login_page():
-    base = os.environ.get("REDIRECT_URI") or ("https://" + request.host + "/callback")
+    # Render gibi proxy arkasındaki sunucularda request.host_url http:// döndürebilir.
+    # REDIRECT_URI env variable varsa onu kullan, yoksa https:// olarak zorla.
+    base = os.environ.get("REDIRECT_URI") or (
+        "https://" + request.host + "/callback"
+    )
     redirect_uri = base.rstrip("/")
     if not redirect_uri.endswith("/callback"):
         redirect_uri += "/callback"
@@ -637,20 +656,19 @@ def callback():
     error = request.args.get("error")
     if error or not code:
         return redirect("/login")
-    base = os.environ.get("REDIRECT_URI") or ("https://" + request.host + "/callback")
+    base = os.environ.get("REDIRECT_URI") or (
+        "https://" + request.host + "/callback"
+    )
     redirect_uri = base.rstrip("/")
     if not redirect_uri.endswith("/callback"):
         redirect_uri += "/callback"
     try:
         spotify.exchange_code(code, redirect_uri)
-        
-        # FIX: Kullanıcıların çıkış yapmasını önlemek için oturumu kalıcı yapıyoruz.
-        session.permanent = True 
-        
+        # Kullanıcı bilgilerini session'a kaydet
         me = spotify._req("GET", "/me")
         session["user_id"]      = me.get("id", "")
         session["display_name"] = me.get("display_name", me.get("id", "Kullanıcı"))
-        
+        # Sheets'te kullanıcı kaydını oluştur (izin yoksa false olarak)
         uid  = session["user_id"]
         name = session["display_name"]
         if uid and not sheets._find_sheet(uid):
@@ -664,14 +682,43 @@ def callback():
 @app.route("/api/sync")
 @app.route("/sync")
 def manual_sync():
-    uid = get_current_user_id()
-    if not uid:
-        return jsonify({"error": "Giriş yapılmamış"}), 401
-    sync_job(uid)
-    return jsonify({"status": "ok", "message": "Manuel sync tamamlandı", "son_sync": get_last_sync(uid)})
+    sync_job()
+    return jsonify({"status": "ok", "message": "Manuel sync tamamlandı", "son_sync": _last_sync})
 
+@app.route("/api/health")
+@app.route("/health")
+def health():
+    return jsonify({
+        "status": "ok",
+        "cached_rows": len(_cached_rows),
+        "son_sync": _last_sync
+    })
 
-# --- Playlist API endpoints (Güncellendi) ---
+@app.route("/api/debug")
+def debug():
+    import traceback
+    try:
+        headers, rows = load_tumveri()
+        return jsonify({
+            "status": "ok",
+            "cached_rows": len(_cached_rows),
+            "cached_headers": _cached_headers,
+            "son_sync": _last_sync,
+            "env_vars": {
+                "SPOTIFY_CLIENT_ID": bool(os.environ.get("SPOTIFY_CLIENT_ID")),
+                "SPOTIFY_CLIENT_SECRET": bool(os.environ.get("SPOTIFY_CLIENT_SECRET")),
+                "SPOTIFY_REFRESH_TOKEN": bool(os.environ.get("SPOTIFY_REFRESH_TOKEN")),
+                "GOOGLE_SHEETS_ID": bool(os.environ.get("GOOGLE_SHEETS_ID")),
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+# --- Playlist API endpoints ---
 
 @app.route("/api/now-playing")
 def api_now_playing():
@@ -688,20 +735,21 @@ def api_playlists():
         playlists = spotify.get_playlists()
         return jsonify({"playlists": playlists})
     except Exception as e:
+        logger.error(f"❌ Playlist hatası: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/playlist/create-top-tracks", methods=["POST"])
 def api_create_top_tracks_playlist():
     try:
-        uid = get_current_user_id()
-        if not uid: return jsonify({"error": "Giriş yapılmamış"}), 401
-        
-        headers, rows = get_cached_data(uid)
+        if not _cached_rows:
+            load_tumveri()
+        headers, rows = _cached_headers, _cached_rows
         idx_sarki    = headers.index("Şarkı Adı")
         idx_sarki_id = headers.index("Şarkı ID")
 
         from collections import Counter
-        sarki_id_map = {} 
+        # Şarkı adına göre say, ama ID'yi de tut
+        sarki_id_map = {}  # sarki_adi -> track_id
         sarki_counts = Counter()
         for row in rows:
             if len(row) > max(idx_sarki, idx_sarki_id):
@@ -717,7 +765,7 @@ def api_create_top_tracks_playlist():
             if s in sarki_id_map
         ]
 
-        user_id = session.get("user_id")
+        user_id = spotify._get_user_id()
         pl = spotify._req("POST", f"/users/{user_id}/playlists", json={
             "name": "En Çok Dinlediklerim",
             "public": False,
@@ -737,17 +785,16 @@ def api_create_top_tracks_playlist():
 @app.route("/api/playlist/create-top-artists", methods=["POST"])
 def api_create_top_artists_playlist():
     try:
-        uid = get_current_user_id()
-        if not uid: return jsonify({"error": "Giriş yapılmamış"}), 401
-        
-        headers, rows = get_cached_data(uid)
+        if not _cached_rows:
+            load_tumveri()
+        headers, rows = _cached_headers, _cached_rows
         idx_sanatci  = headers.index("Sanatçı")
         idx_sarki    = headers.index("Şarkı Adı")
         idx_sarki_id = headers.index("Şarkı ID")
 
         from collections import Counter, defaultdict
         sanatci_counts   = Counter()
-        sanatci_sarkilar = defaultdict(dict) 
+        sanatci_sarkilar = defaultdict(dict)  # sanatci -> {sarki_adi: track_id}
 
         for row in rows:
             if len(row) > max(idx_sanatci, idx_sarki, idx_sarki_id):
@@ -761,6 +808,7 @@ def api_create_top_artists_playlist():
         top_sanatcilar = [s for s, _ in sanatci_counts.most_common(20) if s]
         track_uris = []
         for s in top_sanatcilar:
+            # Her sanatçıdan en fazla 5 şarkı al
             for tid in list(sanatci_sarkilar[s].values())[:5]:
                 uri = f"spotify:track:{tid}"
                 if uri not in track_uris:
@@ -768,7 +816,7 @@ def api_create_top_artists_playlist():
 
         track_uris = track_uris[:50]
 
-        user_id = session.get("user_id")
+        user_id = spotify._get_user_id()
         pl = spotify._req("POST", f"/users/{user_id}/playlists", json={
             "name": "En Çok Dinlediğim Sanatçılar",
             "public": False,
@@ -843,6 +891,7 @@ def api_remove_unliked(playlist_id):
 
 if __name__ == "__main__":
     scheduler = BackgroundScheduler()
+    # Scheduler artık kullanıcı bazlı çalışıyor, startup'ta otomatik sync yok
     scheduler.start()
     logger.info("⏰ Scheduler başlatıldı")
     port = int(os.environ.get("PORT", 5000))
