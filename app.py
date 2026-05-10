@@ -536,7 +536,14 @@ def logout():
 
 @app.route("/login")
 def login_page():
-    redirect_uri = request.host_url.rstrip("/") + "/callback"
+    # Render gibi proxy arkasındaki sunucularda request.host_url http:// döndürebilir.
+    # REDIRECT_URI env variable varsa onu kullan, yoksa https:// olarak zorla.
+    base = os.environ.get("REDIRECT_URI") or (
+        "https://" + request.host + "/callback"
+    )
+    redirect_uri = base.rstrip("/")
+    if not redirect_uri.endswith("/callback"):
+        redirect_uri += "/callback"
     auth_url = spotify.get_auth_url(redirect_uri)
     return f"""<!DOCTYPE html>
 <html lang="tr">
@@ -575,7 +582,12 @@ def callback():
     error = request.args.get("error")
     if error or not code:
         return redirect("/login")
-    redirect_uri = request.host_url.rstrip("/") + "/callback"
+    base = os.environ.get("REDIRECT_URI") or (
+        "https://" + request.host + "/callback"
+    )
+    redirect_uri = base.rstrip("/")
+    if not redirect_uri.endswith("/callback"):
+        redirect_uri += "/callback"
     try:
         spotify.exchange_code(code, redirect_uri)
         return redirect("/")
