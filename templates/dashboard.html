@@ -611,9 +611,13 @@ async function loadPlaylists() {
       return;
     }
     grid.innerHTML = data.playlists.map(p => `
-      <div class="playlist-card" onclick="openPlaylistActionModal('${p.id}', ${JSON.stringify(p.name).replace(/'/g,"&#39;")}, ${p.track_count})">
+      <div class="playlist-card"
+           data-id="${p.id}"
+           data-name="${p.name.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}"
+           data-count="${p.track_count}"
+           onclick="openPlaylistActionModal(this.dataset.id, this.dataset.name, this.dataset.count)">
         ${p.image_url
-          ? `<img src="${p.image_url}" alt="${p.name}" loading="lazy">`
+          ? `<img src="${p.image_url}" alt="" loading="lazy">`
           : `<div class="pl-no-img">🎵</div>`}
         <div class="pl-info">
           <div class="pl-name">${p.name}</div>
@@ -635,24 +639,16 @@ function openPlaylistActionModal(playlistId, playlistName, trackCount) {
       <button class="pl-action-btn" onclick="plAction('${playlistId}', 'shuffle', this)">
         <span class="pl-icon">🔀</span> Rastgele Karıştır
       </button>
-      <button class="pl-action-btn" onclick="plAction('${playlistId}', 'follow-artists', this)">
-        <span class="pl-icon">➕</span> Tüm Sanatçıları Takip Et
-      </button>
-      <button class="pl-action-btn" onclick="plAction('${playlistId}', 'unfollow-artists', this)">
-        <span class="pl-icon">➖</span> Tüm Sanatçıları Takip Etme
-      </button>
-      <button class="pl-action-btn" onclick="plAction('${playlistId}', 'like-all', this)">
-        <span class="pl-icon">💚</span> Tüm Şarkıları Beğen
-      </button>
-      <button class="pl-action-btn" onclick="plAction('${playlistId}', 'unlike-all', this)">
-        <span class="pl-icon">🩶</span> Tüm Şarkıların Beğenisini Kaldır
-      </button>
       <button class="pl-action-btn danger" onclick="plAction('${playlistId}', 'remove-liked', this)">
         <span class="pl-icon">🗑️</span> Beğenilen Şarkıları Çıkar
       </button>
       <button class="pl-action-btn danger" onclick="plAction('${playlistId}', 'remove-unliked', this)">
         <span class="pl-icon">🗑️</span> Beğenilmeyen Şarkıları Çıkar
       </button>
+      <div style="margin-top:12px; padding:12px 14px; background:#1a1a1a; border:1px solid #333; font-size:11px; color:var(--muted); line-height:1.7">
+        ⚠️ Sanatçı takip etme ve şarkı beğenme işlemleri Spotify'ın Extended Quota kısıtlaması nedeniyle devre dışı.
+        Spotify Developer Dashboard'dan <a href="https://developer.spotify.com/documentation/web-api/concepts/quota-modes" target="_blank" style="color:var(--green)">Extended Quota</a> başvurusu yapılırsa açılır.
+      </div>
     </div>
   `;
   openModal();
