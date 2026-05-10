@@ -149,6 +149,17 @@
   .now-playing-card .np-time span{color:var(--text);}
   .now-playing-card .np-bar-track{position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--border);}
   .now-playing-card .np-progress{position:absolute;bottom:0;left:0;height:2px;background:var(--green);transition:width 1s linear;}
+  .now-playing-card .np-lyrics-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:10px 14px;cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;transition:all .2s;margin-right:12px;text-align:center;line-height:1.2;min-width:52px;}
+  .now-playing-card .np-lyrics-btn:hover,.now-playing-card .np-lyrics-btn.active{border-color:var(--green);color:var(--green);}
+
+  /* LYRICS PANEL */
+  .lyrics-panel{display:none;background:var(--surface);border:1px solid var(--border);border-top:none;margin-bottom:32px;max-height:360px;overflow-y:auto;}
+  .lyrics-panel.open{display:block;}
+  .lyrics-inner{padding:28px 32px;}
+  .lyrics-inner pre{font-family:'DM Mono',monospace;font-size:13px;line-height:2;color:var(--text);white-space:pre-wrap;word-break:break-word;}
+  .lyrics-loading{color:var(--muted);font-size:12px;letter-spacing:1px;text-align:center;padding:32px;}
+  .lyrics-not-found{color:var(--muted);font-size:12px;text-align:center;padding:32px;line-height:1.8;}
+  .lyrics-not-found span{color:var(--text);display:block;font-size:14px;margin-bottom:8px;}
   .playlist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
   .playlist-card{background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
   .playlist-card:hover{border-color:var(--green);transform:translateY(-2px);}
@@ -208,8 +219,17 @@
         <div class="np-artist" id="npArtist">—</div>
         <div class="np-time"><span id="npCurrent">0:00</span> / <span id="npTotal">0:00</span></div>
       </div>
+      <button class="np-lyrics-btn" id="npLyricsBtn" onclick="toggleLyrics()" title="Şarkı Sözleri">
+        <span>V</span><span style="font-size:8px;display:block;letter-spacing:1px;margin-top:2px">SÖZLER</span>
+      </button>
       <div class="np-bar-track"></div>
       <div class="np-progress" id="npProgress" style="width:0%"></div>
+    </div>
+    <!-- LYRICS PANEL -->
+    <div class="lyrics-panel" id="lyricsPanel">
+      <div class="lyrics-inner" id="lyricsInner">
+        <div class="lyrics-loading">Şarkı sözleri yükleniyor...</div>
+      </div>
     </div>
 
     <div class="stats-row" id="statsRow">
@@ -339,6 +359,17 @@ async function fetchNowPlaying() {
     }
 
     card.classList.add('visible');
+
+    const newTrack = d.track_name + '__' + d.artist_name;
+    const prevTrack = document.getElementById('npTrack').textContent + '__' + document.getElementById('npArtist').textContent;
+
+    // Şarkı değiştiyse lyrics panelini sıfırla
+    if (newTrack !== prevTrack && _lyricsOpen) {
+      _lastLyricsTrack = '';
+      document.getElementById('lyricsInner').innerHTML = '<div class="lyrics-loading">Yeni şarkı için sözler yükleniyor...</div>';
+      loadLyrics(d.artist_name, d.track_name);
+    }
+
     document.getElementById('npTrack').textContent  = d.track_name;
     document.getElementById('npArtist').textContent = d.artist_name;
     document.getElementById('npPaused').textContent = d.is_playing ? '' : '· Duraklatıldı';
@@ -372,6 +403,64 @@ async function fetchNowPlaying() {
 
 fetchNowPlaying();
 setInterval(fetchNowPlaying, 5000);
+
+// ===================== ŞARKI SÖZLERİ =====================
+let _lyricsOpen = false;
+let _lastLyricsTrack = '';
+
+async function toggleLyrics() {
+  const panel = document.getElementById('lyricsPanel');
+  const btn   = document.getElementById('npLyricsBtn');
+
+  if (_lyricsOpen) {
+    panel.classList.remove('open');
+    btn.classList.remove('active');
+    _lyricsOpen = false;
+    return;
+  }
+
+  panel.classList.add('open');
+  btn.classList.add('active');
+  _lyricsOpen = true;
+
+  const track  = document.getElementById('npTrack').textContent;
+  const artist = document.getElementById('npArtist').textContent;
+  const key    = `${artist}__${track}`;
+
+  if (key === _lastLyricsTrack) return; // aynı şarkı, tekrar çekme
+  _lastLyricsTrack = key;
+
+  await loadLyrics(artist, track);
+}
+
+async function loadLyrics(artist, track) {
+  const inner = document.getElementById('lyricsInner');
+  inner.innerHTML = '<div class="lyrics-loading">Şarkı sözleri aranıyor...</div>';
+
+  try {
+    // Sanatçı adında virgül varsa ilk sanatçıyı al
+    const cleanArtist = artist.split(',')[0].trim();
+    const url = `https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtist)}/${encodeURIComponent(track)}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if (data.lyrics && data.lyrics.trim()) {
+      inner.innerHTML = `<pre>${data.lyrics.trim()}</pre>`;
+    } else {
+      inner.innerHTML = `
+        <div class="lyrics-not-found">
+          <span>${track}</span>
+          Bu şarkı için söz bulunamadı.
+        </div>`;
+    }
+  } catch(e) {
+    inner.innerHTML = `
+      <div class="lyrics-not-found">
+        <span>Bağlantı hatası</span>
+        Şarkı sözleri yüklenemedi.
+      </div>`;
+  }
+}
 
 // YARDIMCI VE RENDER FONKSİYONLARI
 function fmtSure(sn) {
