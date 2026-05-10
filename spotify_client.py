@@ -151,8 +151,9 @@ class SpotifyClient:
         is_playing  = data.get("is_playing", False)
         progress_ms = data.get("progress_ms", 0)
         duration_ms = item.get("duration_ms", 1)
-        images      = item.get("album", {}).get("images", [])
-        art_url     = images[0]["url"] if images else None
+        images  = item.get("album", {}).get("images", [])
+        # En yüksek kaliteli resmi seç (images genelde büyükten küçüğe sıralı)
+        art_url = images[0]["url"] if images else None
 
         return {
             "playing":     True,
