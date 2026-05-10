@@ -212,7 +212,8 @@
     <h2>MENÜ</h2>
     <button style="background:none;border:none;color:var(--text);font-size:24px;cursor:pointer" onclick="toggleMenu()">✕</button>
   </div>
-  <a class="menu-item active" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler">İstatistiklerin</a>
+  <a class="menu-item active" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler">İstatistiklerim</a>
+  <a class="menu-item" onclick="switchView('topluluk');toggleMenu()" id="nav-topluluk">İstatistikler</a>
   <a class="menu-item" onclick="switchView('profil');toggleMenu()" id="nav-profil">Profilin</a>
 </div>
 
@@ -301,6 +302,12 @@
 
   <!-- Düzenle sayfası kaldırıldı -->
 
+  <div id="view-topluluk" class="view-section">
+    <div id="toplulukContent">
+      <div class="loading" id="toplulukLoading">Yükleniyor...</div>
+    </div>
+  </div>
+
   <div id="view-profil" class="view-section">
     <div class="section-title">Hesap Özetin</div>
     
@@ -320,6 +327,17 @@
         <div class="setting-desc">Şu an çalınan şarkı destekliyorsa, söylenen satır otomatik vurgulanır ve istatistikler ile now playing arasında gösterilir</div>
       </div>
       <div class="setting-toggle" id="toggle-syncedLyrics">
+        <div class="toggle-knob"></div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:32px">Gizlilik</div>
+    <div class="setting-row" onclick="toggleIzin()">
+      <div class="setting-info">
+        <div class="setting-name">Verilerimi İstatistikler'de Kullan</div>
+        <div class="setting-desc">Açıksa dinleme verileriniz topluluk istatistiklerine dahil edilir. Kapalıysa sadece sizin verileriniz görünür.</div>
+      </div>
+      <div class="setting-toggle" id="toggle-izin">
         <div class="toggle-knob"></div>
       </div>
     </div>
@@ -357,10 +375,124 @@ function switchView(viewId) {
   document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
   document.getElementById('nav-' + viewId).classList.add('active');
   const titles = {
-    'istatistikler': 'Kişisel Spotify Verileri',
-    'profil': 'Hesap ve Ayarlar'
+    'istatistikler': 'Kişisel Spotify Verilerin',
+    'topluluk':      'Topluluk İstatistikleri',
+    'profil':        'Hesap ve Ayarlar'
   };
   document.getElementById('headerSubtitle').textContent = titles[viewId] || '';
+  if (viewId === 'topluluk') loadTopluluk();
+}
+
+// ===================== İZİN YÖNETİMİ =====================
+let _izinDurumu = false;
+
+async function loadIzin() {
+  try {
+    const res  = await fetch('/api/izin');
+    const data = await res.json();
+    _izinDurumu = data.allowed || false;
+    const toggle = document.getElementById('toggle-izin');
+    if (toggle) {
+      if (_izinDurumu) toggle.classList.add('on');
+      else toggle.classList.remove('on');
+    }
+  } catch(e) {}
+}
+
+async function toggleIzin() {
+  _izinDurumu = !_izinDurumu;
+  const toggle = document.getElementById('toggle-izin');
+  if (_izinDurumu) toggle.classList.add('on');
+  else toggle.classList.remove('on');
+  try {
+    await fetch('/api/izin', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({allowed: _izinDurumu})
+    });
+  } catch(e) {
+    _izinDurumu = !_izinDurumu; // geri al
+    if (_izinDurumu) toggle.classList.add('on');
+    else toggle.classList.remove('on');
+  }
+}
+
+// ===================== TOPLULUK İSTATİSTİKLERİ =====================
+let _toplulukLoaded = false;
+
+async function loadTopluluk() {
+  if (_toplulukLoaded) return;
+  const content = document.getElementById('toplulukContent');
+  content.innerHTML = '<div class="loading">Topluluk verileri yükleniyor...</div>';
+
+  try {
+    const res  = await fetch('/api/istatistikler');
+    const data = await res.json();
+
+    if (data.error === 'Henüz kimse izin vermemiş') {
+      content.innerHTML = `
+        <div class="section" style="text-align:center;padding:48px 24px;">
+          <div style="font-size:32px;margin-bottom:16px">👥</div>
+          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:12px">Henüz kimse izin vermedi</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.8">Profil → Gizlilik bölümünden "Verilerimi İstatistikler'de Kullan"<br>seçeneğini açarak katkıda bulunabilirsin.</div>
+        </div>`;
+      return;
+    }
+
+    if (data.error) {
+      content.innerHTML = `<div class="loading" style="color:#ff6b6b">Hata: ${data.error}</div>`;
+      return;
+    }
+
+    _toplulukLoaded = true;
+    content.innerHTML = buildToplulukHTML(data);
+  } catch(e) {
+    content.innerHTML = `<div class="loading" style="color:#ff6b6b">Bağlantı hatası</div>`;
+  }
+}
+
+function buildToplulukHTML(d) {
+  const fmtSure = (sn) => {
+    const s = parseInt(sn);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return h > 0 ? `${h} Saat ${m} Dakika` : `${m} Dakika`;
+  };
+
+  const topSarkilar = (d.top_sarkilar || []).map((s, i) => `
+    <div class="rank-item" style="cursor:default">
+      <div class="rank-num">${String(i+1).padStart(2,'0')}</div>
+      <div class="rank-info">
+        <div class="rank-name">${s.sarki}</div>
+        <div class="rank-sub">${s.sanatci}</div>
+      </div>
+      <div class="rank-count"><span>${s.count}</span><small>kez</small></div>
+    </div>`).join('');
+
+  const topSanatcilar = (d.top_sanatcilar || []).map((s, i) => `
+    <div class="rank-item" style="cursor:default">
+      <div class="rank-num">${String(i+1).padStart(2,'0')}</div>
+      <div class="rank-info"><div class="rank-name">${s.sanatci}</div></div>
+      <div class="rank-count"><span>${s.count}</span><small>kez</small></div>
+    </div>`).join('');
+
+  return `
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Toplam Dinlenme</div><div class="stat-val">${d.toplam_kayit?.toLocaleString('tr')}</div><div class="stat-sub">kayıt</div></div>
+      <div class="stat-card"><div class="stat-label">Farklı Şarkı</div><div class="stat-val">${d.farkli_sarki?.toLocaleString('tr')}</div></div>
+      <div class="stat-card"><div class="stat-label">Farklı Sanatçı</div><div class="stat-val">${d.farkli_sanatci?.toLocaleString('tr')}</div></div>
+      <div class="stat-card"><div class="stat-label">Toplam Süre</div><div class="stat-val">${Math.floor((d.toplam_sure_sn||0)/3600)}</div><div class="stat-sub">saat · ${d.katilimci_sayisi} kişi</div></div>
+    </div>
+    <div class="two-col">
+      <div>
+        <div class="section-title">En Çok Dinlenen Şarkılar</div>
+        <div class="rank-list">${topSarkilar}</div>
+      </div>
+      <div>
+        <div class="section-title">En Çok Dinlenen Sanatçılar</div>
+        <div class="rank-list">${topSanatcilar}</div>
+      </div>
+    </div>`;
 }
 
 // ===================== NOW PLAYING =====================
@@ -709,6 +841,7 @@ updateNpTime = function() {
 };
 
 initSettings();
+loadIzin();
 
 // Lyric line CSS (inline)
 const _lyricStyle = document.createElement('style');
