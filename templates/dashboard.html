@@ -137,15 +137,17 @@
   /* NOW PLAYING */
   .now-playing-card{display:none;background:var(--surface);border:1px solid var(--border);margin-bottom:32px;overflow:hidden;position:relative;}
   .now-playing-card.visible{display:flex;align-items:center;gap:0;}
-  .now-playing-card .np-art{width:80px;height:80px;min-width:80px;object-fit:cover;display:block;}
-  .now-playing-card .np-art-placeholder{width:80px;height:80px;min-width:80px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:28px;}
+  .now-playing-card .np-art{width:90px;height:90px;min-width:90px;object-fit:cover;display:block;}
+  .now-playing-card .np-art-placeholder{width:90px;height:90px;min-width:90px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:28px;}
   .now-playing-card .np-info{padding:16px 20px;flex:1;min-width:0;}
   .now-playing-card .np-label{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--green);margin-bottom:6px;display:flex;align-items:center;gap:8px;}
   .now-playing-card .np-label::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s ease-in-out infinite;}
   .now-playing-card .np-track{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
   .now-playing-card .np-artist{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .now-playing-card .np-time{font-size:10px;color:var(--muted);margin-top:6px;letter-spacing:1px;font-family:'DM Mono',monospace;}
+  .now-playing-card .np-time span{color:var(--text);}
+  .now-playing-card .np-bar-track{position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--border);}
   .now-playing-card .np-progress{position:absolute;bottom:0;left:0;height:2px;background:var(--green);transition:width 1s linear;}
-  .now-playing-card .np-paused{font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-left:8px;}
   .playlist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
   .playlist-card{background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
   .playlist-card:hover{border-color:var(--green);transform:translateY(-2px);}
@@ -203,7 +205,9 @@
         <div class="np-label">Şu an çalıyor <span class="np-paused" id="npPaused"></span></div>
         <div class="np-track" id="npTrack">—</div>
         <div class="np-artist" id="npArtist">—</div>
+        <div class="np-time"><span id="npCurrent">0:00</span> / <span id="npTotal">0:00</span></div>
       </div>
+      <div class="np-bar-track"></div>
       <div class="np-progress" id="npProgress" style="width:0%"></div>
     </div>
 
@@ -305,6 +309,22 @@ let _npProgress = 0;
 let _npDuration = 0;
 let _npPlaying = false;
 
+function fmtMs(ms) {
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function updateNpTime() {
+  document.getElementById('npCurrent').textContent = fmtMs(_npProgress);
+  document.getElementById('npTotal').textContent   = fmtMs(_npDuration);
+  if (_npDuration > 0) {
+    const pct = Math.min(100, _npProgress / _npDuration * 100);
+    document.getElementById('npProgress').style.width = pct + '%';
+  }
+}
+
 async function fetchNowPlaying() {
   try {
     const res = await fetch('/api/now-playing');
@@ -313,6 +333,7 @@ async function fetchNowPlaying() {
 
     if (!d.playing) {
       card.classList.remove('visible');
+      clearInterval(_npTimer);
       return;
     }
 
@@ -320,24 +341,27 @@ async function fetchNowPlaying() {
     document.getElementById('npTrack').textContent  = d.track_name;
     document.getElementById('npArtist').textContent = d.artist_name;
     document.getElementById('npPaused').textContent = d.is_playing ? '' : '· Duraklatıldı';
-    document.getElementById('npProgress').style.width = d.progress_pct + '%';
 
+    // Albüm kapağı — en yüksek kaliteli resmi kullan
     const art = document.getElementById('npArt');
     if (d.art_url) { art.src = d.art_url; art.style.display = 'block'; }
     else { art.style.display = 'none'; }
 
-    // İlerleme çubuğunu canlı ilerlet
     clearInterval(_npTimer);
     _npProgress = d.progress_ms;
     _npDuration = d.duration_ms;
     _npPlaying  = d.is_playing;
 
+    updateNpTime();
+
     if (_npPlaying && _npDuration > 0) {
       _npTimer = setInterval(() => {
         _npProgress += 1000;
-        if (_npProgress > _npDuration) { clearInterval(_npTimer); return; }
-        const pct = Math.min(100, _npProgress / _npDuration * 100);
-        document.getElementById('npProgress').style.width = pct + '%';
+        if (_npProgress > _npDuration) {
+          _npProgress = _npDuration;
+          clearInterval(_npTimer);
+        }
+        updateNpTime();
       }, 1000);
     }
   } catch(e) {
@@ -345,7 +369,6 @@ async function fetchNowPlaying() {
   }
 }
 
-// 30 saniyede bir güncelle
 fetchNowPlaying();
 setInterval(fetchNowPlaying, 30000);
 
