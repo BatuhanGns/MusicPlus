@@ -167,10 +167,11 @@ class SpotifyClient:
                 if not p:
                     continue
                 image_url = p["images"][0]["url"] if p.get("images") else None
+                track_count = (p.get("items") or p.get("tracks") or {}).get("total", 0)
                 all_playlists.append({
                     "id": p["id"],
                     "name": p["name"],
-                    "track_count": p["tracks"]["total"],
+                    "track_count": track_count,
                     "image_url": image_url,
                     "owner": p["owner"]["display_name"],
                 })
