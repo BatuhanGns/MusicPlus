@@ -651,21 +651,40 @@ def api_create_top_tracks_playlist():
         if not _cached_rows:
             load_tumveri()
         headers, rows = _cached_headers, _cached_rows
-        idx_sarki = headers.index("Şarkı Adı")
-        idx_sure  = headers.index("Süre (sn)")
+        idx_sarki    = headers.index("Şarkı Adı")
+        idx_sarki_id = headers.index("Şarkı ID")
 
         from collections import Counter
+        # Şarkı adına göre say, ama ID'yi de tut
+        sarki_id_map = {}  # sarki_adi -> track_id
         sarki_counts = Counter()
         for row in rows:
-            if len(row) > idx_sarki:
-                sarki_counts[row[idx_sarki].strip()] += 1
+            if len(row) > max(idx_sarki, idx_sarki_id):
+                sarki = row[idx_sarki].strip()
+                sid   = row[idx_sarki_id].strip()
+                if sarki and sid:
+                    sarki_counts[sarki] += 1
+                    sarki_id_map[sarki] = sid
 
-        top_sarkilar = [s for s, _ in sarki_counts.most_common(50) if s]
-        playlist_id = spotify.create_playlist_from_track_names(
-            "En Çok Dinlediklerim", top_sarkilar,
-            description="Spotify İstatistik uygulaması tarafından oluşturuldu"
-        )
-        return jsonify({"status": "ok", "playlist_id": playlist_id})
+        top_sarkilar_ids = [
+            f"spotify:track:{sarki_id_map[s]}"
+            for s, _ in sarki_counts.most_common(50)
+            if s in sarki_id_map
+        ]
+
+        user_id = spotify._get_user_id()
+        pl = spotify._req("POST", f"/users/{user_id}/playlists", json={
+            "name": "En Çok Dinlediklerim",
+            "public": False,
+            "description": "Spotify İstatistik uygulaması tarafından oluşturuldu"
+        })
+        playlist_id = pl["id"]
+        for i in range(0, len(top_sarkilar_ids), 100):
+            spotify._req("POST", f"/playlists/{playlist_id}/items", json={
+                "uris": top_sarkilar_ids[i:i+100]
+            })
+
+        return jsonify({"status": "ok", "playlist_id": playlist_id, "track_count": len(top_sarkilar_ids)})
     except Exception as e:
         logger.error(f"❌ Playlist oluşturma hatası: {e}")
         return jsonify({"error": str(e)}), 500
@@ -676,30 +695,47 @@ def api_create_top_artists_playlist():
         if not _cached_rows:
             load_tumveri()
         headers, rows = _cached_headers, _cached_rows
-        idx_sanatci = headers.index("Sanatçı")
-        idx_sarki   = headers.index("Şarkı Adı")
+        idx_sanatci  = headers.index("Sanatçı")
+        idx_sarki    = headers.index("Şarkı Adı")
+        idx_sarki_id = headers.index("Şarkı ID")
 
         from collections import Counter, defaultdict
-        sanatci_counts = Counter()
-        sanatci_sarkilar = defaultdict(set)
+        sanatci_counts   = Counter()
+        sanatci_sarkilar = defaultdict(dict)  # sanatci -> {sarki_adi: track_id}
+
         for row in rows:
-            if len(row) > max(idx_sanatci, idx_sarki):
-                s = row[idx_sanatci].strip()
-                t = row[idx_sarki].strip()
+            if len(row) > max(idx_sanatci, idx_sarki, idx_sarki_id):
+                s   = row[idx_sanatci].strip()
+                t   = row[idx_sarki].strip()
+                tid = row[idx_sarki_id].strip()
                 if s: sanatci_counts[s] += 1
-                if s and t: sanatci_sarkilar[s].add(t)
+                if s and t and tid:
+                    sanatci_sarkilar[s][t] = tid
 
         top_sanatcilar = [s for s, _ in sanatci_counts.most_common(20) if s]
-        sarkilar = []
+        track_uris = []
         for s in top_sanatcilar:
-            sarkilar.extend(list(sanatci_sarkilar[s])[:5])
+            # Her sanatçıdan en fazla 5 şarkı al
+            for tid in list(sanatci_sarkilar[s].values())[:5]:
+                uri = f"spotify:track:{tid}"
+                if uri not in track_uris:
+                    track_uris.append(uri)
 
-        playlist_id = spotify.create_playlist_from_track_names(
-            "En Çok Dinlediğim Sanatçılar",
-            sarkilar[:50],
-            description="Spotify İstatistik uygulaması tarafından oluşturuldu"
-        )
-        return jsonify({"status": "ok", "playlist_id": playlist_id})
+        track_uris = track_uris[:50]
+
+        user_id = spotify._get_user_id()
+        pl = spotify._req("POST", f"/users/{user_id}/playlists", json={
+            "name": "En Çok Dinlediğim Sanatçılar",
+            "public": False,
+            "description": "Spotify İstatistik uygulaması tarafından oluşturuldu"
+        })
+        playlist_id = pl["id"]
+        for i in range(0, len(track_uris), 100):
+            spotify._req("POST", f"/playlists/{playlist_id}/items", json={
+                "uris": track_uris[i:i+100]
+            })
+
+        return jsonify({"status": "ok", "playlist_id": playlist_id, "track_count": len(track_uris)})
     except Exception as e:
         logger.error(f"❌ Sanatçı playlist hatası: {e}")
         return jsonify({"error": str(e)}), 500
