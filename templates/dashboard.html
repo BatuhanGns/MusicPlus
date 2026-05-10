@@ -547,7 +547,6 @@ function _updateSyncedDisplay() {
   if (!_syncedLines.length || !_settings.syncedLyrics) return;
   const wrap = document.getElementById('syncedLineWrap');
 
-  // Şu anki progress'e göre aktif satırı bul
   const now = _npProgress;
   let activeIdx = 0;
   for (let i = 0; i < _syncedLines.length; i++) {
@@ -555,14 +554,43 @@ function _updateSyncedDisplay() {
   }
 
   const prev   = _syncedLines[activeIdx - 1]?.text || '';
-  const active = _syncedLines[activeIdx]?.text || '';
+  const active = _syncedLines[activeIdx]?.text  || '';
   const next   = _syncedLines[activeIdx + 1]?.text || '';
 
-  wrap.innerHTML = `
-    ${prev   ? `<div class="synced-line prev">${prev}</div>` : ''}
-    <div class="synced-line active">${active}</div>
-    ${next   ? `<div class="synced-line next">${next}</div>` : ''}
-  `;
+  // DOM henüz oluşmadıysa ilk kez yaz
+  if (!wrap.querySelector('.synced-line.active')) {
+    wrap.innerHTML = `
+      <div class="synced-line prev"  id="sl-prev">${prev}</div>
+      <div class="synced-line active" id="sl-active">${active}</div>
+      <div class="synced-line next"  id="sl-next">${next}</div>
+    `;
+    return;
+  }
+
+  const elPrev   = wrap.querySelector('#sl-prev');
+  const elActive = wrap.querySelector('#sl-active');
+  const elNext   = wrap.querySelector('#sl-next');
+
+  // Aktif satır değiştiyse smooth geçiş yap
+  if (elActive.textContent !== active) {
+    elActive.style.transition = 'opacity .35s ease, font-size .35s ease';
+    elPrev.style.transition   = 'opacity .35s ease, font-size .35s ease';
+    elNext.style.transition   = 'opacity .35s ease, font-size .35s ease';
+
+    elActive.style.opacity = '0';
+    elPrev.style.opacity   = '0';
+    elNext.style.opacity   = '0';
+
+    setTimeout(() => {
+      elPrev.textContent   = prev;
+      elActive.textContent = active;
+      elNext.textContent   = next;
+
+      elActive.style.opacity = '1';
+      elPrev.style.opacity   = '1';
+      elNext.style.opacity   = '1';
+    }, 300);
+  }
 }
 
 // Progress güncellendiğinde synced lyrics de güncelle
