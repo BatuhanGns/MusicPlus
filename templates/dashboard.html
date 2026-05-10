@@ -438,14 +438,39 @@ async function loadLyrics(artist, track) {
   inner.innerHTML = '<div class="lyrics-loading">Şarkı sözleri aranıyor...</div>';
 
   try {
-    // Sanatçı adında virgül varsa ilk sanatçıyı al
     const cleanArtist = artist.split(',')[0].trim();
-    const url = `https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtist)}/${encodeURIComponent(track)}`;
+    const url = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(track)}`;
     const res  = await fetch(url);
-    const data = await res.json();
 
-    if (data.lyrics && data.lyrics.trim()) {
-      inner.innerHTML = `<pre>${data.lyrics.trim()}</pre>`;
+    if (res.status === 404) {
+      // Bulunamadıysa daha geniş arama dene
+      const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(cleanArtist + ' ' + track)}`;
+      const searchRes = await fetch(searchUrl);
+      const results   = await searchRes.json();
+
+      if (results && results.length > 0) {
+        const best = results[0];
+        const lyrics = best.plainLyrics || best.syncedLyrics?.replace(/\[\d+:\d+\.\d+\]/g, '').trim();
+        if (lyrics) {
+          inner.innerHTML = `<pre>${lyrics.trim()}</pre>`;
+          return;
+        }
+      }
+
+      inner.innerHTML = `
+        <div class="lyrics-not-found">
+          <span>${track}</span>
+          Bu şarkı için söz bulunamadı.
+        </div>`;
+      return;
+    }
+
+    const data = await res.json();
+    // plainLyrics varsa kullan, yoksa syncedLyrics'ten zaman etiketlerini temizle
+    const lyrics = data.plainLyrics || data.syncedLyrics?.replace(/\[\d+:\d+\.\d+\]/g, '').trim();
+
+    if (lyrics && lyrics.trim()) {
+      inner.innerHTML = `<pre>${lyrics.trim()}</pre>`;
     } else {
       inner.innerHTML = `
         <div class="lyrics-not-found">
