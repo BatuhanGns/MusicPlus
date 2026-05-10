@@ -891,9 +891,8 @@ def api_remove_unliked(playlist_id):
 
 if __name__ == "__main__":
     scheduler = BackgroundScheduler()
-    scheduler.add_job(sync_job, "cron", minute="0,30", id="spotify_sync")
+    # Scheduler artık kullanıcı bazlı çalışıyor, startup'ta otomatik sync yok
     scheduler.start()
-    logger.info("⏰ Scheduler başlatıldı (her 30 dakika)")
-    sync_job()
+    logger.info("⏰ Scheduler başlatıldı")
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)

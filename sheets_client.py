@@ -41,14 +41,26 @@ def format_tarih(played_at_str):
 class SheetsClient:
     def __init__(self):
         creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON", "{}")
-        creds_dict = json.loads(creds_json)
-        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-        self.gc = gspread.authorize(creds)
         sid = os.environ.get("GOOGLE_SHEETS_ID", "")
-        self.sh = self.gc.open_by_key(sid)
-        self._ensure_settings_sheet()
+        if not sid or not creds_json or creds_json == "{}":
+            logger.error("❌ GOOGLE_SHEETS_ID veya GOOGLE_CREDENTIALS_JSON eksik!")
+            self.gc = None
+            self.sh = None
+            return
+        try:
+            creds_dict = json.loads(creds_json)
+            creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+            self.gc = gspread.authorize(creds)
+            self.sh = self.gc.open_by_key(sid)
+            self._ensure_settings_sheet()
+        except Exception as e:
+            logger.error(f"❌ SheetsClient init hatası: {e}")
+            self.gc = None
+            self.sh = None
 
     def _find_sheet(self, name):
+        if not self.sh:
+            return None
         for ws in self.sh.worksheets():
             if ws.title.strip() == name.strip():
                 return ws
@@ -57,6 +69,8 @@ class SheetsClient:
     # ─── Settings sayfası ───────────────────────────────────────────────────
 
     def _ensure_settings_sheet(self):
+        if not self.sh:
+            return None
         ws = self._find_sheet("Settings")
         if not ws:
             ws = self.sh.add_worksheet(title="Settings", rows=100, cols=5)
@@ -108,6 +122,8 @@ class SheetsClient:
     # ─── Kullanıcı veri sayfası ─────────────────────────────────────────────
 
     def _ensure_user_sheet(self, user_id: str):
+        if not self.sh:
+            return None
         ws = self._find_sheet(user_id)
         if not ws:
             ws = self.sh.add_worksheet(title=user_id, rows=50000, cols=10)
