@@ -73,8 +73,8 @@ class SheetsClient:
             return None
         ws = self._find_sheet("Settings")
         if not ws:
-            ws = self.sh.add_worksheet(title="Settings", rows=100, cols=5)
-            ws.append_row(["user_id", "display_name", "stats_permission", "last_sync"], value_input_option="RAW")
+            ws = self.sh.add_worksheet(title="Settings", rows=100, cols=6)
+            ws.append_row(["user_id", "display_name", "stats_permission", "last_sync", "refresh_token"], value_input_option="RAW")
             logger.info("✅ Settings sayfası oluşturuldu.")
         return ws
 
@@ -88,16 +88,43 @@ class SheetsClient:
                 return len(row) > 2 and row[2].lower() == "true"
         return False
 
-    def set_user_permission(self, user_id: str, display_name: str, allowed: bool):
+    def set_user_permission(self, user_id: str, display_name: str, allowed: bool, refresh_token: str = ""):
         """Kullanıcının istatistikler sayfası iznini günceller"""
         ws = self._find_sheet("Settings") or self._ensure_settings_sheet()
         now_str = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M")
         records = ws.get_all_values()
         for i, row in enumerate(records[1:], start=2):
             if row and row[0] == user_id:
-                ws.update(f"A{i}:D{i}", [[user_id, display_name, str(allowed), now_str]])
+                existing_token = row[4] if len(row) > 4 else ""
+                token_to_save  = refresh_token or existing_token
+                ws.update(f"A{i}:E{i}", [[user_id, display_name, str(allowed), now_str, token_to_save]])
                 return
-        ws.append_row([user_id, display_name, str(allowed), now_str], value_input_option="RAW")
+        ws.append_row([user_id, display_name, str(allowed), now_str, refresh_token], value_input_option="RAW")
+
+    def save_refresh_token(self, user_id: str, refresh_token: str):
+        """Kullanıcının refresh token'ını günceller"""
+        ws = self._find_sheet("Settings")
+        if not ws:
+            return
+        records = ws.get_all_values()
+        for i, row in enumerate(records[1:], start=2):
+            if row and row[0] == user_id:
+                ws.update(f"E{i}", [[refresh_token]])
+                return
+
+    def get_all_users_with_tokens(self) -> list:
+        """Tüm kullanıcıları token'larıyla döndürür — scheduled sync için"""
+        ws = self._find_sheet("Settings")
+        if not ws:
+            return []
+        users = []
+        for row in ws.get_all_values()[1:]:
+            if row and row[0]:
+                users.append({
+                    "user_id": row[0],
+                    "refresh_token": row[4] if len(row) > 4 else ""
+                })
+        return users
 
     def get_all_permitted_users(self) -> list:
         """İzin vermiş tüm kullanıcı id'lerini döndürür"""

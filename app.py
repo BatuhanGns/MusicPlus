@@ -72,12 +72,23 @@ _last_sync = "Henüz sync yapılmadı"
 _cached_rows = []
 _cached_headers = []
 
-def sync_job(user_id: str = None):
+def sync_job(user_id: str = None, refresh_token: str = None):
     global _last_sync
     uid = user_id or get_current_user_id()
     if not uid:
         logger.warning("⚠️ Sync: user_id yok, atlanıyor")
         return
+
+    # Token varsa spotify client'a yükle
+    if refresh_token:
+        spotify.refresh_token = refresh_token
+    elif not spotify.refresh_token:
+        spotify.refresh_token = os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
+
+    if not spotify.refresh_token:
+        logger.warning(f"⚠️ Sync: {uid} için refresh_token yok, atlanıyor")
+        return
+
     logger.info(f"🎵 Sync başladı: {uid}")
     try:
         tracks = spotify.get_recently_played()
@@ -91,7 +102,7 @@ def sync_job(user_id: str = None):
         load_user_data(uid)
         logger.info(f"📊 Sync tamamlandı: {uid}")
     except Exception as e:
-        logger.error(f"❌ Sync hatası: {e}")
+        logger.error(f"❌ Sync hatası ({uid}): {e}")
 
 @app.route("/")
 @app.route("/dashboard")
@@ -688,12 +699,16 @@ def callback():
         me = spotify._req("GET", "/me")
         session["user_id"]       = me.get("id", "")
         session["display_name"]  = me.get("display_name", me.get("id", "Kullanıcı"))
-        session["refresh_token"] = spotify.refresh_token  # token'ı session'a kaydet
-        uid  = session["user_id"]
-        name = session["display_name"]
-        if uid and not sheets._find_sheet(uid):
-            sheets._ensure_user_sheet(uid)
-            sheets.set_user_permission(uid, name, False)
+        session["refresh_token"] = spotify.refresh_token
+        uid   = session["user_id"]
+        name  = session["display_name"]
+        token = spotify.refresh_token
+        if uid:
+            if not sheets._find_sheet(uid):
+                sheets._ensure_user_sheet(uid)
+                sheets.set_user_permission(uid, name, False, token)
+            else:
+                sheets.save_refresh_token(uid, token)
         return redirect("/")
     except Exception as e:
         logger.error(f"❌ OAuth callback hatası: {e}")
@@ -909,10 +924,30 @@ def api_remove_unliked(playlist_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def scheduled_sync_all():
+    """Tüm kayıtlı kullanıcılar için sync yapar — token Sheets'ten alınır"""
+    try:
+        users = sheets.get_all_users_with_tokens()
+        if not users:
+            logger.info("⏰ Scheduled sync: kayıtlı kullanıcı yok")
+            return
+        for u in users:
+            uid   = u["user_id"]
+            token = u["refresh_token"]
+            if not token:
+                logger.warning(f"⚠️ Scheduled sync: {uid} için token yok, atlanıyor")
+                continue
+            try:
+                sync_job(uid, refresh_token=token)
+            except Exception as e:
+                logger.error(f"❌ Scheduled sync hatası ({uid}): {e}")
+    except Exception as e:
+        logger.error(f"❌ Scheduled sync genel hata: {e}")
+
 if __name__ == "__main__":
     scheduler = BackgroundScheduler()
-    # Scheduler artık kullanıcı bazlı çalışıyor, startup'ta otomatik sync yok
+    scheduler.add_job(scheduled_sync_all, "cron", minute="0,30", id="spotify_sync")
     scheduler.start()
-    logger.info("⏰ Scheduler başlatıldı")
+    logger.info("⏰ Scheduler başlatıldı (her 30 dakika, tüm kullanıcılar)")
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
