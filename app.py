@@ -36,6 +36,7 @@ def fmt_sure(sn):
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 spotify = SpotifyClient()
 sheets  = SheetsClient()
 
@@ -95,6 +96,25 @@ def sync_job(user_id: str = None):
 @app.route("/")
 @app.route("/dashboard")
 def dashboard():
+    uid           = session.get("user_id")
+    refresh_token = session.get("refresh_token")
+
+    if not uid or not refresh_token:
+        return redirect("/login")
+
+    # Render restart sonrası spotify client'ın token'ını session'dan geri yükle
+    if not spotify.refresh_token and refresh_token:
+        spotify.refresh_token = refresh_token
+        logger.info(f"🔄 Token session'dan geri yüklendi: {uid}")
+
+    # Veri cache'de yoksa yükle
+    if uid not in _user_cache:
+        try:
+            load_user_data(uid)
+            sync_job(uid)
+        except Exception as e:
+            logger.warning(f"⚠️ Auto-sync hatası: {e}")
+
     return render_template("dashboard.html")
 
 @app.route("/api/export-csv")
@@ -664,11 +684,11 @@ def callback():
         redirect_uri += "/callback"
     try:
         spotify.exchange_code(code, redirect_uri)
-        # Kullanıcı bilgilerini session'a kaydet
+        session.permanent = True  # 30 gün hatırla
         me = spotify._req("GET", "/me")
-        session["user_id"]      = me.get("id", "")
-        session["display_name"] = me.get("display_name", me.get("id", "Kullanıcı"))
-        # Sheets'te kullanıcı kaydını oluştur (izin yoksa false olarak)
+        session["user_id"]       = me.get("id", "")
+        session["display_name"]  = me.get("display_name", me.get("id", "Kullanıcı"))
+        session["refresh_token"] = spotify.refresh_token  # token'ı session'a kaydet
         uid  = session["user_id"]
         name = session["display_name"]
         if uid and not sheets._find_sheet(uid):
