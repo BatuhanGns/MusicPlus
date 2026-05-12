@@ -14,7 +14,6 @@ from sheets_client import SheetsClient
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-# Sunucunun başlama zamanı (Uptime hesaplamak için)
 SERVER_START_TIME = time.time()
 
 TR_GUNLER = {0:"Pazartesi",1:"Salı",2:"Çarşamba",3:"Perşembe",4:"Cuma",5:"Cumartesi",6:"Pazar"}
@@ -40,23 +39,22 @@ def fmt_sure(sn):
     return f"{saat} Saat {dk} Dakika" if saat > 0 else f"{dk} Dakika"
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+# 2026 GÜNCELLEMESİ: PKCE doğrulaması session(çerez) tabanlı olduğu için sunucu her yeniden 
+# başladığında urandom ile yeni şifre oluşturulması PKCE'yi bozuyordu. Artık kalıcı bir key kullanıyoruz.
+app.secret_key = os.environ.get("SECRET_KEY", "spotify-stats-2026-pkce-persistent-secret-key")
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 spotify = SpotifyClient()
 sheets  = SheetsClient()
 
 def get_current_user_id():
-    """Session'dan mevcut kullanıcının Spotify ID'sini döndürür"""
     return session.get("user_id")
 
 def get_current_user_name():
     return session.get("display_name", "Kullanıcı")
 
-# Cache: her kullanıcı için ayrı
-_user_cache = {}  # user_id -> {"headers": [], "rows": [], "last_sync": ""}
+_user_cache = {}
 
 def load_user_data(user_id: str):
-    """Kullanıcının verisini Sheets'ten yükler ve cache'ler"""
     headers, rows = sheets.get_user_data(user_id)
     _user_cache[user_id] = {"headers": headers, "rows": rows}
     return headers, rows
@@ -129,7 +127,6 @@ def dashboard():
 
     return render_template("dashboard.html")
 
-# YENİ EKLENEN ROTA: SİSTEM METRİKLERİ
 @app.route("/api/system-stats")
 def api_system_stats():
     try:
@@ -384,7 +381,6 @@ def api_sarki_detay(sarki_adi):
         toplam_count = 0
         toplam_sure  = 0
         sanatci      = ""
-        
         ilk_dinlenme_iso = None 
 
         for row in rows:
@@ -398,28 +394,24 @@ def api_sarki_detay(sarki_adi):
             try:
                 sure = int(row[idx_sure])
                 toplam_sure += sure
-            except:
-                pass
+            except: pass
 
             iso = row[idx_iso].strip()
             if iso and iso != "—":
                 if ilk_dinlenme_iso is None or iso < ilk_dinlenme_iso:
                     ilk_dinlenme_iso = iso
-
                 try:
                     dt = datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M")
                     saat_counts[dt.hour] += 1
                     vakit_counts[get_vakit(dt.hour)] += 1
-                except:
-                    pass
+                except: pass
 
         ilk_tarih_str = "Bilinmiyor"
         if ilk_dinlenme_iso:
             try:
                 dt = datetime.strptime(ilk_dinlenme_iso[:16], "%Y-%m-%dT%H:%M")
                 ilk_tarih_str = dt.strftime("%d.%m.%Y")
-            except:
-                pass
+            except: pass
 
         saatler = [{"saat": f"{h:02d}:00", "count": saat_counts.get(h, 0)} for h in range(24)]
         vakitler = [{"vakit": k, "count": v} for k, v in sorted(vakit_counts.items(), key=lambda x: -x[1])]
@@ -482,8 +474,7 @@ def api_sanatci_detay(sanatci_adi):
                     dt = datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M")
                     saat_counts[dt.hour] += 1
                     vakit_counts[get_vakit(dt.hour)] += 1
-                except:
-                    pass
+                except: pass
 
         top_sarkilar = sorted(
             [{"sarki": k, "count": v["count"], "sure": fmt_sure(v["sure"])}
@@ -528,8 +519,7 @@ def api_tum_sanatcilar():
             artist_counts[sanatci]["count"] += 1
             try:
                 artist_counts[sanatci]["sure"] += int(row[idx_sure])
-            except:
-                pass
+            except: pass
 
         sanatcilar = sorted(
             [{"sanatci": k, "count": v["count"], "sure": fmt_sure(v["sure"])}
@@ -538,7 +528,6 @@ def api_tum_sanatcilar():
         )
         return jsonify({"sanatcilar": sanatcilar, "toplam": len(sanatcilar)})
     except Exception as e:
-        logger.error(f"❌ Tüm sanatçılar hatası: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/tum-sarkilar')
@@ -565,8 +554,7 @@ def api_tum_sarkilar():
             track_counts[sarki]["sanatci"] = row[idx_sanatci].strip()
             try:
                 track_counts[sarki]["sure"] += int(row[idx_sure])
-            except:
-                pass
+            except: pass
 
         sarkilar = sorted(
             [{"sarki": k, "sanatci": v["sanatci"], "count": v["count"], "sure": fmt_sure(v["sure"])}
@@ -575,7 +563,6 @@ def api_tum_sarkilar():
         )
         return jsonify({"sarkilar": sarkilar, "toplam": len(sarkilar)})
     except Exception as e:
-        logger.error(f"❌ Tüm şarkılar hatası: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/ay/<ay_label>")
@@ -616,15 +603,12 @@ def api_ay_detay(ay_label):
                 g, ay, y = tarih.split(".")
                 if y != yil or ay != ay_no:
                     continue
-            except:
-                continue
+            except: continue
 
             sarki   = row[idx_sarki].strip()
             sanatci = row[idx_sanatci].strip()
-            try:
-                sure = int(row[idx_sure])
-            except:
-                sure = 0
+            try: sure = int(row[idx_sure])
+            except: sure = 0
 
             toplam_kayit += 1
             toplam_sure  += sure
@@ -657,7 +641,6 @@ def api_ay_detay(ay_label):
             "top_sanatcilar": top_sanatcilar,
         })
     except Exception as e:
-        logger.error(f"❌ Ay detay hatası: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/logout")
@@ -753,30 +736,6 @@ def health():
         "cached_rows": len(_cached_rows),
         "son_sync": _last_sync
     })
-
-@app.route("/api/debug")
-def debug():
-    import traceback
-    try:
-        headers, rows = load_tumveri()
-        return jsonify({
-            "status": "ok",
-            "cached_rows": len(_cached_rows),
-            "cached_headers": _cached_headers,
-            "son_sync": _last_sync,
-            "env_vars": {
-                "SPOTIFY_CLIENT_ID": bool(os.environ.get("SPOTIFY_CLIENT_ID")),
-                "SPOTIFY_CLIENT_SECRET": bool(os.environ.get("SPOTIFY_CLIENT_SECRET")),
-                "SPOTIFY_REFRESH_TOKEN": bool(os.environ.get("SPOTIFY_REFRESH_TOKEN")),
-                "GOOGLE_SHEETS_ID": bool(os.environ.get("GOOGLE_SHEETS_ID")),
-            }
-        })
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }), 500
 
 @app.route("/api/now-playing")
 def api_now_playing():
