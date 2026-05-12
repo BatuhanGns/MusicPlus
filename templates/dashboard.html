@@ -306,7 +306,7 @@
     </div>
   </div>
 
-  <!-- DÜZENLE / PLAYLIST EKRANI (GERİ GETİRİLDİ) -->
+  <!-- DÜZENLE / PLAYLIST EKRANI -->
   <div id="view-duzenle" class="view-section">
     <div class="section-title">Otomatik Çalma Listeleri</div>
     <button class="action-btn" onclick="createPlaylist('top-tracks', this)">🎵 En Çok Dinlediklerim (Top 50)</button>
@@ -1320,6 +1320,12 @@ function openPlaylistActionModal(playlistId, playlistName, trackCount) {
       <button class="pl-action-btn" onclick="plAction('${playlistId}', 'shuffle', this)">
         <span class="pl-icon">🔀</span> Rastgele Karıştır
       </button>
+      <button class="pl-action-btn" onclick="plAction('${playlistId}', 'follow-artists', this)">
+        <span class="pl-icon">➕</span> Listedeki Tüm Sanatçıları Takip Et
+      </button>
+      <button class="pl-action-btn" onclick="plAction('${playlistId}', 'like-all', this)">
+        <span class="pl-icon">💚</span> Listedeki Tüm Şarkıları Beğen
+      </button>
       <button class="pl-action-btn danger" onclick="plAction('${playlistId}', 'remove-liked', this)">
         <span class="pl-icon">🗑️</span> Beğenilen Şarkıları Çıkar
       </button>
@@ -1327,7 +1333,7 @@ function openPlaylistActionModal(playlistId, playlistName, trackCount) {
         <span class="pl-icon">🗑️</span> Beğenilmeyen Şarkıları Çıkar
       </button>
       <div style="margin-top:12px; padding:12px 14px; background:#1a1a1a; border:1px solid #333; font-size:11px; color:var(--muted); line-height:1.7">
-        ⚠️ Sanatçı takip etme ve şarkı beğenme işlemleri Spotify'ın Extended Quota kısıtlaması nedeniyle devre dışı.
+        ⚠️ 2026 API Kuralları: Bu işlemler yalnızca Geliştirici Dashboard'da ekli Premium (maksimum 5) hesaplar için çalışır.
       </div>
     </div>
   `;
@@ -1431,4 +1437,3 @@ document.addEventListener('click', function(e) {
 </script>
 </body>
 </html>
-
