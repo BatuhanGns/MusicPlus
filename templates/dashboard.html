@@ -67,8 +67,7 @@
   .rank-item .days span{color:var(--green);font-family:'Syne',sans-serif;font-weight:700;}
 
   .bar-wrap{margin-top:4px;height:2px;background:var(--muted2);border-radius:1px;overflow:hidden;}
-  .bar-fill{height:100%;background:var(--green);border-radius:1px;transform-origin:left;animation:growBar .6s ease forwards;}
-  @keyframes growBar{from{transform:scaleX(0);}to{transform:scaleX(1);}}
+  .bar-fill{height:100%;background:var(--green);border-radius:1px;transform-origin:left;transition:width 0.5s ease;}
 
   .two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
   @media(max-width:680px){.two-col{grid-template-columns:1fr;}}
@@ -89,7 +88,6 @@
   .week-day .day-sure.empty{color:var(--muted2);}
   @media(max-width:500px){.week-grid{grid-template-columns:repeat(4,1fr);}}
 
-  /* Aksiyon Butonları (Düzenle ve Profil İçin) */
   .action-btn {display:block; width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); padding:18px 24px; font-family:'Syne',sans-serif; font-size:15px; font-weight:700; text-align:left; cursor:pointer; transition:all 0.2s; margin-bottom:8px; border-left:4px solid transparent;}
   .action-btn:hover {background:var(--surface2); border-left-color:var(--green);}
   .action-btn.danger {color:#ff4444;}
@@ -139,7 +137,6 @@
   .now-playing-card{display:none;background:var(--surface);border:1px solid var(--border);margin-bottom:32px;overflow:hidden;position:relative;}
   .now-playing-card.visible{display:flex;align-items:center;gap:0;}
   .now-playing-card .np-art{width:90px;height:90px;min-width:90px;object-fit:cover;display:block;}
-  .now-playing-card .np-art-placeholder{width:90px;height:90px;min-width:90px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:28px;}
   .now-playing-card .np-info{padding:16px 20px;flex:1;min-width:0;}
   .now-playing-card .np-label{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--green);margin-bottom:6px;display:flex;align-items:center;gap:8px;}
   .now-playing-card .np-label::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s ease-in-out infinite;}
@@ -181,16 +178,16 @@
   .setting-toggle.on{background:var(--green);}
   .toggle-knob{position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:left .25s;}
   .setting-toggle.on .toggle-knob{left:23px;}
-  .playlist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
-  .playlist-card{background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
-  .playlist-card:hover{border-color:var(--green);transform:translateY(-2px);}
-  .playlist-card img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:var(--surface2);}
-  .playlist-card .pl-no-img{width:100%;aspect-ratio:1;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:36px;}
-  .playlist-card .pl-info{padding:10px 12px;}
-  .playlist-card .pl-name{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
-  .playlist-card .pl-count{font-size:10px;color:var(--muted);}
 
-  /* PLAYLİST AKSİYON MODAL */
+  /* PLAYLİST AKSİYON VE KARTLAR */
+  .playlist-card { display:flex; align-items:center; gap:16px; background:var(--surface); border:1px solid var(--border); padding:12px 16px; cursor:pointer; transition:all .2s;}
+  .playlist-card:hover { border-color:var(--green); background:var(--surface2); }
+  .playlist-card img { width:48px; height:48px; object-fit:cover; }
+  .pl-no-img { width:48px; height:48px; background:var(--surface2); display:flex; align-items:center; justify-content:center; font-size:20px; }
+  .pl-info { flex:1; min-width:0; }
+  .pl-name { font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pl-count { font-size:11px; color:var(--muted); margin-top:4px; }
+
   .pl-action-list{display:flex;flex-direction:column;gap:6px;}
   .pl-action-btn{display:flex;align-items:center;gap:14px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:16px 20px;font-family:'DM Mono',monospace;font-size:13px;cursor:pointer;transition:all .2s;text-align:left;border-left:3px solid transparent;width:100%;}
   .pl-action-btn:hover:not(:disabled){background:var(--surface);border-left-color:var(--green);}
@@ -214,6 +211,9 @@
   </div>
   <a class="menu-item active" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler">İstatistiklerim</a>
   <a class="menu-item" onclick="switchView('topluluk');toggleMenu()" id="nav-topluluk">İstatistikleriniz</a>
+  <a class="menu-item" onclick="switchView('duzenle');toggleMenu()" id="nav-duzenle">Çalma Listeleri</a>
+  <!-- YENİ MENÜ BAĞLANTISI -->
+  <a class="menu-item" onclick="switchView('kullanim');toggleMenu()" id="nav-kullanim">Kullanım ve Limitler</a>
   <a class="menu-item" onclick="switchView('profil');toggleMenu()" id="nav-profil">Profilin</a>
 </div>
 
@@ -254,7 +254,7 @@
       </div>
     </div>
 
-    <!-- SYNCED LYRICS PANEL (ayar açıksa gösterilir) -->
+    <!-- SYNCED LYRICS PANEL -->
     <div class="synced-lyrics-panel" id="syncedLyricsPanel">
       <div class="synced-line-wrap" id="syncedLineWrap">
         <div class="synced-no-support">Şarkı bekleniyor...</div>
@@ -262,7 +262,7 @@
     </div>
 
     <div class="stats-row" id="statsRow">
-      <div class="stat-card"><div class="label">Toplam Dinleme</div><div class="value" id="statTotal">—</div><div class="sub">kayıt</div></div>
+      <div class="stat-card"><div class="label">Toplam Dinlenme</div><div class="value" id="statTotal">—</div><div class="sub">kayıt</div></div>
       <div class="stat-card" onclick="openTumSarkilarModal()" style="cursor:pointer"><div class="label">Farklı Şarkı ↗</div><div class="value" id="statTracks">—</div><div class="sub">tıkla → tümünü gör</div></div>
       <div class="stat-card" onclick="openTumSanatcilarModal()" style="cursor:pointer"><div class="label">Farklı Sanatçı ↗</div><div class="value" id="statArtists">—</div><div class="sub">tıkla → tümünü gör</div></div>
       <div class="stat-card"><div class="label">Toplam Süre</div><div class="value" id="statHours">—</div><div class="sub">saat</div></div>
@@ -300,11 +300,68 @@
     </div>
   </div>
 
-  <!-- Düzenle sayfası kaldırıldı -->
-
   <div id="view-topluluk" class="view-section">
     <div id="toplulukContent">
       <div class="loading" id="toplulukLoading">Yükleniyor...</div>
+    </div>
+  </div>
+
+  <!-- DÜZENLE / PLAYLIST EKRANI (GERİ GETİRİLDİ) -->
+  <div id="view-duzenle" class="view-section">
+    <div class="section-title">Otomatik Çalma Listeleri</div>
+    <button class="action-btn" onclick="createPlaylist('top-tracks', this)">🎵 En Çok Dinlediklerim (Top 50)</button>
+    <button class="action-btn" onclick="createPlaylist('top-artists', this)">🎤 Favori Sanatçılarımın Şarkıları</button>
+
+    <div class="section-title" style="margin-top:32px">Mevcut Çalma Listelerin</div>
+    <div id="playlistGrid" style="display:grid;grid-template-columns:1fr;gap:12px">
+      <!-- Playlist kartları buraya yüklenecek -->
+    </div>
+  </div>
+
+  <!-- YENİ KULLANIM VE LİMİTLER EKRANI -->
+  <div id="view-kullanim" class="view-section">
+    <div class="section-title">Sunucu (Render) Durumu</div>
+    <div class="stats-row" id="serverStatsRow">
+      <div class="stat-card">
+        <div class="label">CPU Kullanımı</div>
+        <div class="value" id="sysCpu">—</div>
+        <div class="bar-wrap" style="margin-top:10px; background:var(--surface2)"><div class="bar-fill" id="sysCpuBar" style="width:0%"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">RAM Kullanımı</div>
+        <div class="value" id="sysRam">—</div>
+        <div class="sub" id="sysRamDetail">— MB / — MB</div>
+        <div class="bar-wrap" style="margin-top:10px; background:var(--surface2)"><div class="bar-fill" id="sysRamBar" style="width:0%"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Ağ Trafiği (G/Ç)</div>
+        <div class="value" id="sysNet" style="font-size:16px">—</div>
+        <div class="sub">Sunucu veri trafiği</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Uptime (Çalışma)</div>
+        <div class="value" id="sysUptime" style="font-size:18px">—</div>
+        <div class="sub">Son yeniden başlatmadan beri</div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:32px">Cihaz / İstemci Ağ Durumu</div>
+    <div class="stats-row" id="clientStatsRow">
+      <div class="stat-card">
+        <div class="label">Bağlantı Tipi</div>
+        <div class="value" id="clientConnType">—</div>
+        <div class="sub">Tahmini ağ türü</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Tahmini Hız (Downlink)</div>
+        <div class="value" id="clientDownlink">—</div>
+        <div class="sub">Mbps</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Oturum Veri Tüketimi</div>
+        <div class="value" id="clientDataUsage">—</div>
+        <div class="sub">Sayfa ve API yükleri</div>
+      </div>
     </div>
   </div>
 
@@ -363,11 +420,16 @@
 </div>
 
 <script>
-// MENÜ VE EKRAN GEÇİŞ FONKSİYONLARI
+// ===================== MENÜ FONKSİYONLARI =====================
 function toggleMenu() {
-  document.getElementById('sideMenu').classList.toggle('open');
-  document.getElementById('menuOverlay').classList.toggle('open');
+  const menu = document.getElementById('sideMenu');
+  const overlay = document.getElementById('menuOverlay');
+  if(menu) menu.classList.toggle('open');
+  if(overlay) overlay.classList.toggle('open');
 }
+
+// ===================== EKRAN GEÇİŞ FONKSİYONLARI =====================
+let sysStatsInterval = null;
 
 function switchView(viewId) {
   document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
@@ -377,10 +439,78 @@ function switchView(viewId) {
   const titles = {
     'istatistikler': 'Kişisel Spotify Verilerin',
     'topluluk':      'Topluluk İstatistikleri',
+    'duzenle':       'Çalma Listesi Yönetimi',
+    'kullanim':      'Kullanım ve Limitler',
     'profil':        'Hesap ve Ayarlar'
   };
   document.getElementById('headerSubtitle').textContent = titles[viewId] || '';
+  
   if (viewId === 'topluluk') loadTopluluk();
+  if (viewId === 'duzenle') loadPlaylists(); // Playlistleri yükle
+  
+  // Sadece "Kullanım" ekranındayken verileri güncelle
+  if (viewId === 'kullanim') {
+    loadSystemStats();
+    loadClientStats();
+    if(!sysStatsInterval) {
+      sysStatsInterval = setInterval(() => {
+        loadSystemStats();
+        loadClientStats();
+      }, 3000); // 3 saniyede bir güncelle
+    }
+  } else {
+    if(sysStatsInterval) {
+      clearInterval(sysStatsInterval);
+      sysStatsInterval = null;
+    }
+  }
+}
+
+// ===================== YENİ: SİSTEM METRİKLERİ FONKSİYONLARI =====================
+async function loadSystemStats() {
+  try {
+    const res = await fetch('/api/system-stats');
+    if(!res.ok) return;
+    const data = await res.json();
+    if(data.status === 'ok') {
+      document.getElementById('sysCpu').textContent = data.cpu_percent + '%';
+      document.getElementById('sysCpuBar').style.width = data.cpu_percent + '%';
+      
+      document.getElementById('sysRam').textContent = data.ram_percent + '%';
+      document.getElementById('sysRamDetail').textContent = data.ram_used_mb + ' MB / ' + data.ram_total_mb + ' MB';
+      document.getElementById('sysRamBar').style.width = data.ram_percent + '%';
+      
+      document.getElementById('sysNet').textContent = data.net_sent_mb + ' MB 🔼 / ' + data.net_recv_mb + ' MB 🔽';
+      document.getElementById('sysUptime').textContent = data.uptime;
+    }
+  } catch(e) {}
+}
+
+function loadClientStats() {
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if(conn) {
+    document.getElementById('clientConnType').textContent = (conn.effectiveType || conn.type || 'Bilinmiyor').toUpperCase();
+    document.getElementById('clientDownlink').textContent = conn.downlink ? conn.downlink : '—';
+  } else {
+    document.getElementById('clientConnType').textContent = 'Desteklenmiyor';
+  }
+
+  if(window.performance && window.performance.getEntriesByType) {
+    let totalBytes = 0;
+    const resources = window.performance.getEntriesByType('resource');
+    resources.forEach(r => {
+      totalBytes += r.transferSize || r.decodedBodySize || 0;
+    });
+    const navs = window.performance.getEntriesByType('navigation');
+    if(navs.length > 0) {
+      totalBytes += navs[0].transferSize || navs[0].decodedBodySize || 0;
+    }
+    
+    const mb = (totalBytes / (1024 * 1024)).toFixed(2);
+    document.getElementById('clientDataUsage').textContent = mb > 0 ? mb + ' MB' : (totalBytes / 1024).toFixed(1) + ' KB';
+  } else {
+    document.getElementById('clientDataUsage').textContent = 'Desteklenmiyor';
+  }
 }
 
 // ===================== İZİN YÖNETİMİ =====================
@@ -411,7 +541,7 @@ async function toggleIzin() {
       body: JSON.stringify({allowed: _izinDurumu})
     });
   } catch(e) {
-    _izinDurumu = !_izinDurumu; // geri al
+    _izinDurumu = !_izinDurumu;
     if (_izinDurumu) toggle.classList.add('on');
     else toggle.classList.remove('on');
   }
@@ -452,7 +582,6 @@ async function loadTopluluk() {
 }
 
 function buildToplulukHTML(d) {
-  // Şarkı listesi ve yeşil barlar
   const topSarkilar = (d.top_sarkilar || []).map((s, i) => {
     const max = d.top_sarkilar[0]?.count || 1;
     return `
@@ -469,7 +598,6 @@ function buildToplulukHTML(d) {
     </div>`;
   }).join('');
 
-  // Sanatçı listesi ve yeşil barlar
   const topSanatcilar = (d.top_sanatcilar || []).map((s, i) => {
     const max = d.top_sanatcilar[0]?.count || 1;
     return `
@@ -485,7 +613,6 @@ function buildToplulukHTML(d) {
     </div>`;
   }).join('');
 
-  // 7 Günlük Tablo
   const haftaHTML = (d.hafta || []).map(g => `
     <div class="week-day ${g.sure_sn>0?'has-data':''}">
       <div class="day-name">${g.gun?.slice(0,3)}</div>
@@ -493,11 +620,9 @@ function buildToplulukHTML(d) {
       <div class="day-sure ${g.sure_sn===0?'empty':''}">${fmtSure(g.sure_sn)}</div>
     </div>`).join('');
 
-  // Mevcut grafik fonksiyonlarını topluluk için yeniden kullanıyoruz
   const saatBars = renderHourChart(d.genel_saatler || []);
   const vakitHTML = renderVakitler(d.genel_vakitler || []);
 
-  // Aylık Tablo
   const aylarHTML = `<table class="month-table">
     <thead><tr><th>Ay</th><th>Aylık Toplam</th><th>Günlük Ortalama</th><th>Dinleme Sayısı</th></tr></thead>
     <tbody>${(d.aylar||[]).slice().reverse().map(a => `
@@ -509,7 +634,6 @@ function buildToplulukHTML(d) {
       </tr>`).join('')}
     </tbody></table>`;
 
-  // Ana HTML iskeletini birleştir
   return `
     <div class="stats-row">
       <div class="stat-card"><div class="label">Toplam Dinlenme</div><div class="value">${(d.toplam_kayit||0).toLocaleString('tr')}</div><div class="sub">kayıt · ${d.katilimci_sayisi||0} kişi</div></div>
@@ -517,12 +641,10 @@ function buildToplulukHTML(d) {
       <div class="stat-card"><div class="label">Farklı Sanatçı</div><div class="value">${(d.farkli_sanatci||0).toLocaleString('tr')}</div></div>
       <div class="stat-card"><div class="label">Toplam Süre</div><div class="value">${Math.floor((d.toplam_sure_sn||0)/3600).toLocaleString('tr')}</div><div class="sub">saat</div></div>
     </div>
-
     <div class="section">
       <div class="section-title">Son 7 Gün</div>
       <div class="week-grid">${haftaHTML}</div>
     </div>
-
     <div class="two-col">
       <div class="section">
         <div class="section-title">En Çok Dinlenen Şarkılar</div>
@@ -533,7 +655,6 @@ function buildToplulukHTML(d) {
         <div class="rank-list">${topSanatcilar}</div>
       </div>
     </div>
-
     <div class="section">
       <div class="section-title">Tüm Zamanlar Dinleme Alışkanlıkları</div>
       <div style="background:var(--surface); padding:24px; border:1px solid var(--border);">
@@ -543,7 +664,6 @@ function buildToplulukHTML(d) {
         ${vakitHTML}
       </div>
     </div>
-
     <div class="section">
       <div class="section-title">Aylık Analiz</div>
       ${aylarHTML}
@@ -589,14 +709,12 @@ async function fetchNowPlaying() {
     const newTrack = d.track_name + '__' + d.artist_name;
     const prevTrack = document.getElementById('npTrack').textContent + '__' + document.getElementById('npArtist').textContent;
 
-    // Şarkı değiştiyse lyrics panelini sıfırla
     if (newTrack !== prevTrack && _lyricsOpen) {
       _lastLyricsTrack = '';
       document.getElementById('lyricsInner').innerHTML = '<div class="lyrics-loading">Yeni şarkı için sözler yükleniyor...</div>';
       loadLyrics(d.artist_name, d.track_name);
     }
 
-    // Synced lyrics panelini tetikle
     if (newTrack !== prevTrack && _settings.syncedLyrics) {
       _lastSyncedTrack = '';
       loadSyncedLyrics(d.artist_name, d.track_name);
@@ -606,7 +724,6 @@ async function fetchNowPlaying() {
     document.getElementById('npArtist').textContent = d.artist_name;
     document.getElementById('npPaused').textContent = d.is_playing ? '' : '· Duraklatıldı';
 
-    // Albüm kapağı — en yüksek kaliteli resmi kullan
     const art = document.getElementById('npArt');
     if (d.art_url) { art.src = d.art_url; art.style.display = 'block'; }
     else { art.style.display = 'none'; }
@@ -628,9 +745,7 @@ async function fetchNowPlaying() {
         updateNpTime();
       }, 1000);
     }
-  } catch(e) {
-    // sessizce geç
-  }
+  } catch(e) {}
 }
 
 fetchNowPlaying();
@@ -671,12 +786,11 @@ function initSettings() {
 // ===================== ŞARKI SÖZLERİ =====================
 let _lyricsOpen     = false;
 let _lastLyricsTrack = '';
-let _syncedLines    = [];   // [{time, text}]
+let _syncedLines    = []; 
 let _syncedTimer    = null;
 let _lastSyncedTrack = '';
-let _hasSynced      = false; // bu şarkıda synced var mı
+let _hasSynced      = false; 
 
-// --- Synced panel (ayar açıkken otomatik) ---
 async function loadSyncedLyrics(artist, track) {
   const panel = document.getElementById('syncedLyricsPanel');
   const wrap  = document.getElementById('syncedLineWrap');
@@ -700,7 +814,6 @@ async function loadSyncedLyrics(artist, track) {
 
     if (!data.syncedLyrics) { _showSyncedUnsupported(wrap); return; }
 
-    // Parse [mm:ss.xx] satırları
     const parsed = [];
     data.syncedLyrics.split('\n').forEach(line => {
       const m = line.match(/^\[(\d+):(\d+\.\d+)\](.*)/);
@@ -716,9 +829,7 @@ async function loadSyncedLyrics(artist, track) {
     _hasSynced   = true;
     _updateSyncedDisplay();
 
-    // Lyrics butonuna yeşil nokta ekle
     document.getElementById('npLyricsBtn').style.borderColor = 'var(--green)';
-
   } catch(e) {
     _showSyncedUnsupported(wrap);
   }
@@ -744,7 +855,6 @@ function _updateSyncedDisplay() {
   const active = _syncedLines[activeIdx]?.text  || '';
   const next   = _syncedLines[activeIdx + 1]?.text || '';
 
-  // DOM henüz oluşmadıysa ilk kez yaz
   if (!wrap.querySelector('.synced-line.active')) {
     wrap.innerHTML = `
       <div class="synced-line prev"  id="sl-prev">${prev}</div>
@@ -758,7 +868,6 @@ function _updateSyncedDisplay() {
   const elActive = wrap.querySelector('#sl-active');
   const elNext   = wrap.querySelector('#sl-next');
 
-  // Aktif satır değiştiyse smooth geçiş yap
   if (elActive.textContent !== active) {
     elActive.style.transition = 'opacity .35s ease, font-size .35s ease';
     elPrev.style.transition   = 'opacity .35s ease, font-size .35s ease';
@@ -780,14 +889,12 @@ function _updateSyncedDisplay() {
   }
 }
 
-// Progress güncellendiğinde synced lyrics de güncelle
 const _origUpdateNpTime = updateNpTime;
 updateNpTime = function() {
   _origUpdateNpTime();
   if (_settings.syncedLyrics && _syncedLines.length) _updateSyncedDisplay();
 };
 
-// --- Manuel sözler butonu ---
 async function toggleLyrics() {
   const panel = document.getElementById('lyricsPanel');
   const btn   = document.getElementById('npLyricsBtn');
@@ -828,7 +935,6 @@ async function loadLyrics(artist, track) {
         const best   = results[0];
         const lyrics = best.plainLyrics || best.syncedLyrics?.replace(/\[\d+:\d+\.\d+\]/g, '').trim();
         if (lyrics) {
-          // Synced lyrics varsa satırları vurgula
           if (_settings.syncedLyrics && best.syncedLyrics) {
             inner.innerHTML = _buildHighlightedLyrics(best.syncedLyrics);
           } else {
@@ -844,7 +950,6 @@ async function loadLyrics(artist, track) {
     const data = await res.json();
     if (data.syncedLyrics && _settings.syncedLyrics) {
       inner.innerHTML = _buildHighlightedLyrics(data.syncedLyrics);
-      // Aktif satıra scroll et
       _scrollToActiveLyricLine();
     } else {
       const lyrics = data.plainLyrics || data.syncedLyrics?.replace(/\[\d+:\d+\.\d+\]/g, '').trim();
@@ -888,7 +993,6 @@ function _scrollToActiveLyricLine() {
   }
 }
 
-// Progress her güncellendiğinde açık lyrics panelindeki aktif satırı güncelle
 const _origUpdate2 = updateNpTime;
 updateNpTime = function() {
   _origUpdate2();
@@ -898,7 +1002,6 @@ updateNpTime = function() {
 initSettings();
 loadIzin();
 
-// Lyric line CSS (inline)
 const _lyricStyle = document.createElement('style');
 _lyricStyle.textContent = `.lyric-lines{padding:20px 28px;}.lyric-line{font-family:'DM Mono',monospace;font-size:13px;line-height:2.2;color:var(--muted);cursor:default;transition:color .3s,font-size .3s;}.lyric-line.lyric-active{color:var(--green);font-size:15px;font-weight:700;font-family:'Syne',sans-serif;}`;
 document.head.appendChild(_lyricStyle);
@@ -1172,27 +1275,7 @@ async function openAyModal(ayLabel) {
     </div>`;
 }
 
-async function init() {
-  const data = await fetchData();
-  if (!data) return;
-  renderStats(data);
-  renderWeek(data.hafta);
-  
-  renderRankList('topTracks',   data.top_sarkilar,   'sarki',   'sanatci', 'count', 'kac_gundur', 'openSarkiModal');
-  renderRankList('topArtists',  data.top_sanatcilar, 'sanatci', null,      'count', 'kac_gundur', 'openSanatciModal');
-  
-  // YENİ: GENEL GRAFİKLERİ ÇİZ
-  if (data.genel_saatler && data.genel_vakitler) {
-    document.getElementById('globalHourChartContainer').innerHTML = renderHourChart(data.genel_saatler);
-    document.getElementById('globalVakitContainer').innerHTML = renderVakitler(data.genel_vakitler);
-  }
-  
-  renderMonths(data.aylar);
-  document.getElementById('footerTime').textContent = new Date().toLocaleString('tr-TR');
-}
-
-// ===================== PLAYLİST YÖNETİMİ =====================
-
+// ===================== PLAYLIST YÖNETİMİ =====================
 async function loadPlaylists() {
   const grid = document.getElementById('playlistGrid');
   if (!grid) return;
@@ -1245,7 +1328,6 @@ function openPlaylistActionModal(playlistId, playlistName, trackCount) {
       </button>
       <div style="margin-top:12px; padding:12px 14px; background:#1a1a1a; border:1px solid #333; font-size:11px; color:var(--muted); line-height:1.7">
         ⚠️ Sanatçı takip etme ve şarkı beğenme işlemleri Spotify'ın Extended Quota kısıtlaması nedeniyle devre dışı.
-        Spotify Developer Dashboard'dan <a href="https://developer.spotify.com/documentation/web-api/concepts/quota-modes" target="_blank" style="color:var(--green)">Extended Quota</a> başvurusu yapılırsa açılır.
       </div>
     </div>
   `;
@@ -1284,9 +1366,7 @@ async function plAction(playlistId, action, btn) {
   allBtns.forEach(b => b.disabled = false);
 }
 
-async function createPlaylist(type) {
-  const btnId = type === 'top-tracks' ? 'btnCreateTopTracks' : 'btnCreateTopArtists';
-  const btn = document.getElementById(btnId);
+async function createPlaylist(type, btn) {
   const origHTML = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = btn.innerHTML.replace(/(🎵|🎤)/, '⏳') + ' — Oluşturuluyor...';
@@ -1308,13 +1388,27 @@ async function createPlaylist(type) {
   }
 }
 
-// Düzenle ekranına geçilince playlistleri yükle
-const _origSwitchView = switchView;
-// Override edilecek (aşağıda)
+// ===================== BAŞLATMA =====================
+async function init() {
+  const data = await fetchData();
+  if (!data) return;
+  renderStats(data);
+  renderWeek(data.hafta);
+  
+  renderRankList('topTracks',   data.top_sarkilar,   'sarki',   'sanatci', 'count', 'kac_gundur', 'openSarkiModal');
+  renderRankList('topArtists',  data.top_sanatcilar, 'sanatci', null,      'count', 'kac_gundur', 'openSanatciModal');
+  
+  if (data.genel_saatler && data.genel_vakitler) {
+    document.getElementById('globalHourChartContainer').innerHTML = renderHourChart(data.genel_saatler);
+    document.getElementById('globalVakitContainer').innerHTML = renderVakitler(data.genel_vakitler);
+  }
+  
+  renderMonths(data.aylar);
+  document.getElementById('footerTime').textContent = new Date().toLocaleString('tr-TR');
+}
 
 init();
 
-// Delegated click
 document.addEventListener('click', function(e) {
   const item = e.target.closest('.rank-item[data-fn]');
   if (item) {
