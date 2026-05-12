@@ -2,6 +2,8 @@ import os
 import io
 import csv
 import logging
+import time
+import psutil
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from flask import Flask, jsonify, render_template, request, Response, stream_with_context, session, redirect, url_for
@@ -11,6 +13,9 @@ from sheets_client import SheetsClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
+
+# Sunucunun başlama zamanı (Uptime hesaplamak için)
+SERVER_START_TIME = time.time()
 
 TR_GUNLER = {0:"Pazartesi",1:"Salı",2:"Çarşamba",3:"Perşembe",4:"Cuma",5:"Cumartesi",6:"Pazar"}
 TR_AYLAR  = {1:"Ocak",2:"Şubat",3:"Mart",4:"Nisan",5:"Mayıs",6:"Haziran",
@@ -61,7 +66,6 @@ def get_cached_data(user_id: str):
         return load_user_data(user_id)
     return _user_cache[user_id]["headers"], _user_cache[user_id]["rows"]
 
-# Geriye dönük uyumluluk için
 def load_tumveri():
     uid = get_current_user_id()
     if uid:
@@ -79,7 +83,6 @@ def sync_job(user_id: str = None, refresh_token: str = None):
         logger.warning("⚠️ Sync: user_id yok, atlanıyor")
         return
 
-    # Token varsa spotify client'a yükle
     if refresh_token:
         spotify.refresh_token = refresh_token
     elif not spotify.refresh_token:
@@ -113,12 +116,10 @@ def dashboard():
     if not uid or not refresh_token:
         return redirect("/login")
 
-    # Render restart sonrası spotify client'ın token'ını session'dan geri yükle
     if not spotify.refresh_token and refresh_token:
         spotify.refresh_token = refresh_token
         logger.info(f"🔄 Token session'dan geri yüklendi: {uid}")
 
-    # Veri cache'de yoksa yükle
     if uid not in _user_cache:
         try:
             load_user_data(uid)
@@ -127,6 +128,36 @@ def dashboard():
             logger.warning(f"⚠️ Auto-sync hatası: {e}")
 
     return render_template("dashboard.html")
+
+# YENİ EKLENEN ROTA: SİSTEM METRİKLERİ
+@app.route("/api/system-stats")
+def api_system_stats():
+    try:
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        mem = psutil.virtual_memory()
+        ram_percent = mem.percent
+        ram_used_mb = mem.used / (1024 * 1024)
+        ram_total_mb = mem.total / (1024 * 1024)
+        net = psutil.net_io_counters()
+        net_sent_mb = net.bytes_sent / (1024 * 1024)
+        net_recv_mb = net.bytes_recv / (1024 * 1024)
+        uptime_sec = int(time.time() - SERVER_START_TIME)
+        uptime_hours = uptime_sec // 3600
+        uptime_mins = (uptime_sec % 3600) // 60
+        
+        return jsonify({
+            "status": "ok",
+            "cpu_percent": cpu_percent,
+            "ram_percent": ram_percent,
+            "ram_used_mb": round(ram_used_mb, 1),
+            "ram_total_mb": round(ram_total_mb, 1),
+            "net_sent_mb": round(net_sent_mb, 2),
+            "net_recv_mb": round(net_recv_mb, 2),
+            "uptime": f"{uptime_hours}s {uptime_mins}dk"
+        })
+    except Exception as e:
+        logger.error(f"❌ Sistem stats hatası: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/api/export-csv")
 def export_csv():
@@ -148,7 +179,6 @@ def export_csv():
                     headers={"Content-Disposition": "attachment; filename=spotify_verilerim.csv"})
 
 def compute_stats(headers, rows):
-    """Verilen satırlardan istatistik hesaplar — hem kişisel hem birleşik için kullanılır"""
     if not rows:
         return None
 
@@ -292,7 +322,6 @@ def api_dashboard():
 
 @app.route("/api/istatistikler")
 def api_istatistikler():
-    """Tüm izin veren kullanıcıların birleşik istatistiği"""
     try:
         uid = get_current_user_id()
         if not uid:
@@ -313,7 +342,6 @@ def api_istatistikler():
 
 @app.route("/api/izin", methods=["POST"])
 def api_izin():
-    """Kullanıcının istatistikler sayfası iznini günceller"""
     try:
         uid  = get_current_user_id()
         name = get_current_user_name()
@@ -328,7 +356,6 @@ def api_izin():
 
 @app.route("/api/izin")
 def api_izin_get():
-    """Mevcut kullanıcının izin durumunu döndürür"""
     try:
         uid = get_current_user_id()
         if not uid:
@@ -641,8 +668,6 @@ def logout():
 
 @app.route("/login")
 def login_page():
-    # Render gibi proxy arkasındaki sunucularda request.host_url http:// döndürebilir.
-    # REDIRECT_URI env variable varsa onu kullan, yoksa https:// olarak zorla.
     base = os.environ.get("REDIRECT_URI") or (
         "https://" + request.host + "/callback"
     )
@@ -695,7 +720,7 @@ def callback():
         redirect_uri += "/callback"
     try:
         spotify.exchange_code(code, redirect_uri)
-        session.permanent = True  # 30 gün hatırla
+        session.permanent = True
         me = spotify._req("GET", "/me")
         session["user_id"]       = me.get("id", "")
         session["display_name"]  = me.get("display_name", me.get("id", "Kullanıcı"))
@@ -753,8 +778,6 @@ def debug():
             "traceback": traceback.format_exc()
         }), 500
 
-# --- Playlist API endpoints ---
-
 @app.route("/api/now-playing")
 def api_now_playing():
     try:
@@ -783,8 +806,7 @@ def api_create_top_tracks_playlist():
         idx_sarki_id = headers.index("Şarkı ID")
 
         from collections import Counter
-        # Şarkı adına göre say, ama ID'yi de tut
-        sarki_id_map = {}  # sarki_adi -> track_id
+        sarki_id_map = {}
         sarki_counts = Counter()
         for row in rows:
             if len(row) > max(idx_sarki, idx_sarki_id):
@@ -829,7 +851,7 @@ def api_create_top_artists_playlist():
 
         from collections import Counter, defaultdict
         sanatci_counts   = Counter()
-        sanatci_sarkilar = defaultdict(dict)  # sanatci -> {sarki_adi: track_id}
+        sanatci_sarkilar = defaultdict(dict)
 
         for row in rows:
             if len(row) > max(idx_sanatci, idx_sarki, idx_sarki_id):
@@ -843,7 +865,6 @@ def api_create_top_artists_playlist():
         top_sanatcilar = [s for s, _ in sanatci_counts.most_common(20) if s]
         track_uris = []
         for s in top_sanatcilar:
-            # Her sanatçıdan en fazla 5 şarkı al
             for tid in list(sanatci_sarkilar[s].values())[:5]:
                 uri = f"spotify:track:{tid}"
                 if uri not in track_uris:
@@ -925,7 +946,6 @@ def api_remove_unliked(playlist_id):
         return jsonify({"error": str(e)}), 500
 
 def scheduled_sync_all():
-    """Tüm kayıtlı kullanıcılar için sync yapar — token Sheets'ten alınır"""
     try:
         users = sheets.get_all_users_with_tokens()
         if not users:
