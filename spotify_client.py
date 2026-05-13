@@ -156,17 +156,22 @@ class SpotifyClient:
         token = self._get_access_token()
         headers = kwargs.pop("headers", {})
         headers["Authorization"] = f"Bearer {token}"
+        # JSON body gönderirken Content-Type zorunlu
+        if "json" in kwargs:
+            headers["Content-Type"] = "application/json"
         url = f"{API_BASE}{endpoint}" if not endpoint.startswith("http") else endpoint
         
         resp = requests.request(method, url, headers=headers, **kwargs)
         
-        # 2026 GÜNCELLEMESİ: Geliştirici kotası (Premium ve 5 Kullanıcı Kısıtı) hatası yakalama
+        # Hata durumunda tam response body'yi logla
+        if resp.status_code >= 400:
+            logger.error(f"❌ Spotify API {resp.status_code} - {method} {endpoint} - Yanıt: {resp.text[:500]}")
+        
         if resp.status_code == 403:
-            logger.error(f"403 Yasaklandı - {endpoint} - Premium hesap veya Whitelist gereksinimi olabilir.")
-            raise Exception("403 Yasaklandı - Spotify 2026 API Kuralları: Bu işlem Geliştirici Modunda yalnızca Premium hesaba sahip Whitelist (ilk 5) kullanıcılar için çalışır.")
+            raise Exception(f"403 Yasaklandı - {endpoint} - Spotify 2026 API: Premium hesap ve Whitelist gereksinimi. Yanıt: {resp.text[:200]}")
 
         resp.raise_for_status()
-        if resp.text:
+        if resp.text and resp.text.strip():
             return resp.json()
         return {}
 
@@ -250,22 +255,33 @@ class SpotifyClient:
         return all_playlists
 
     def _get_playlist_tracks(self, playlist_id):
+        # 2026 API: Yalnızca kendi sahip olduğunuz playlist'lerin içeriği döner
         tracks = []
         url = f"/playlists/{playlist_id}/items"
-        params = {"limit": 100, "offset": 0}
+        params = {"limit": 50, "offset": 0}  # 2026: limit max 50
         while url:
             data = self._req("GET", url, params=params)
-            for item in data.get("items", []):
+            items = data.get("items")
+            if items is None:
+                # Başkasının playlist'i - içerik döndürülmüyor
+                logger.warning(f"⚠️ Playlist {playlist_id} içeriği alınamadı. Yalnızca kendi playlist'leriniz üzerinde işlem yapılabilir.")
+                break
+            for item in items:
                 if not item:
                     continue
+                # 2026: field "track" (eski "item" alanı artık kullanılmıyor)
                 track = item.get("track")
-                if track and track.get("id") and track.get("type") == "track":
+                if not track:
+                    continue
+                # Yerel dosyaları ve podcast'leri atla
+                if track.get("type") == "track" and track.get("id"):
                     tracks.append(track)
             if data.get("next"):
                 url = data["next"]
                 params = {}
             else:
                 url = None
+        logger.info(f"📋 Playlist {playlist_id}: {len(tracks)} şarkı yüklendi")
         return tracks
 
     def _search_track(self, track_name):
@@ -297,15 +313,18 @@ class SpotifyClient:
     def shuffle_playlist(self, playlist_id):
         import random
         tracks = self._get_playlist_tracks(playlist_id)
+        if not tracks:
+            raise Exception("Bu playlist boş veya içeriğine erişilemiyor. Yalnızca kendi sahip olduğunuz playlist'leri karıştırabilirsiniz.")
         track_uris = [f"spotify:track:{t['id']}" for t in tracks if t.get("id")]
         random.shuffle(track_uris)
-        # 2026 API: DELETE /playlists/{id}/items → body: {"items": [{"uri": "..."}]}
-        for i in range(0, len(track_uris), 100):
-            chunk = [{"uri": u} for u in track_uris[i:i+100]]
-            self._req("DELETE", f"/playlists/{playlist_id}/items", json={
-                "items": chunk
-            })
-        for i in range(0, len(track_uris), 100):
+        # 2026 API: PUT /playlists/{id}/items ile replace - ilk 100 şarkıyı replace eder
+        # Sonraki şarkılar POST ile eklenir
+        first_batch = track_uris[:100]
+        self._req("PUT", f"/playlists/{playlist_id}/items", json={
+            "uris": first_batch
+        })
+        # Kalan şarkıları ekle
+        for i in range(100, len(track_uris), 100):
             self._req("POST", f"/playlists/{playlist_id}/items", json={
                 "uris": track_uris[i:i+100]
             })
@@ -321,36 +340,48 @@ class SpotifyClient:
     def unfollow_all_artists_in_playlist(self, playlist_id):
         tracks = self._get_playlist_tracks(playlist_id)
         artist_ids = list({a["id"] for t in tracks for a in t.get("artists", []) if a.get("id")})
+        # 2026 API: DELETE /me/following hala mevcut (sanatci takibi)
         for i in range(0, len(artist_ids), 50):
             ids_chunk = artist_ids[i:i+50]
-            self._req("DELETE", "/me/following", params={"type": "artist", "ids": ",".join(ids_chunk)})
+            try:
+                self._req("DELETE", "/me/following", params={"type": "artist", "ids": ",".join(ids_chunk)})
+            except Exception as e:
+                logger.warning(f"\u26a0\ufe0f Unfollow hatas\u0131: {e}")
         return len(artist_ids)
 
     def _get_liked_track_ids(self, track_ids):
+        # 2026 API: GET /me/tracks/contains KALDIRILDI → GET /me/library/contains
+        # Yeni endpoint ID değil Spotify URI bekliyor
         liked = set()
         for i in range(0, len(track_ids), 50):
             chunk = track_ids[i:i+50]
-            data = self._req("GET", "/me/tracks/contains", params={"ids": ",".join(chunk)})
-            if isinstance(data, list):
-                for j, is_liked in enumerate(data):
-                    if is_liked:
-                        liked.add(chunk[j])
+            uris = [f"spotify:track:{tid}" for tid in chunk]
+            try:
+                data = self._req("GET", "/me/library/contains", params={"uris": ",".join(uris)})
+                if isinstance(data, list):
+                    for j, is_liked in enumerate(data):
+                        if is_liked:
+                            liked.add(chunk[j])
+            except Exception as e:
+                logger.warning(f"\u26a0\ufe0f library/contains hatas\u0131: {e}")
         return liked
 
     def like_all_tracks_in_playlist(self, playlist_id):
         tracks = self._get_playlist_tracks(playlist_id)
         track_ids = [t["id"] for t in tracks if t.get("id")]
-        # 2026 API: PUT /me/tracks → JSON body {"ids": [...]}
-        for i in range(0, len(track_ids), 50):
-            self._req("PUT", "/me/tracks", json={"ids": track_ids[i:i+50]})
+        # 2026 API: PUT /me/tracks KALDIRILDI → PUT /me/library (URI listesi)
+        uris = [f"spotify:track:{tid}" for tid in track_ids]
+        for i in range(0, len(uris), 50):
+            self._req("PUT", "/me/library", json={"uris": uris[i:i+50]})
         return len(track_ids)
 
     def unlike_all_tracks_in_playlist(self, playlist_id):
         tracks = self._get_playlist_tracks(playlist_id)
         track_ids = [t["id"] for t in tracks if t.get("id")]
-        # 2026 API: DELETE /me/tracks → JSON body {"ids": [...]}
-        for i in range(0, len(track_ids), 50):
-            self._req("DELETE", "/me/tracks", json={"ids": track_ids[i:i+50]})
+        # 2026 API: DELETE /me/tracks KALDIRILDI → DELETE /me/library (URI listesi)
+        uris = [f"spotify:track:{tid}" for tid in track_ids]
+        for i in range(0, len(uris), 50):
+            self._req("DELETE", "/me/library", json={"uris": uris[i:i+50]})
         return len(track_ids)
 
     def remove_liked_tracks_from_playlist(self, playlist_id):
