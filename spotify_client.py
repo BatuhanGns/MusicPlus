@@ -258,7 +258,7 @@ class SpotifyClient:
             for item in data.get("items", []):
                 if not item:
                     continue
-                track = item.get("item") or item.get("track")
+                track = item.get("track")
                 if track and track.get("id") and track.get("type") == "track":
                     tracks.append(track)
             if data.get("next"):
@@ -274,8 +274,8 @@ class SpotifyClient:
         return items[0]["id"] if items else None
 
     def create_playlist_from_track_names(self, name, track_names, description=""):
-        user_id = self._get_user_id()
-        pl = self._req("POST", f"/users/{user_id}/playlists", json={
+        # 2026 API: POST /users/{id}/playlists kaldırıldı → POST /me/playlists kullan
+        pl = self._req("POST", "/me/playlists", json={
             "name": name,
             "public": False,
             "description": description
@@ -299,9 +299,11 @@ class SpotifyClient:
         tracks = self._get_playlist_tracks(playlist_id)
         track_uris = [f"spotify:track:{t['id']}" for t in tracks if t.get("id")]
         random.shuffle(track_uris)
+        # 2026 API: DELETE /playlists/{id}/items → body: {"items": [{"uri": "..."}]}
         for i in range(0, len(track_uris), 100):
+            chunk = [{"uri": u} for u in track_uris[i:i+100]]
             self._req("DELETE", f"/playlists/{playlist_id}/items", json={
-                "uris": track_uris[i:i+100]
+                "items": chunk
             })
         for i in range(0, len(track_uris), 100):
             self._req("POST", f"/playlists/{playlist_id}/items", json={
@@ -338,15 +340,17 @@ class SpotifyClient:
     def like_all_tracks_in_playlist(self, playlist_id):
         tracks = self._get_playlist_tracks(playlist_id)
         track_ids = [t["id"] for t in tracks if t.get("id")]
+        # 2026 API: PUT /me/tracks → JSON body {"ids": [...]}
         for i in range(0, len(track_ids), 50):
-            self._req("PUT", "/me/tracks", params={"ids": ",".join(track_ids[i:i+50])})
+            self._req("PUT", "/me/tracks", json={"ids": track_ids[i:i+50]})
         return len(track_ids)
 
     def unlike_all_tracks_in_playlist(self, playlist_id):
         tracks = self._get_playlist_tracks(playlist_id)
         track_ids = [t["id"] for t in tracks if t.get("id")]
+        # 2026 API: DELETE /me/tracks → JSON body {"ids": [...]}
         for i in range(0, len(track_ids), 50):
-            self._req("DELETE", "/me/tracks", params={"ids": ",".join(track_ids[i:i+50])})
+            self._req("DELETE", "/me/tracks", json={"ids": track_ids[i:i+50]})
         return len(track_ids)
 
     def remove_liked_tracks_from_playlist(self, playlist_id):
@@ -354,9 +358,11 @@ class SpotifyClient:
         track_ids = [t["id"] for t in tracks if t.get("id")]
         liked_ids = self._get_liked_track_ids(track_ids)
         liked_uris = [f"spotify:track:{tid}" for tid in liked_ids]
+        # 2026 API: DELETE /playlists/{id}/items → body: {"items": [{"uri": "..."}]}
         for i in range(0, len(liked_uris), 100):
+            chunk = [{"uri": u} for u in liked_uris[i:i+100]]
             self._req("DELETE", f"/playlists/{playlist_id}/items", json={
-                "uris": liked_uris[i:i+100]
+                "items": chunk
             })
         return len(liked_uris)
 
@@ -365,8 +371,10 @@ class SpotifyClient:
         track_ids = [t["id"] for t in tracks if t.get("id")]
         liked_ids = self._get_liked_track_ids(track_ids)
         unliked_uris = [f"spotify:track:{tid}" for tid in track_ids if tid not in liked_ids]
+        # 2026 API: DELETE /playlists/{id}/items → body: {"items": [{"uri": "..."}]}
         for i in range(0, len(unliked_uris), 100):
+            chunk = [{"uri": u} for u in unliked_uris[i:i+100]]
             self._req("DELETE", f"/playlists/{playlist_id}/items", json={
-                "uris": unliked_uris[i:i+100]
+                "items": chunk
             })
         return len(unliked_uris)

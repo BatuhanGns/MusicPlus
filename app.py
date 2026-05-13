@@ -500,9 +500,10 @@ def api_sanatci_detay(sanatci_adi):
 @app.route('/api/tum-sanatcilar')
 def api_tum_sanatcilar():
     try:
-        if not _cached_rows:
-            load_tumveri()
-        headers, rows = _cached_headers, _cached_rows
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+        headers, rows = get_cached_data(uid)
         if not rows:
             return jsonify({"error": "Veri yok"})
 
@@ -533,9 +534,10 @@ def api_tum_sanatcilar():
 @app.route('/api/tum-sarkilar')
 def api_tum_sarkilar():
     try:
-        if not _cached_rows:
-            load_tumveri()
-        headers, rows = _cached_headers, _cached_rows
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+        headers, rows = get_cached_data(uid)
         if not rows:
             return jsonify({"error": "Veri yok"})
 
@@ -568,9 +570,10 @@ def api_tum_sarkilar():
 @app.route("/api/ay/<ay_label>")
 def api_ay_detay(ay_label):
     try:
-        if not _cached_rows:
-            load_tumveri()
-        headers, rows = _cached_headers, _cached_rows
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+        headers, rows = get_cached_data(uid)
         if not rows:
             return jsonify({"error": "Veri yok"})
 
@@ -758,9 +761,12 @@ def api_playlists():
 @app.route("/api/playlist/create-top-tracks", methods=["POST"])
 def api_create_top_tracks_playlist():
     try:
-        if not _cached_rows:
-            load_tumveri()
-        headers, rows = _cached_headers, _cached_rows
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+        headers, rows = get_cached_data(uid)
+        if not rows:
+            return jsonify({"error": "Veri yok"})
         idx_sarki    = headers.index("Şarkı Adı")
         idx_sarki_id = headers.index("Şarkı ID")
 
@@ -781,8 +787,8 @@ def api_create_top_tracks_playlist():
             if s in sarki_id_map
         ]
 
-        user_id = spotify._get_user_id()
-        pl = spotify._req("POST", f"/users/{user_id}/playlists", json={
+        # 2026 API: POST /users/{id}/playlists kaldırıldı → POST /me/playlists
+        pl = spotify._req("POST", "/me/playlists", json={
             "name": "En Çok Dinlediklerim",
             "public": False,
             "description": "Spotify İstatistik uygulaması tarafından oluşturuldu"
@@ -801,9 +807,12 @@ def api_create_top_tracks_playlist():
 @app.route("/api/playlist/create-top-artists", methods=["POST"])
 def api_create_top_artists_playlist():
     try:
-        if not _cached_rows:
-            load_tumveri()
-        headers, rows = _cached_headers, _cached_rows
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+        headers, rows = get_cached_data(uid)
+        if not rows:
+            return jsonify({"error": "Veri yok"})
         idx_sanatci  = headers.index("Sanatçı")
         idx_sarki    = headers.index("Şarkı Adı")
         idx_sarki_id = headers.index("Şarkı ID")
@@ -831,8 +840,8 @@ def api_create_top_artists_playlist():
 
         track_uris = track_uris[:50]
 
-        user_id = spotify._get_user_id()
-        pl = spotify._req("POST", f"/users/{user_id}/playlists", json={
+        # 2026 API: POST /users/{id}/playlists kaldırıldı → POST /me/playlists
+        pl = spotify._req("POST", "/me/playlists", json={
             "name": "En Çok Dinlediğim Sanatçılar",
             "public": False,
             "description": "Spotify İstatistik uygulaması tarafından oluşturuldu"
