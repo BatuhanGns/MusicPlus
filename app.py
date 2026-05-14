@@ -863,30 +863,28 @@ def api_create_top_artists_playlist():
 
         for row in rows:
             if len(row) > max(idx_sanatci, idx_sarki, idx_sarki_id):
-                s   = row[idx_sanatci].strip()
-                t   = row[idx_sarki].strip()
-                tid = row[idx_sarki_id].strip()
-                if s: sanatci_counts[s] += 1
-                if s and t and tid:
-                    sanatci_sarkilar[s][t] = tid
+                s       = row[idx_sanatci].strip()
+                t       = row[idx_sarki].strip()
+                raw_tid = row[idx_sarki_id].strip()
+                if s:
+                    sanatci_counts[s] += 1
+                if s and t and raw_tid:
+                    # ID'yi kaynakta temizle — spotify:track:xxx, URL, ya da ham ID olabilir
+                    clean_tid = _extract_track_id(raw_tid)
+                    if clean_tid:
+                        sanatci_sarkilar[s][t] = clean_tid
 
         top_sanatcilar = [s for s, _ in sanatci_counts.most_common(20) if s]
+        seen_ids = set()
         track_uris = []
         for s in top_sanatcilar:
             for tid in list(sanatci_sarkilar[s].values())[:5]:
-                uri = f"spotify:track:{tid}"
-                if uri not in track_uris:
-                    track_uris.append(uri)
+                if tid not in seen_ids:
+                    seen_ids.add(tid)
+                    track_uris.append(f"spotify:track:{tid}")
 
-        # Her ID'yi temizle ve doğrula
-        clean_uris = []
-        for u in track_uris:
-            tid = _extract_track_id(u)
-            if tid:
-                clean_uris.append(f"spotify:track:{tid}")
-            else:
-                logger.warning(f"⚠️ Geçersiz URI atlandı: {u!r}")
-        track_uris = clean_uris[:50]
+        track_uris = track_uris[:50]
+        logger.info(f"📋 Sanatçı playlist URI örnekleri (ilk 3): {track_uris[:3]}")
 
         if not track_uris:
             return jsonify({"error": "Playlist oluşturmak için yeterli şarkı verisi bulunamadı."}), 400
