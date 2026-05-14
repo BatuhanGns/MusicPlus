@@ -781,13 +781,23 @@ def api_create_top_tracks_playlist():
                     sarki_counts[sarki] += 1
                     sarki_id_map[sarki] = sid
 
+        def to_uri(raw_id):
+            # Eğer zaten tam URI ise olduğu gibi kullan
+            if raw_id.startswith("spotify:track:"):
+                return raw_id
+            return f"spotify:track:{raw_id}"
+
         top_sarkilar_ids = [
-            f"spotify:track:{sarki_id_map[s]}"
+            to_uri(sarki_id_map[s])
             for s, _ in sarki_counts.most_common(50)
             if s in sarki_id_map
         ]
 
-        # 2026 API: POST /users/{id}/playlists kaldırıldı → POST /me/playlists
+        logger.info(f"📋 Top şarkılar ID listesi (ilk 3): {top_sarkilar_ids[:3]}")
+        if not top_sarkilar_ids:
+            return jsonify({"error": "Playlist oluşturmak için yeterli şarkı verisi bulunamadı."}), 400
+
+        # 2026 API: POST /me/playlists
         pl = spotify._req("POST", "/me/playlists", json={
             "name": "En Çok Dinlediklerim",
             "public": False,
@@ -795,9 +805,11 @@ def api_create_top_tracks_playlist():
         })
         playlist_id = pl["id"]
         for i in range(0, len(top_sarkilar_ids), 100):
-            spotify._req("POST", f"/playlists/{playlist_id}/items", json={
-                "uris": top_sarkilar_ids[i:i+100]
-            })
+            chunk = top_sarkilar_ids[i:i+100]
+            if chunk:  # Boş liste gönderme
+                spotify._req("POST", f"/playlists/{playlist_id}/items", json={
+                    "uris": chunk
+                })
 
         return jsonify({"status": "ok", "playlist_id": playlist_id, "track_count": len(top_sarkilar_ids)})
     except Exception as e:
@@ -838,9 +850,16 @@ def api_create_top_artists_playlist():
                 if uri not in track_uris:
                     track_uris.append(uri)
 
-        track_uris = track_uris[:50]
+        # Şarkı ID'si zaten spotify:track:xxx formatında olabilir - tekrar ekleme
+        track_uris = [
+            u if u.startswith("spotify:track:") else f"spotify:track:{u.split(':')[-1]}"
+            for u in track_uris
+        ][:50]
 
-        # 2026 API: POST /users/{id}/playlists kaldırıldı → POST /me/playlists
+        if not track_uris:
+            return jsonify({"error": "Playlist oluşturmak için yeterli şarkı verisi bulunamadı."}), 400
+
+        # 2026 API: POST /me/playlists
         pl = spotify._req("POST", "/me/playlists", json={
             "name": "En Çok Dinlediğim Sanatçılar",
             "public": False,
@@ -848,9 +867,11 @@ def api_create_top_artists_playlist():
         })
         playlist_id = pl["id"]
         for i in range(0, len(track_uris), 100):
-            spotify._req("POST", f"/playlists/{playlist_id}/items", json={
-                "uris": track_uris[i:i+100]
-            })
+            chunk = track_uris[i:i+100]
+            if chunk:  # Boş liste gönderme
+                spotify._req("POST", f"/playlists/{playlist_id}/items", json={
+                    "uris": chunk
+                })
 
         return jsonify({"status": "ok", "playlist_id": playlist_id, "track_count": len(track_uris)})
     except Exception as e:
