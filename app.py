@@ -38,6 +38,36 @@ def fmt_sure(sn):
     dk   = (s % 3600) // 60
     return f"{saat} Saat {dk} Dakika" if saat > 0 else f"{dk} Dakika"
 
+import re as _re
+
+def _extract_track_id(raw):
+    """
+    Şarkı ID'sini her formattan temiz base62 olarak çıkarır:
+      - "4iV5W9uYEdYUVa79Axb7Ru"            → olduğu gibi
+      - "spotify:track:4iV5W9uYEdYUVa79Axb7Ru" → sondaki parça
+      - "https://open.spotify.com/track/4iV5W9uYEdYUVa79Axb7Ru" → path'den
+      - Herhangi bir URL/URI                  → base62 kısmı alınır
+    """
+    if not raw:
+        return None
+    raw = raw.strip()
+    # spotify:track:ID
+    if raw.startswith("spotify:track:"):
+        return raw.split(":")[-1]
+    # URL: https://open.spotify.com/track/ID?si=...
+    m = _re.search(r'/track/([A-Za-z0-9]+)', raw)
+    if m:
+        return m.group(1)
+    # Sadece ID: 22 karakter base62
+    if _re.match(r'^[A-Za-z0-9]{22}$', raw):
+        return raw
+    # Son çare: son slash veya colon'dan sonraki parça
+    part = _re.split(r'[/:]', raw)[-1].split('?')[0].strip()
+    if _re.match(r'^[A-Za-z0-9]{22}$', part):
+        return part
+    return None
+
+
 app = Flask(__name__)
 # 2026 GÜNCELLEMESİ: PKCE doğrulaması session(çerez) tabanlı olduğu için sunucu her yeniden 
 # başladığında urandom ile yeni şifre oluşturulması PKCE'yi bozuyordu. Artık kalıcı bir key kullanıyoruz.
@@ -781,17 +811,15 @@ def api_create_top_tracks_playlist():
                     sarki_counts[sarki] += 1
                     sarki_id_map[sarki] = sid
 
-        def to_uri(raw_id):
-            # Eğer zaten tam URI ise olduğu gibi kullan
-            if raw_id.startswith("spotify:track:"):
-                return raw_id
-            return f"spotify:track:{raw_id}"
-
-        top_sarkilar_ids = [
-            to_uri(sarki_id_map[s])
-            for s, _ in sarki_counts.most_common(50)
-            if s in sarki_id_map
-        ]
+        top_sarkilar_ids = []
+        for s, _ in sarki_counts.most_common(50):
+            if s not in sarki_id_map:
+                continue
+            tid = _extract_track_id(sarki_id_map[s])
+            if tid:
+                top_sarkilar_ids.append(f"spotify:track:{tid}")
+            else:
+                logger.warning(f"⚠️ Geçersiz şarkı ID'si atlandı: {sarki_id_map[s]!r}")
 
         logger.info(f"📋 Top şarkılar ID listesi (ilk 3): {top_sarkilar_ids[:3]}")
         if not top_sarkilar_ids:
@@ -850,11 +878,15 @@ def api_create_top_artists_playlist():
                 if uri not in track_uris:
                     track_uris.append(uri)
 
-        # Şarkı ID'si zaten spotify:track:xxx formatında olabilir - tekrar ekleme
-        track_uris = [
-            u if u.startswith("spotify:track:") else f"spotify:track:{u.split(':')[-1]}"
-            for u in track_uris
-        ][:50]
+        # Her ID'yi temizle ve doğrula
+        clean_uris = []
+        for u in track_uris:
+            tid = _extract_track_id(u)
+            if tid:
+                clean_uris.append(f"spotify:track:{tid}")
+            else:
+                logger.warning(f"⚠️ Geçersiz URI atlandı: {u!r}")
+        track_uris = clean_uris[:50]
 
         if not track_uris:
             return jsonify({"error": "Playlist oluşturmak için yeterli şarkı verisi bulunamadı."}), 400
