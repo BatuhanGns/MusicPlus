@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Spotify İstatistikleri</title>
+<title>Music+</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -312,7 +312,7 @@
     margin-top: 6px; background: rgba(29,185,84,.08);
     border: 1px solid var(--green); padding: 10px 14px;
     font-size: 11px; color: var(--green); letter-spacing: .5px;
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: flex-start; gap: 8px; flex-direction: column;
   }
   .ai-action-card .ai-action-run {
     margin-left: auto; background: var(--green); color: #000;
@@ -396,7 +396,7 @@
 <div class="wrapper">
   <header>
     <div class="logo-area">
-      <h1>MÜZİK<span>.</span><br>İSTATİSTİKLERİN</h1>
+      <h1>MUSIC<span>+</span></h1>
       <p id="headerSubtitle">Kişisel Spotify Verileri</p>
     </div>
     <div style="display:flex;align-items:center;gap:12px">
@@ -557,7 +557,7 @@
     <div class="section-title">Hesap Özetin</div>
     
     <div style="background:var(--surface); padding:32px 24px; border:1px solid var(--border); margin-bottom:24px; text-align:center;">
-      <p style="color:var(--muted); font-size:11px; letter-spacing:2px; margin-bottom:8px;">MÜZİK İSTATİSTİKLERİN'E KATILIM TARİHİN</p>
+      <p style="color:var(--muted); font-size:11px; letter-spacing:2px; margin-bottom:8px;">MUSIC+'A KATILIM TARİHİN</p>
       <h3 id="profilKatilimTarihi" style="font-family:'Syne',sans-serif; font-size:32px; color:var(--green); font-weight:800;">—</h3>
     </div>
 
@@ -589,7 +589,7 @@
   </div>
 
   <footer>
-    <span>Bu Bir Spotify Ürünü Değildir</span>
+    <span>Music+ — Bu Bir Spotify Ürünü Değildir</span>
     <span id="footerTime"></span>
   </footer>
 </div>
@@ -1635,7 +1635,6 @@ document.addEventListener('click', function(e) {
       AI MODU
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <span class="ai-model-badge" id="aiModelBadge">GEMMA 4</span>
       <div class="ai-header-btns">
         <button class="ai-header-btn" onclick="clearAIHistory()" title="Sohbeti Temizle">🗑</button>
         <button class="ai-header-btn" onclick="toggleAIPanel()" title="Kapat">✕</button>
@@ -1646,13 +1645,14 @@ document.addEventListener('click', function(e) {
   <div class="ai-messages" id="aiMessages">
     <div class="ai-welcome" id="aiWelcome">
       <div class="ai-welcome-icon">🎵</div>
-      <h3>Müzik Asistanın</h3>
-      <p>Dinleme alışkanlıklarını analiz edebilir,<br>şarkı önerebilir, playlist oluşturabilirim.</p>
+      <h3>Music+ Asistanın</h3>
+      <p>Dinleme alışkanlıklarını analiz edebilir,<br>şarkı önerebilir, playlist oluşturabilir ve düzenleyebilirim.</p>
       <div class="ai-suggestions">
         <button class="ai-suggestion-btn" onclick="sendAISuggestion('Bana müzik zevkime göre şarkı öner')">🎧 Müzik öner</button>
         <button class="ai-suggestion-btn" onclick="sendAISuggestion('En çok hangi sanatçıları dinliyorum?')">📊 Dinleme analizi</button>
         <button class="ai-suggestion-btn" onclick="sendAISuggestion('Bu hafta en çok ne dinledim?')">📅 Bu hafta</button>
         <button class="ai-suggestion-btn" onclick="sendAISuggestion('Şu an çalan şarkıya benzer şeyler öner')">▶ Şu an çalana benzer</button>
+        <button class="ai-suggestion-btn" onclick="triggerFullAnalysis()">🔍 Tam detaylı analiz yap</button>
       </div>
     </div>
   </div>
@@ -1840,10 +1840,6 @@ async function sendAIMessage() {
 
         } else if (chunk.type === 'done') {
           usedModel = chunk.model || '';
-          if (usedModel) {
-            document.getElementById('aiModelBadge').textContent =
-              usedModel.includes('31b') ? 'GEMMA 4 31B' : 'GEMMA 4 26B';
-          }
 
         } else if (chunk.type === 'error') {
           throw new Error(chunk.text);
@@ -1879,7 +1875,10 @@ function _parseAction(text) {
   const match = text.match(/\{[\s\S]*?"action"[\s\S]*?\}[\s]*$/);
   if (!match) return null;
   try {
-    return JSON.parse(match[0]);
+    const action = JSON.parse(match[0]);
+    const validActions = ['search_track', 'create_playlist', 'add_to_playlist', 'edit_playlist', 'shuffle_playlist'];
+    if (!validActions.includes(action.action)) return null;
+    return action;
   } catch {
     return null;
   }
@@ -1890,20 +1889,51 @@ function _appendActionCard(parent, action) {
     search_track:    '🔍 Şarkı ID ara',
     create_playlist: '🎵 Playlist oluştur',
     add_to_playlist: '➕ Playliste ekle',
+    edit_playlist:   '✏️ Playlist düzenle',
     shuffle_playlist:'🔀 Playlist karıştır',
   };
   const label = labels[action.action] || '⚡ İşlem yap';
-  let detail = '';
-  if (action.name)        detail = `: "${action.name}"`;
-  else if (action.track)  detail = `: "${action.track}"`;
-  else if (action.tracks) detail = ` (${action.tracks.length} şarkı)`;
 
   const card = document.createElement('div');
   card.className = 'ai-action-card';
-  card.innerHTML = `
-    <span>${label}${_esc(detail)}</span>
-    <button class="ai-action-run" onclick="executeAIAction(this, ${_esc(JSON.stringify(action))})">Çalıştır</button>
-  `;
+  card.style.flexDirection = 'column';
+  card.style.alignItems = 'flex-start';
+  card.style.gap = '8px';
+
+  // create_playlist ve add_to_playlist için şarkıları listele
+  if ((action.action === 'create_playlist' || action.action === 'add_to_playlist' || action.action === 'edit_playlist') && action.tracks && action.tracks.length > 0) {
+    const headerRow = document.createElement('div');
+    headerRow.style.cssText = 'display:flex;align-items:center;gap:8px;width:100%;';
+    headerRow.innerHTML = `<span style="flex:1;">${label}${action.name ? ': <strong>' + _esc(action.name) + '</strong>' : ''} — <em>${action.tracks.length} şarkı</em></span>`;
+    card.appendChild(headerRow);
+
+    // Şarkı listesi
+    const trackList = document.createElement('div');
+    trackList.style.cssText = 'width:100%;display:flex;flex-direction:column;gap:3px;max-height:200px;overflow-y:auto;';
+    action.tracks.forEach((t, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'font-size:11px;color:var(--text);padding:5px 8px;background:rgba(29,185,84,0.06);border-left:2px solid var(--green);display:flex;gap:8px;align-items:center;';
+      row.innerHTML = `<span style="color:var(--muted);min-width:18px;">${i+1}.</span><span>${_esc(t)}</span>`;
+      trackList.appendChild(row);
+    });
+    card.appendChild(trackList);
+
+    const runBtn = document.createElement('button');
+    runBtn.className = 'ai-action-run';
+    runBtn.textContent = 'Çalıştır';
+    runBtn.style.marginTop = '4px';
+    runBtn.onclick = function() { executeAIAction(runBtn, action); };
+    card.appendChild(runBtn);
+  } else {
+    let detail = '';
+    if (action.track) detail = `: "${action.track}"`;
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;width:100%">
+        <span style="flex:1">${label}${_esc(detail)}</span>
+        <button class="ai-action-run" onclick="executeAIAction(this, ${_esc(JSON.stringify(action))})">Çalıştır</button>
+      </div>`;
+  }
+
   parent.appendChild(card);
 }
 
@@ -1912,18 +1942,15 @@ async function executeAIAction(btn, action) {
   btn.textContent = '⏳';
 
   try {
-    let result = '';
+    let resultText = '';
 
     if (action.action === 'search_track') {
       const q = encodeURIComponent(`${action.track} ${action.artist || ''}`);
       const res = await fetch(`/api/ai/search-track?q=${q}`);
       const data = await res.json();
-      if (data.id) {
-        result = `✅ ID: ${data.id}`;
-        btn.closest('.ai-action-card').querySelector('span').textContent = result;
-      } else {
-        result = '❌ Bulunamadı';
-      }
+      resultText = data.id ? `✅ Bulundu: ${data.id}` : '❌ Bulunamadı';
+      const span = btn.closest('.ai-action-card').querySelector('span');
+      if (span) span.textContent = resultText;
 
     } else if (action.action === 'create_playlist') {
       const res = await fetch('/api/ai/create-playlist', {
@@ -1932,25 +1959,38 @@ async function executeAIAction(btn, action) {
         body: JSON.stringify({ name: action.name, tracks: action.tracks || [] }),
       });
       const data = await res.json();
-      result = data.error ? `❌ ${data.error}` : `✅ Oluşturuldu! (${data.track_count} şarkı)`;
-      btn.closest('.ai-action-card').querySelector('span').textContent = result;
+      resultText = data.error ? `❌ ${data.error}` : `✅ Playlist oluşturuldu! (${data.track_count} şarkı eklendi)`;
+      btn.insertAdjacentHTML('afterend', `<div style="font-size:11px;color:${data.error ? '#ff6b6b' : 'var(--green)'};">${resultText}</div>`);
       if (!data.error) loadPlaylists();
 
     } else if (action.action === 'add_to_playlist') {
-      const res = await fetch(`/api/ai/add-to-playlist`, {
+      const res = await fetch('/api/ai/add-to-playlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ playlist_id: action.playlist_id, tracks: action.tracks || [] }),
       });
       const data = await res.json();
-      result = data.error ? `❌ ${data.error}` : `✅ ${data.added} şarkı eklendi`;
-      btn.closest('.ai-action-card').querySelector('span').textContent = result;
+      resultText = data.error ? `❌ ${data.error}` : `✅ ${data.added} şarkı playlist'e eklendi`;
+      btn.insertAdjacentHTML('afterend', `<div style="font-size:11px;color:${data.error ? '#ff6b6b' : 'var(--green)'};">${resultText}</div>`);
+
+    } else if (action.action === 'edit_playlist') {
+      // Playlist düzenleme: mevcut playlist'e şarkı ekle veya adını güncelle
+      const res = await fetch('/api/ai/edit-playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playlist_id: action.playlist_id, tracks: action.tracks || [], new_name: action.new_name || null }),
+      });
+      const data = await res.json();
+      resultText = data.error ? `❌ ${data.error}` : `✅ Playlist düzenlendi! (${data.added || 0} şarkı eklendi)`;
+      btn.insertAdjacentHTML('afterend', `<div style="font-size:11px;color:${data.error ? '#ff6b6b' : 'var(--green)'};">${resultText}</div>`);
+      if (!data.error) loadPlaylists();
 
     } else if (action.action === 'shuffle_playlist') {
       const res = await fetch(`/api/playlist/${action.playlist_id}/shuffle`, { method: 'POST' });
       const data = await res.json();
-      result = data.error ? `❌ ${data.error}` : '✅ Karıştırıldı!';
-      btn.closest('.ai-action-card').querySelector('span').textContent = result;
+      resultText = data.error ? `❌ ${data.error}` : '✅ Playlist karıştırıldı!';
+      const span = btn.closest('.ai-action-card').querySelector('span');
+      if (span) span.textContent = resultText;
     }
 
     btn.textContent = '✓';
@@ -1965,6 +2005,40 @@ async function clearAIHistory() {
   await fetch('/api/ai/history', { method: 'DELETE' });
   document.getElementById('aiMessages').innerHTML = '';
   _showWelcome();
+}
+
+// ── Tam detaylı analiz ─────────────────────────────────────────────────────
+async function triggerFullAnalysis() {
+  _hideWelcome();
+  
+  // Tüm sanatçı ve şarkı verilerini çek
+  const msgs = document.getElementById('aiMessages');
+  const loadDiv = document.createElement('div');
+  loadDiv.className = 'ai-msg assistant';
+  loadDiv.innerHTML = '<div class="ai-bubble" style="color:var(--muted)">🔍 Tüm veriler yükleniyor, tam analiz hazırlanıyor...</div>';
+  msgs.appendChild(loadDiv);
+  _scrollBottom();
+
+  try {
+    const [sanatciRes, sarkiRes] = await Promise.all([
+      fetch('/api/tum-sanatcilar'),
+      fetch('/api/tum-sarkilar')
+    ]);
+    const sanatciData = await sanatciRes.json();
+    const sarkiData   = await sarkiRes.json();
+
+    const topSanatcilar = (sanatciData.sanatcilar || []).slice(0, 30);
+    const topSarkilar   = (sarkiData.sarkilar || []).slice(0, 30);
+
+    const prompt = `Benim dinleme istatistiklerimin tam detaylı analizini yap:\n\nTOPLAM SANATÇI SAYISI: ${sanatciData.toplam || 0}\nTOPLAM ŞARKI SAYISI: ${sarkiData.toplam || 0}\n\nEN ÇOK DİNLENEN 30 SANATÇI:\n${topSanatcilar.map((s, i) => `${i+1}. ${s.sanatci} — ${s.count} dinlenme (${s.sure})`).join('\n')}\n\nEN ÇOK DİNLENEN 30 ŞARKI:\n${topSarkilar.map((s, i) => `${i+1}. ${s.sarki} — ${s.sanatci} (${s.count} kez, ${s.sure})`).join('\n')}\n\nBu verilere göre: 1) Müzik zevkimi analiz et 2) En sevdiğim türleri ve sanatçı profilimi çıkar 3) İlginç kalıplar ve alışkanlıklar bul 4) Kişiselleştirilmiş öneriler ver. Detaylı ve kapsamlı bir analiz yap.`;
+
+    loadDiv.remove();
+    document.getElementById('aiInput').value = prompt;
+    sendAIMessage();
+  } catch(e) {
+    loadDiv.querySelector('.ai-bubble').textContent = '❌ Veri yüklenemedi: ' + e.message;
+    loadDiv.querySelector('.ai-bubble').style.color = '#ff6b6b';
+  }
 }
 
 function _scrollBottom() {
@@ -1986,13 +2060,14 @@ function _showWelcome() {
   document.getElementById('aiMessages').innerHTML = `
     <div class="ai-welcome" id="aiWelcome">
       <div class="ai-welcome-icon">🎵</div>
-      <h3>Müzik Asistanın</h3>
-      <p>Dinleme alışkanlıklarını analiz edebilir,<br>şarkı önerebilir, playlist oluşturabilirim.</p>
+      <h3>Music+ Asistanın</h3>
+      <p>Dinleme alışkanlıklarını analiz edebilir,<br>şarkı önerebilir, playlist oluşturabilir ve düzenleyebilirim.</p>
       <div class="ai-suggestions">
         <button class="ai-suggestion-btn" onclick="sendAISuggestion('Bana müzik zevkime göre şarkı öner')">🎧 Müzik öner</button>
         <button class="ai-suggestion-btn" onclick="sendAISuggestion('En çok hangi sanatçıları dinliyorum?')">📊 Dinleme analizi</button>
         <button class="ai-suggestion-btn" onclick="sendAISuggestion('Bu hafta en çok ne dinledim?')">📅 Bu hafta</button>
         <button class="ai-suggestion-btn" onclick="sendAISuggestion('Şu an çalan şarkıya benzer şeyler öner')">▶ Şu an çalana benzer</button>
+        <button class="ai-suggestion-btn" onclick="triggerFullAnalysis()">🔍 Tam detaylı analiz yap</button>
       </div>
     </div>`;
 }
