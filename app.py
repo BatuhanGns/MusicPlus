@@ -10,6 +10,7 @@ from flask import Flask, jsonify, render_template, request, Response, stream_wit
 from apscheduler.schedulers.background import BackgroundScheduler
 from spotify_client import SpotifyClient
 from sheets_client import SheetsClient
+from gemini_client import GeminiClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -75,6 +76,12 @@ app.secret_key = os.environ.get("SECRET_KEY", "spotify-stats-2026-pkce-persisten
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 spotify = SpotifyClient()
 sheets  = SheetsClient()
+gemini  = GeminiClient()
+
+
+# ── AI KONUŞMA GEÇMİŞİ ──────────────────────────────────────────────────────
+_ai_history: dict[str, list] = {}   # {user_id: [{"role":"user/assistant","content":"..."}]}
+AI_MAX_HISTORY = 20                  # Her kullanıcı için max mesaj sayısı
 
 def get_current_user_id():
     return session.get("user_id")
@@ -961,6 +968,147 @@ def api_remove_unliked(playlist_id):
     try:
         count = spotify.remove_unliked_tracks_from_playlist(playlist_id)
         return jsonify({"status": "ok", "removed": count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  AI MODU — GEMINI STREAMING CHAT                                            
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/ai/chat", methods=["POST"])
+def api_ai_chat():
+    """Streaming SSE endpoint — Gemma 4 ile sohbet."""
+    import json as _json
+
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giriş yapılmamış"}), 401
+
+    body = request.get_json(silent=True) or {}
+    user_message = (body.get("message") or "").strip()
+    if not user_message:
+        return jsonify({"error": "Mesaj boş"}), 400
+
+    # Kullanıcıya ait geçmişi al veya oluştur
+    history = _ai_history.get(uid, [])
+    history.append({"role": "user", "content": user_message})
+
+    # Spotify bağlamını hazırla
+    now_playing   = None
+    recent_tracks = None
+    try:
+        now_playing = spotify.get_now_playing()
+    except Exception:
+        pass
+    try:
+        recent_tracks = spotify.get_recently_played(10)
+    except Exception:
+        pass
+
+    spotify_context = GeminiClient.build_spotify_context(now_playing, recent_tracks)
+
+    def generate():
+        full_response = ""
+        try:
+            for raw in gemini.stream_chat(history, spotify_context):
+                chunk = _json.loads(raw)
+                if chunk.get("type") == "text":
+                    full_response += chunk["text"]
+                yield f"data: {raw}\n\n"
+        except Exception as e:
+            logger.error(f"❌ AI stream hatası: {e}")
+            yield f"data: {_json.dumps({'type':'error','text':str(e)}, ensure_ascii=False)}\n\n"
+        finally:
+            # Yanıtı geçmişe kaydet
+            if full_response:
+                history.append({"role": "assistant", "content": full_response})
+            # Son kullanıcı mesajı eklendi, geçmişi sınırla
+            trimmed = history[-AI_MAX_HISTORY:]
+            _ai_history[uid] = trimmed
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.route("/api/ai/history", methods=["GET"])
+def api_ai_get_history():
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giriş yapılmamış"}), 401
+    return jsonify({"history": _ai_history.get(uid, [])})
+
+
+@app.route("/api/ai/history", methods=["DELETE"])
+def api_ai_clear_history():
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giriş yapılmamış"}), 401
+    _ai_history.pop(uid, None)
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/ai/search-track")
+def api_ai_search_track():
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giriş yapılmamış"}), 401
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify({"error": "Sorgu boş"}), 400
+    try:
+        tid = spotify._search_track(q)
+        if tid:
+            return jsonify({"id": tid, "uri": f"spotify:track:{tid}"})
+        return jsonify({"id": None, "error": "Bulunamadı"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/ai/create-playlist", methods=["POST"])
+def api_ai_create_playlist():
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giriş yapılmamış"}), 401
+    body        = request.get_json(silent=True) or {}
+    name        = (body.get("name") or "AI Playlist").strip()
+    track_names = body.get("tracks") or []
+    try:
+        playlist_id = spotify.create_playlist_from_track_names(
+            name, track_names, description="Müzik asistanı tarafından oluşturuldu"
+        )
+        return jsonify({"status": "ok", "playlist_id": playlist_id, "track_count": len(track_names)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/ai/add-to-playlist", methods=["POST"])
+def api_ai_add_to_playlist():
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giriş yapılmamış"}), 401
+    body        = request.get_json(silent=True) or {}
+    playlist_id = (body.get("playlist_id") or "").strip()
+    track_names = body.get("tracks") or []
+    if not playlist_id:
+        return jsonify({"error": "playlist_id gerekli"}), 400
+    try:
+        uris = []
+        for t in track_names:
+            tid = spotify._search_track(t)
+            if tid:
+                uris.append(f"spotify:track:{tid}")
+        if uris:
+            for i in range(0, len(uris), 100):
+                spotify._req("POST", f"/playlists/{playlist_id}/items", json={"uris": uris[i:i+100]})
+        return jsonify({"status": "ok", "added": len(uris)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
