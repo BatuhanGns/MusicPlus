@@ -4,6 +4,7 @@ import csv
 import logging
 import time
 import psutil
+import requests
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from flask import Flask, jsonify, render_template, request, Response, stream_with_context, session, redirect, url_for
@@ -16,6 +17,53 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 SERVER_START_TIME = time.time()
+
+# ── AI LIMIT VE UPTIMEROBOT ────────────────────────────────────────────────
+AI_MAX_REQUESTS = 3000
+ai_requests_used = 0
+
+_ur_cache = {"data": {"status": "Sorgulanıyor...", "uptime_ratio": "—"}, "last_fetch": 0}
+
+def get_uptimerobot_data():
+    global _ur_cache
+    now = time.time()
+    # 60 saniyelik önbellek (Rate Limit'e takılmamak ve paneli hızlı yüklemek için)
+    if now - _ur_cache["last_fetch"] < 60:
+        return _ur_cache["data"]
+
+    ur_api_key = os.environ.get("UPTIMEROBOT_API_KEY", "")
+    if not ur_api_key:
+        return {"status": "API Key Bekleniyor", "uptime_ratio": "—"}
+
+    try:
+        resp = requests.post("https://api.uptimerobot.com/v2/getMonitors", 
+                             data={"api_key": ur_api_key, "format": "json"}, 
+                             timeout=3)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("stat") == "ok" and data.get("monitors"):
+                m = data["monitors"][0]
+                s_code = m.get("status")
+                
+                # UptimeRobot status kodları: 0=Paused, 2=Up, 8=Seems Down, 9=Down
+                if s_code == 2:
+                    status_str = "AKTİF (UP)"
+                elif s_code in [8, 9]:
+                    status_str = "KAPALI (DOWN)"
+                elif s_code == 0:
+                    status_str = "DURAKLATILDI"
+                else:
+                    status_str = "BİLİNMİYOR"
+                    
+                _ur_cache["data"] = {
+                    "status": status_str,
+                    "uptime_ratio": m.get("all_time_uptime_ratio", "—")
+                }
+                _ur_cache["last_fetch"] = now
+    except Exception as e:
+        logger.error(f"❌ UptimeRobot API hatası: {e}")
+
+    return _ur_cache["data"]
 
 TR_GUNLER = {0:"Pazartesi",1:"Salı",2:"Çarşamba",3:"Perşembe",4:"Cuma",5:"Cumartesi",6:"Pazar"}
 TR_AYLAR  = {1:"Ocak",2:"Şubat",3:"Mart",4:"Nisan",5:"Mayıs",6:"Haziran",
@@ -42,46 +90,30 @@ def fmt_sure(sn):
 import re as _re
 
 def _extract_track_id(raw):
-    """
-    Şarkı ID'sini her formattan temiz base62 olarak çıkarır:
-      - "4iV5W9uYEdYUVa79Axb7Ru"            → olduğu gibi
-      - "spotify:track:4iV5W9uYEdYUVa79Axb7Ru" → sondaki parça
-      - "https://open.spotify.com/track/4iV5W9uYEdYUVa79Axb7Ru" → path'den
-      - Herhangi bir URL/URI                  → base62 kısmı alınır
-    """
     if not raw:
         return None
     raw = raw.strip()
-    # spotify:track:ID
     if raw.startswith("spotify:track:"):
         return raw.split(":")[-1]
-    # URL: https://open.spotify.com/track/ID?si=...
     m = _re.search(r'/track/([A-Za-z0-9]+)', raw)
     if m:
         return m.group(1)
-    # Sadece ID: 22 karakter base62
     if _re.match(r'^[A-Za-z0-9]{22}$', raw):
         return raw
-    # Son çare: son slash veya colon'dan sonraki parça
     part = _re.split(r'[/:]', raw)[-1].split('?')[0].strip()
     if _re.match(r'^[A-Za-z0-9]{22}$', part):
         return part
     return None
 
-
 app = Flask(__name__)
-# 2026 GÜNCELLEMESİ: PKCE doğrulaması session(çerez) tabanlı olduğu için sunucu her yeniden 
-# başladığında urandom ile yeni şifre oluşturulması PKCE'yi bozuyordu. Artık kalıcı bir key kullanıyoruz.
 app.secret_key = os.environ.get("SECRET_KEY", "spotify-stats-2026-pkce-persistent-secret-key")
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 spotify = SpotifyClient()
 sheets  = SheetsClient()
 gemini  = GeminiClient()
 
-
-# ── AI KONUŞMA GEÇMİŞİ ──────────────────────────────────────────────────────
-_ai_history: dict[str, list] = {}   # {user_id: [{"role":"user/assistant","content":"..."}]}
-AI_MAX_HISTORY = 20                  # Her kullanıcı için max mesaj sayısı
+_ai_history: dict[str, list] = {}
+AI_MAX_HISTORY = 20
 
 def get_current_user_id():
     return session.get("user_id")
@@ -166,7 +198,9 @@ def dashboard():
 
 @app.route("/api/system-stats")
 def api_system_stats():
+    global ai_requests_used
     try:
+        # Sistem İstatistikleri
         cpu_percent = psutil.cpu_percent(interval=0.1)
         mem = psutil.virtual_memory()
         ram_percent = mem.percent
@@ -179,6 +213,9 @@ def api_system_stats():
         uptime_hours = uptime_sec // 3600
         uptime_mins = (uptime_sec % 3600) // 60
         
+        # Limit hesaplaması
+        ai_remaining = max(0, AI_MAX_REQUESTS - ai_requests_used)
+        
         return jsonify({
             "status": "ok",
             "cpu_percent": cpu_percent,
@@ -187,7 +224,10 @@ def api_system_stats():
             "ram_total_mb": round(ram_total_mb, 1),
             "net_sent_mb": round(net_sent_mb, 2),
             "net_recv_mb": round(net_recv_mb, 2),
-            "uptime": f"{uptime_hours}s {uptime_mins}dk"
+            "uptime": f"{uptime_hours}s {uptime_mins}dk",
+            "ai_remaining": ai_remaining,
+            "ai_total": AI_MAX_REQUESTS,
+            "uptimerobot": get_uptimerobot_data()
         })
     except Exception as e:
         logger.error(f"❌ Sistem stats hatası: {e}")
@@ -832,7 +872,6 @@ def api_create_top_tracks_playlist():
         if not top_sarkilar_ids:
             return jsonify({"error": "Playlist oluşturmak için yeterli şarkı verisi bulunamadı."}), 400
 
-        # 2026 API: POST /me/playlists
         pl = spotify._req("POST", "/me/playlists", json={
             "name": "En Çok Dinlediklerim",
             "public": False,
@@ -841,7 +880,7 @@ def api_create_top_tracks_playlist():
         playlist_id = pl["id"]
         for i in range(0, len(top_sarkilar_ids), 100):
             chunk = top_sarkilar_ids[i:i+100]
-            if chunk:  # Boş liste gönderme
+            if chunk:  
                 spotify._req("POST", f"/playlists/{playlist_id}/items", json={
                     "uris": chunk
                 })
@@ -876,7 +915,6 @@ def api_create_top_artists_playlist():
                 if s:
                     sanatci_counts[s] += 1
                 if s and t and raw_tid:
-                    # ID'yi kaynakta temizle — spotify:track:xxx, URL, ya da ham ID olabilir
                     clean_tid = _extract_track_id(raw_tid)
                     if clean_tid:
                         sanatci_sarkilar[s][t] = clean_tid
@@ -896,7 +934,6 @@ def api_create_top_artists_playlist():
         if not track_uris:
             return jsonify({"error": "Playlist oluşturmak için yeterli şarkı verisi bulunamadı."}), 400
 
-        # 2026 API: POST /me/playlists
         pl = spotify._req("POST", "/me/playlists", json={
             "name": "En Çok Dinlediğim Sanatçılar",
             "public": False,
@@ -905,7 +942,7 @@ def api_create_top_artists_playlist():
         playlist_id = pl["id"]
         for i in range(0, len(track_uris), 100):
             chunk = track_uris[i:i+100]
-            if chunk:  # Boş liste gönderme
+            if chunk:  
                 spotify._req("POST", f"/playlists/{playlist_id}/items", json={
                     "uris": chunk
                 })
@@ -978,8 +1015,8 @@ def api_remove_unliked(playlist_id):
 
 @app.route("/api/ai/chat", methods=["POST"])
 def api_ai_chat():
-    """Streaming SSE endpoint — Gemma 4 ile sohbet."""
     import json as _json
+    global ai_requests_used
 
     uid = get_current_user_id()
     if not uid:
@@ -990,11 +1027,9 @@ def api_ai_chat():
     if not user_message:
         return jsonify({"error": "Mesaj boş"}), 400
 
-    # Kullanıcıya ait geçmişi al veya oluştur
     history = _ai_history.get(uid, [])
     history.append({"role": "user", "content": user_message})
 
-    # Spotify bağlamını hazırla
     now_playing   = None
     recent_tracks = None
     try:
@@ -1009,23 +1044,31 @@ def api_ai_chat():
     spotify_context = GeminiClient.build_spotify_context(now_playing, recent_tracks)
 
     def generate():
+        global ai_requests_used
         full_response = ""
+        request_successful = False
+        
         try:
             for raw in gemini.stream_chat(history, spotify_context):
                 chunk = _json.loads(raw)
                 if chunk.get("type") == "text":
                     full_response += chunk["text"]
+                elif chunk.get("type") == "done":
+                    request_successful = True # AI başarıyla sonuç döndürdü
+                    
                 yield f"data: {raw}\n\n"
         except Exception as e:
             logger.error(f"❌ AI stream hatası: {e}")
             yield f"data: {_json.dumps({'type':'error','text':str(e)}, ensure_ascii=False)}\n\n"
         finally:
-            # Yanıtı geçmişe kaydet
             if full_response:
                 history.append({"role": "assistant", "content": full_response})
-            # Son kullanıcı mesajı eklendi, geçmişi sınırla
             trimmed = history[-AI_MAX_HISTORY:]
             _ai_history[uid] = trimmed
+            
+            # Eğer istek başarıyla tamamlandıysa, limiti 1 eksilt
+            if request_successful:
+                ai_requests_used += 1
 
     return Response(
         stream_with_context(generate()),
