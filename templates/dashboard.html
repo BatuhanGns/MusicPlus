@@ -198,6 +198,183 @@
   .pl-action-result{font-size:11px;color:var(--green);margin-top:12px;padding:10px 14px;background:var(--green-dim);border:1px solid var(--green);display:none;}
   .pl-action-result.error{color:#ff6b6b;background:#ff6b6b11;border-color:#ff6b6b;}
   .pl-action-result.show{display:block;}
+
+  /* ═══════════════════════════ AI MODU ═══════════════════════════════════ */
+  .ai-fab {
+    position: fixed; bottom: 24px; right: 24px; z-index: 300;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--green); color: #000;
+    border: none; padding: 12px 20px;
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    cursor: pointer; transition: all .2s; box-shadow: 0 4px 20px rgba(29,185,84,.4);
+  }
+  .ai-fab:hover { background: #1ed760; box-shadow: 0 6px 28px rgba(29,185,84,.6); transform: translateY(-2px); }
+  .ai-fab .ai-fab-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #000;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .ai-panel {
+    position: fixed; bottom: 0; right: 0; z-index: 400;
+    width: 420px; max-width: 100vw;
+    height: 620px; max-height: 92vh;
+    background: var(--surface); border: 1px solid var(--border);
+    border-bottom: none; border-right: none;
+    display: flex; flex-direction: column;
+    transform: translateY(110%); transition: transform .35s cubic-bezier(.4,0,.2,1);
+    box-shadow: -8px -8px 40px rgba(0,0,0,.6);
+  }
+  .ai-panel.open { transform: translateY(0); }
+
+  .ai-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .ai-panel-title {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 1px;
+  }
+  .ai-panel-title .ai-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .ai-model-badge {
+    font-size: 9px; letter-spacing: 1px; color: var(--muted);
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 3px 8px; font-family: 'DM Mono', monospace;
+  }
+  .ai-header-btns { display: flex; gap: 8px; }
+  .ai-header-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    width: 28px; height: 28px; cursor: pointer; font-size: 13px;
+    display: flex; align-items: center; justify-content: center; transition: all .15s;
+  }
+  .ai-header-btn:hover { border-color: var(--green); color: var(--green); }
+
+  .ai-messages {
+    flex: 1; overflow-y: auto; padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+    scroll-behavior: smooth;
+  }
+  .ai-messages::-webkit-scrollbar { width: 4px; }
+  .ai-messages::-webkit-scrollbar-track { background: transparent; }
+  .ai-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .ai-msg {
+    display: flex; flex-direction: column; max-width: 88%;
+    animation: fadeIn .25s ease;
+  }
+  .ai-msg.user { align-self: flex-end; align-items: flex-end; }
+  .ai-msg.assistant { align-self: flex-start; align-items: flex-start; }
+
+  .ai-bubble {
+    padding: 10px 14px; font-size: 13px; line-height: 1.6;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .ai-msg.user .ai-bubble {
+    background: var(--green); color: #000; font-weight: 500;
+  }
+  .ai-msg.assistant .ai-bubble {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  }
+
+  .ai-thinking-block {
+    margin-bottom: 6px; border: 1px solid var(--border);
+    background: var(--surface2); overflow: hidden; width: 100%;
+  }
+  .ai-thinking-toggle {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; cursor: pointer; font-size: 11px;
+    color: var(--muted); letter-spacing: 1px; text-transform: uppercase;
+    user-select: none; background: none; border: none; width: 100%; text-align: left;
+    transition: color .15s;
+  }
+  .ai-thinking-toggle:hover { color: var(--text); }
+  .ai-thinking-toggle .think-spinner {
+    width: 10px; height: 10px; border: 2px solid var(--border);
+    border-top-color: var(--green); border-radius: 50%;
+    animation: spin .8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .ai-thinking-toggle .think-arrow { font-size: 10px; transition: transform .2s; }
+  .ai-thinking-toggle.expanded .think-arrow { transform: rotate(90deg); }
+  .ai-thinking-body {
+    display: none; padding: 10px 12px;
+    font-size: 11px; color: var(--muted); line-height: 1.7;
+    border-top: 1px solid var(--border); font-family: 'DM Mono', monospace;
+    max-height: 200px; overflow-y: auto; white-space: pre-wrap;
+  }
+  .ai-thinking-body.show { display: block; }
+
+  .ai-action-card {
+    margin-top: 6px; background: rgba(29,185,84,.08);
+    border: 1px solid var(--green); padding: 10px 14px;
+    font-size: 11px; color: var(--green); letter-spacing: .5px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ai-action-card .ai-action-run {
+    margin-left: auto; background: var(--green); color: #000;
+    border: none; padding: 5px 12px; font-family: 'Syne', sans-serif;
+    font-size: 11px; font-weight: 700; cursor: pointer; letter-spacing: 1px; flex-shrink: 0;
+  }
+  .ai-action-card .ai-action-run:hover { background: #1ed760; }
+  .ai-action-card .ai-action-run:disabled { opacity: .5; cursor: not-allowed; }
+
+  .ai-welcome {
+    text-align: center; padding: 32px 20px; color: var(--muted);
+  }
+  .ai-welcome .ai-welcome-icon { font-size: 36px; margin-bottom: 12px; }
+  .ai-welcome h3 { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+  .ai-welcome p { font-size: 12px; line-height: 1.8; }
+  .ai-welcome .ai-suggestions { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+  .ai-suggestion-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 8px 12px; font-family: 'DM Mono', monospace;
+    font-size: 11px; cursor: pointer; text-align: left;
+    transition: border-color .15s; border-left: 3px solid transparent;
+  }
+  .ai-suggestion-btn:hover { border-left-color: var(--green); color: var(--green); }
+
+  .ai-input-area {
+    display: flex; gap: 8px; padding: 12px 16px;
+    border-top: 1px solid var(--border); flex-shrink: 0; background: var(--surface);
+  }
+  .ai-input {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 14px; font-family: 'DM Mono', monospace;
+    font-size: 13px; resize: none; min-height: 42px; max-height: 120px;
+    outline: none; transition: border-color .15s; line-height: 1.4;
+  }
+  .ai-input:focus { border-color: var(--green); }
+  .ai-input::placeholder { color: var(--muted); }
+  .ai-send-btn {
+    background: var(--green); color: #000; border: none;
+    width: 42px; height: 42px; font-size: 16px; cursor: pointer;
+    flex-shrink: 0; transition: background .15s; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ai-send-btn:hover:not(:disabled) { background: #1ed760; }
+  .ai-send-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  .ai-typing-indicator {
+    display: flex; align-items: center; gap: 4px; padding: 12px 14px;
+    background: var(--surface2); border: 1px solid var(--border); align-self: flex-start;
+  }
+  .ai-typing-indicator span {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
+    animation: bounce .8s ease-in-out infinite;
+  }
+  .ai-typing-indicator span:nth-child(2) { animation-delay: .15s; }
+  .ai-typing-indicator span:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce { 0%,80%,100% { transform: scale(1); opacity:.4; } 40% { transform: scale(1.4); opacity:1; } }
+
+  @media (max-width: 480px) {
+    .ai-panel { width: 100vw; height: 70vh; right: 0; }
+    .ai-fab { padding: 10px 16px; font-size: 12px; }
+  }
+  /* ═══════════════════════════════════════════════════════════════════════ */
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -1435,5 +1612,398 @@ document.addEventListener('click', function(e) {
   }
 });
 </script>
+
+<!-- ═══════════════════════ AI MODU ═══════════════════════════════════════ -->
+<!-- Floating Action Button -->
+<button class="ai-fab" id="aiFab" onclick="toggleAIPanel()">
+  <div class="ai-fab-dot"></div>
+  AI MODU
+</button>
+
+<!-- AI Sohbet Paneli -->
+<div class="ai-panel" id="aiPanel">
+  <div class="ai-panel-header">
+    <div class="ai-panel-title">
+      <div class="ai-dot"></div>
+      AI MODU
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span class="ai-model-badge" id="aiModelBadge">GEMMA 4</span>
+      <div class="ai-header-btns">
+        <button class="ai-header-btn" onclick="clearAIHistory()" title="Sohbeti Temizle">🗑</button>
+        <button class="ai-header-btn" onclick="toggleAIPanel()" title="Kapat">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ai-messages" id="aiMessages">
+    <div class="ai-welcome" id="aiWelcome">
+      <div class="ai-welcome-icon">🎵</div>
+      <h3>Müzik Asistanın</h3>
+      <p>Dinleme alışkanlıklarını analiz edebilir,<br>şarkı önerebilir, playlist oluşturabilirim.</p>
+      <div class="ai-suggestions">
+        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Bana müzik zevkime göre şarkı öner')">🎧 Müzik öner</button>
+        <button class="ai-suggestion-btn" onclick="sendAISuggestion('En çok hangi sanatçıları dinliyorum?')">📊 Dinleme analizi</button>
+        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Bu hafta en çok ne dinledim?')">📅 Bu hafta</button>
+        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Şu an çalan şarkıya benzer şeyler öner')">▶ Şu an çalana benzer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ai-input-area">
+    <textarea
+      class="ai-input"
+      id="aiInput"
+      placeholder="Bir şey sor veya playlist oluşturmamı iste..."
+      rows="1"
+      onkeydown="aiInputKeydown(event)"
+      oninput="aiInputResize(this)"
+    ></textarea>
+    <button class="ai-send-btn" id="aiSendBtn" onclick="sendAIMessage()">➤</button>
+  </div>
+</div>
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  AI MODU — GEMMA 4 STREAMING CHAT
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _aiOpen         = false;
+let _aiStreaming     = false;
+let _currentThinkEl = null;   // aktif düşünme bloğu
+let _currentBubble  = null;   // aktif yanıt balonu
+
+// ── Panel aç/kapat ────────────────────────────────────────────────────────
+function toggleAIPanel() {
+  _aiOpen = !_aiOpen;
+  document.getElementById('aiPanel').classList.toggle('open', _aiOpen);
+  if (_aiOpen) {
+    document.getElementById('aiInput').focus();
+  }
+}
+
+// ── Öneri butonları ───────────────────────────────────────────────────────
+function sendAISuggestion(text) {
+  document.getElementById('aiInput').value = text;
+  sendAIMessage();
+}
+
+// ── Input otomatik boyutlandırma ──────────────────────────────────────────
+function aiInputResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function aiInputKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendAIMessage();
+  }
+}
+
+// ── Kullanıcı mesajı balonu ekle ──────────────────────────────────────────
+function appendUserMsg(text) {
+  _hideWelcome();
+  const msgs = document.getElementById('aiMessages');
+  const div = document.createElement('div');
+  div.className = 'ai-msg user';
+  div.innerHTML = `<div class="ai-bubble">${_esc(text)}</div>`;
+  msgs.appendChild(div);
+  _scrollBottom();
+}
+
+// ── Asistan cevap alanı oluştur ───────────────────────────────────────────
+function createAssistantSlot() {
+  const msgs = document.getElementById('aiMessages');
+
+  // Düşünme bloğu (başlangıçta gizli)
+  const thinkBlock = document.createElement('div');
+  thinkBlock.className = 'ai-thinking-block';
+  thinkBlock.style.display = 'none';
+  thinkBlock.innerHTML = `
+    <button class="ai-thinking-toggle" onclick="_toggleThinking(this)">
+      <div class="think-spinner"></div>
+      <span class="think-label">Düşünüyor...</span>
+      <span class="think-arrow" style="margin-left:auto">▶</span>
+    </button>
+    <div class="ai-thinking-body"></div>
+  `;
+
+  // Yazıyor indikatörü
+  const typing = document.createElement('div');
+  typing.className = 'ai-typing-indicator';
+  typing.innerHTML = '<span></span><span></span><span></span>';
+
+  // Yanıt balonu (başlangıçta boş, typing gösterilecek)
+  const msgDiv = document.createElement('div');
+  msgDiv.className = 'ai-msg assistant';
+
+  msgs.appendChild(thinkBlock);
+  msgs.appendChild(typing);
+  msgs.appendChild(msgDiv);
+
+  _currentThinkEl = thinkBlock;
+  _scrollBottom();
+
+  return { thinkBlock, typing, msgDiv };
+}
+
+// ── Düşünme bloğunu aç/kapat ──────────────────────────────────────────────
+function _toggleThinking(btn) {
+  btn.classList.toggle('expanded');
+  btn.nextElementSibling.classList.toggle('show');
+}
+
+// ── Ana mesaj gönderme ────────────────────────────────────────────────────
+async function sendAIMessage() {
+  if (_aiStreaming) return;
+
+  const input = document.getElementById('aiInput');
+  const text  = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('aiSendBtn').disabled = true;
+  _aiStreaming = true;
+
+  appendUserMsg(text);
+  const { thinkBlock, typing, msgDiv } = createAssistantSlot();
+
+  let thinkText    = '';
+  let responseText = '';
+  let usedModel    = '';
+  let bubble       = null;
+
+  try {
+    const resp = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: resp.statusText }));
+      throw new Error(err.error || resp.statusText);
+    }
+
+    const reader  = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+
+      const lines = buf.split('\n');
+      buf = lines.pop(); // tamamlanmamış satır tamponda kalsın
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (!raw) continue;
+
+        let chunk;
+        try { chunk = JSON.parse(raw); } catch { continue; }
+
+        if (chunk.type === 'thinking') {
+          // Düşünme bloğunu göster ve metni ekle
+          thinkBlock.style.display = 'block';
+          thinkText += chunk.text;
+          thinkBlock.querySelector('.ai-thinking-body').textContent = thinkText;
+          thinkBlock.querySelector('.think-label').textContent = 'Düşünüyor...';
+          _scrollBottom();
+
+        } else if (chunk.type === 'text') {
+          // İlk metin geldiğinde typing'i kaldır, balonu oluştur
+          if (!bubble) {
+            typing.remove();
+            // Düşünme bitişini işaretle
+            if (thinkBlock.style.display !== 'none') {
+              const spinner = thinkBlock.querySelector('.think-spinner');
+              if (spinner) spinner.style.animation = 'none';
+              thinkBlock.querySelector('.think-label').textContent = 'Düşünceler ▸ görmek için tıkla';
+            }
+            bubble = document.createElement('div');
+            bubble.className = 'ai-bubble';
+            msgDiv.appendChild(bubble);
+          }
+          responseText += chunk.text;
+          bubble.textContent = responseText;
+          _scrollBottom();
+
+        } else if (chunk.type === 'done') {
+          usedModel = chunk.model || '';
+          if (usedModel) {
+            document.getElementById('aiModelBadge').textContent =
+              usedModel.includes('31b') ? 'GEMMA 4 31B' : 'GEMMA 4 26B';
+          }
+
+        } else if (chunk.type === 'error') {
+          throw new Error(chunk.text);
+        }
+      }
+    }
+
+    // Yanıtta action JSON var mı? Bul ve kart oluştur
+    if (responseText) {
+      const action = _parseAction(responseText);
+      if (action) {
+        // Yanıt balonundan action JSON'u temizle
+        const cleanText = responseText.replace(/\{[\s\S]*?"action"[\s\S]*?\}[\s]*$/, '').trim();
+        if (bubble) bubble.textContent = cleanText || responseText;
+        _appendActionCard(msgDiv, action);
+      }
+    }
+
+  } catch (e) {
+    typing.remove();
+    const errDiv = document.createElement('div');
+    errDiv.className = 'ai-bubble';
+    errDiv.style.color = '#ff6b6b';
+    errDiv.textContent = 'Hata: ' + e.message;
+    msgDiv.appendChild(errDiv);
+  } finally {
+    _aiStreaming = false;
+    document.getElementById('aiSendBtn').disabled = false;
+    document.getElementById('aiInput').focus();
+    _scrollBottom();
+  }
+}
+
+// ── Action JSON'u parse et ────────────────────────────────────────────────
+function _parseAction(text) {
+  // Yanıtın sonundaki JSON bloğunu bul
+  const match = text.match(/\{[\s\S]*?"action"[\s\S]*?\}[\s]*$/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[0]);
+  } catch {
+    return null;
+  }
+}
+
+// ── Action kart oluştur ───────────────────────────────────────────────────
+function _appendActionCard(parent, action) {
+  const labels = {
+    search_track:    '🔍 Şarkı ID ara',
+    create_playlist: '🎵 Playlist oluştur',
+    add_to_playlist: '➕ Playlist'e ekle',
+    shuffle_playlist:'🔀 Playlist karıştır',
+  };
+  const label = labels[action.action] || '⚡ İşlem yap';
+  let detail = '';
+  if (action.name)        detail = `: "${action.name}"`;
+  else if (action.track)  detail = `: "${action.track}"`;
+  else if (action.tracks) detail = ` (${action.tracks.length} şarkı)`;
+
+  const card = document.createElement('div');
+  card.className = 'ai-action-card';
+  card.innerHTML = `
+    <span>${label}${_esc(detail)}</span>
+    <button class="ai-action-run" onclick="executeAIAction(this, ${_esc(JSON.stringify(action))})">Çalıştır</button>
+  `;
+  parent.appendChild(card);
+}
+
+// ── Action çalıştır ───────────────────────────────────────────────────────
+async function executeAIAction(btn, action) {
+  btn.disabled = true;
+  btn.textContent = '⏳';
+
+  try {
+    let result = '';
+
+    if (action.action === 'search_track') {
+      // Spotify arama
+      const q = encodeURIComponent(`${action.track} ${action.artist || ''}`);
+      const res = await fetch(`/api/ai/search-track?q=${q}`);
+      const data = await res.json();
+      if (data.id) {
+        result = `✅ ID: ${data.id}`;
+        btn.closest('.ai-action-card').querySelector('span').textContent = result;
+      } else {
+        result = '❌ Bulunamadı';
+      }
+
+    } else if (action.action === 'create_playlist') {
+      const res = await fetch('/api/ai/create-playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: action.name, tracks: action.tracks || [] }),
+      });
+      const data = await res.json();
+      result = data.error ? `❌ ${data.error}` : `✅ Oluşturuldu! (${data.track_count} şarkı)`;
+      btn.closest('.ai-action-card').querySelector('span').textContent = result;
+      if (!data.error) loadPlaylists();
+
+    } else if (action.action === 'add_to_playlist') {
+      const res = await fetch(`/api/ai/add-to-playlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playlist_id: action.playlist_id, tracks: action.tracks || [] }),
+      });
+      const data = await res.json();
+      result = data.error ? `❌ ${data.error}` : `✅ ${data.added} şarkı eklendi`;
+      btn.closest('.ai-action-card').querySelector('span').textContent = result;
+
+    } else if (action.action === 'shuffle_playlist') {
+      const res = await fetch(`/api/playlist/${action.playlist_id}/shuffle`, { method: 'POST' });
+      const data = await res.json();
+      result = data.error ? `❌ ${data.error}` : '✅ Karıştırıldı!';
+      btn.closest('.ai-action-card').querySelector('span').textContent = result;
+    }
+
+    btn.textContent = '✓';
+  } catch (e) {
+    btn.textContent = '❌';
+    btn.title = e.message;
+  }
+}
+
+// ── Geçmişi temizle ───────────────────────────────────────────────────────
+async function clearAIHistory() {
+  if (!confirm('Sohbet geçmişini temizlemek istiyor musun?')) return;
+  await fetch('/api/ai/history', { method: 'DELETE' });
+  document.getElementById('aiMessages').innerHTML = '';
+  _showWelcome();
+}
+
+// ── Yardımcılar ───────────────────────────────────────────────────────────
+function _scrollBottom() {
+  const msgs = document.getElementById('aiMessages');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function _esc(s) {
+  if (typeof s !== 'string') return s;
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _hideWelcome() {
+  const w = document.getElementById('aiWelcome');
+  if (w) w.style.display = 'none';
+}
+
+function _showWelcome() {
+  document.getElementById('aiMessages').innerHTML = `
+    <div class="ai-welcome" id="aiWelcome">
+      <div class="ai-welcome-icon">🎵</div>
+      <h3>Müzik Asistanın</h3>
+      <p>Dinleme alışkanlıklarını analiz edebilir,<br>şarkı önerebilir, playlist oluşturabilirim.</p>
+      <div class="ai-suggestions">
+        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Bana müzik zevkime göre şarkı öner')">🎧 Müzik öner</button>
+        <button class="ai-suggestion-btn" onclick="sendAISuggestion('En çok hangi sanatçıları dinliyorum?')">📊 Dinleme analizi</button>
+        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Bu hafta en çok ne dinledim?')">📅 Bu hafta</button>
+        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Şu an çalan şarkıya benzer şeyler öner')">▶ Şu an çalana benzer</button>
+      </div>
+    </div>`;
+}
+// ═══════════════════════════════════════════════════════════════════════════
+</script>
+
 </body>
 </html>
