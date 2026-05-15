@@ -743,7 +743,7 @@ def login_page():
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Giriş Yap – Müzik İstatistiklerin</title>
+<title>Giriş Yap – Music+</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root{{--bg:#0a0a0a;--surface:#111;--border:#222;--green:#1db954;--text:#e8e8e8;--muted:#555;}}
@@ -761,7 +761,7 @@ def login_page():
 </head>
 <body>
 <div class="card">
-  <h1>MÜZİK<span>.</span></h1>
+  <h1>MUSIC<span style="color:var(--green)">+</span></h1>
   <p>Kişisel Spotify İstatistiklerin</p>
   <a class="btn" href="{auth_url}">Spotify ile Giriş Yap</a>
   <div class="note">Bu uygulama yalnızca dinleme verilerini okur.<br>Hiçbir verin üçüncü taraflarla paylaşılmaz.</div>
@@ -875,7 +875,7 @@ def api_create_top_tracks_playlist():
         pl = spotify._req("POST", "/me/playlists", json={
             "name": "En Çok Dinlediklerim",
             "public": False,
-            "description": "Spotify İstatistik uygulaması tarafından oluşturuldu"
+            "description": "Music+ Tarafından Oluşturulmuştur"
         })
         playlist_id = pl["id"]
         for i in range(0, len(top_sarkilar_ids), 100):
@@ -937,7 +937,7 @@ def api_create_top_artists_playlist():
         pl = spotify._req("POST", "/me/playlists", json={
             "name": "En Çok Dinlediğim Sanatçılar",
             "public": False,
-            "description": "Spotify İstatistik uygulaması tarafından oluşturuldu"
+            "description": "Music+ Tarafından Oluşturulmuştur"
         })
         playlist_id = pl["id"]
         for i in range(0, len(track_uris), 100):
@@ -1041,7 +1041,37 @@ def api_ai_chat():
     except Exception:
         pass
 
-    spotify_context = GeminiClient.build_spotify_context(now_playing, recent_tracks)
+    # Tam istatistik verisi (tüm sanatçılar/şarkılar, ay bazlı)
+    full_stats_context = ""
+    try:
+        headers, rows = get_cached_data(uid)
+        if rows:
+            stats = compute_stats(headers, rows)
+            if stats:
+                top_sanatcilar_str = "\n".join(
+                    f"  {i+1}. {s['sanatci']} — {s['count']} dinlenme"
+                    for i, s in enumerate(stats["top_sanatcilar"])
+                )
+                top_sarkilar_str = "\n".join(
+                    f"  {i+1}. {s['sarki']} — {s['sanatci']} ({s['count']} kez)"
+                    for i, s in enumerate(stats["top_sarkilar"])
+                )
+                aylar_str = "\n".join(
+                    f"  {a['ay']}: {a['kayit_sayisi']} dinlenme, {a['toplam']}"
+                    for a in stats["aylar"]
+                )
+                full_stats_context = (
+                    f"\n\nKULLANICININ TAM İSTATİSTİKLERİ:\n"
+                    f"Toplam kayıt: {stats['toplam_kayit']}, Farklı şarkı: {stats['farkli_sarki']}, Farklı sanatçı: {stats['farkli_sanatci']}\n"
+                    f"İlk kayıt: {stats['ilk_kayit_tarihi']}\n\n"
+                    f"En çok dinlenen sanatçılar (Top 10):\n{top_sanatcilar_str}\n\n"
+                    f"En çok dinlenen şarkılar (Top 10):\n{top_sarkilar_str}\n\n"
+                    f"Aylık dinleme geçmişi:\n{aylar_str}"
+                )
+    except Exception:
+        pass
+
+    spotify_context = GeminiClient.build_spotify_context(now_playing, recent_tracks) + full_stats_context
 
     def generate():
         global ai_requests_used
@@ -1125,7 +1155,7 @@ def api_ai_create_playlist():
     track_names = body.get("tracks") or []
     try:
         playlist_id = spotify.create_playlist_from_track_names(
-            name, track_names, description="Müzik asistanı tarafından oluşturuldu"
+            name, track_names, description="Music+ Tarafından Oluşturulmuştur"
         )
         return jsonify({"status": "ok", "playlist_id": playlist_id, "track_count": len(track_names)})
     except Exception as e:
@@ -1153,6 +1183,44 @@ def api_ai_add_to_playlist():
                 spotify._req("POST", f"/playlists/{playlist_id}/items", json={"uris": uris[i:i+100]})
         return jsonify({"status": "ok", "added": len(uris)})
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/ai/edit-playlist", methods=["POST"])
+def api_ai_edit_playlist():
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giriş yapılmamış"}), 401
+    body        = request.get_json(silent=True) or {}
+    playlist_id = (body.get("playlist_id") or "").strip()
+    track_names = body.get("tracks") or []
+    new_name    = body.get("new_name")
+    if not playlist_id:
+        return jsonify({"error": "playlist_id gerekli"}), 400
+    try:
+        # İsim güncelleme
+        if new_name:
+            spotify._req("PUT", f"/playlists/{playlist_id}", json={
+                "name": new_name,
+                "description": "Music+ Tarafından Düzenlenmiştir"
+            })
+        else:
+            # Sadece açıklamayı güncelle
+            spotify._req("PUT", f"/playlists/{playlist_id}", json={
+                "description": "Music+ Tarafından Düzenlenmiştir"
+            })
+        # Şarkı ekleme
+        uris = []
+        for t in track_names:
+            tid = spotify._search_track(t)
+            if tid:
+                uris.append(f"spotify:track:{tid}")
+        if uris:
+            for i in range(0, len(uris), 100):
+                spotify._req("POST", f"/playlists/{playlist_id}/items", json={"uris": uris[i:i+100]})
+        return jsonify({"status": "ok", "added": len(uris)})
+    except Exception as e:
+        logger.error(f"❌ Playlist düzenleme hatası: {e}")
         return jsonify({"error": str(e)}), 500
 
 def scheduled_sync_all():
