@@ -389,7 +389,6 @@
   <a class="menu-item active" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler">İstatistiklerim</a>
   <a class="menu-item" onclick="switchView('topluluk');toggleMenu()" id="nav-topluluk">İstatistikleriniz</a>
   <a class="menu-item" onclick="switchView('duzenle');toggleMenu()" id="nav-duzenle">Çalma Listeleri</a>
-  <!-- YENİ MENÜ BAĞLANTISI -->
   <a class="menu-item" onclick="switchView('kullanim');toggleMenu()" id="nav-kullanim">Kullanım ve Limitler</a>
   <a class="menu-item" onclick="switchView('profil');toggleMenu()" id="nav-profil">Profilin</a>
 </div>
@@ -495,7 +494,7 @@
     </div>
   </div>
 
-  <!-- YENİ KULLANIM VE LİMİTLER EKRANI -->
+  <!-- KULLANIM VE LİMİTLER EKRANI (GÜNCELLENDİ) -->
   <div id="view-kullanim" class="view-section">
     <div class="section-title">Sunucu (Render) Durumu</div>
     <div class="stats-row" id="serverStatsRow">
@@ -522,22 +521,34 @@
       </div>
     </div>
 
-    <div class="section-title" style="margin-top:32px">Cihaz / İstemci Ağ Durumu</div>
-    <div class="stats-row" id="clientStatsRow">
+    <!-- AI LIMITLERI -->
+    <div class="section-title" style="margin-top:32px">AI Hizmetleri (Gemini API)</div>
+    <div class="stats-row" id="aiStatsRow">
       <div class="stat-card">
-        <div class="label">Bağlantı Tipi</div>
-        <div class="value" id="clientConnType">—</div>
-        <div class="sub">Tahmini ağ türü</div>
+        <div class="label">Kalan İstek Hakkı</div>
+        <div class="value" id="aiRemaining">—</div>
+        <div class="sub">Toplam 3.000 limit üzerinden</div>
+        <div class="bar-wrap" style="margin-top:10px; background:var(--surface2)"><div class="bar-fill" id="aiRemainingBar" style="width:0%"></div></div>
       </div>
       <div class="stat-card">
-        <div class="label">Tahmini Hız (Downlink)</div>
-        <div class="value" id="clientDownlink">—</div>
-        <div class="sub">Mbps</div>
+        <div class="label">Kullanılan Modeller</div>
+        <div class="value" style="font-size:22px">Gemma 4</div>
+        <div class="sub">31B & 26B (Yedekli Çalışır)</div>
+      </div>
+    </div>
+
+    <!-- UPTIMEROBOT DURUMU -->
+    <div class="section-title" style="margin-top:32px">UptimeRobot (Erişilebilirlik) Durumu</div>
+    <div class="stats-row" id="uptimeStatsRow">
+      <div class="stat-card">
+        <div class="label">Sistem Durumu</div>
+        <div class="value" id="urStatus">—</div>
+        <div class="sub">UptimeRobot API anlık verisi</div>
       </div>
       <div class="stat-card">
-        <div class="label">Oturum Veri Tüketimi</div>
-        <div class="value" id="clientDataUsage">—</div>
-        <div class="sub">Sayfa ve API yükleri</div>
+        <div class="label">Tüm Zamanlar Uptime</div>
+        <div class="value" id="urRatio">—</div>
+        <div class="sub">Kesintisiz çalışma oranı</div>
       </div>
     </div>
   </div>
@@ -623,16 +634,14 @@ function switchView(viewId) {
   document.getElementById('headerSubtitle').textContent = titles[viewId] || '';
   
   if (viewId === 'topluluk') loadTopluluk();
-  if (viewId === 'duzenle') loadPlaylists(); // Playlistleri yükle
+  if (viewId === 'duzenle') loadPlaylists();
   
-  // Sadece "Kullanım" ekranındayken verileri güncelle
+  // "Kullanım" ekranındayken verileri güncelle (istemci durumu artık yok)
   if (viewId === 'kullanim') {
     loadSystemStats();
-    loadClientStats();
     if(!sysStatsInterval) {
       sysStatsInterval = setInterval(() => {
         loadSystemStats();
-        loadClientStats();
       }, 3000); // 3 saniyede bir güncelle
     }
   } else {
@@ -643,13 +652,14 @@ function switchView(viewId) {
   }
 }
 
-// ===================== YENİ: SİSTEM METRİKLERİ FONKSİYONLARI =====================
+// ===================== SİSTEM METRİKLERİ FONKSİYONLARI (GÜNCELLENDİ) =====================
 async function loadSystemStats() {
   try {
     const res = await fetch('/api/system-stats');
     if(!res.ok) return;
     const data = await res.json();
     if(data.status === 'ok') {
+      // 1) Sunucu Durumu
       document.getElementById('sysCpu').textContent = data.cpu_percent + '%';
       document.getElementById('sysCpuBar').style.width = data.cpu_percent + '%';
       
@@ -659,35 +669,32 @@ async function loadSystemStats() {
       
       document.getElementById('sysNet').textContent = data.net_sent_mb + ' MB 🔼 / ' + data.net_recv_mb + ' MB 🔽';
       document.getElementById('sysUptime').textContent = data.uptime;
+
+      // 2) AI Limitleri
+      if (data.ai_remaining !== undefined) {
+        document.getElementById('aiRemaining').textContent = data.ai_remaining.toLocaleString('tr-TR');
+        const pct = Math.max(0, Math.min(100, (data.ai_remaining / data.ai_total) * 100));
+        const bar = document.getElementById('aiRemainingBar');
+        bar.style.width = pct + '%';
+        if (pct < 10) bar.style.background = '#ff4444'; // %10'dan az kalırsa kırmızı
+        else bar.style.background = 'var(--green)';
+      }
+
+      // 3) UptimeRobot Durumu
+      if (data.uptimerobot) {
+        const urStatusEl = document.getElementById('urStatus');
+        urStatusEl.textContent = data.uptimerobot.status;
+        
+        // Renklendirme
+        if(data.uptimerobot.status.includes('UP')) urStatusEl.style.color = 'var(--green)';
+        else if(data.uptimerobot.status.includes('DOWN')) urStatusEl.style.color = '#ff4444';
+        else urStatusEl.style.color = 'var(--text)';
+
+        const ratio = data.uptimerobot.uptime_ratio;
+        document.getElementById('urRatio').textContent = ratio !== '—' ? '%' + ratio : '—';
+      }
     }
   } catch(e) {}
-}
-
-function loadClientStats() {
-  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  if(conn) {
-    document.getElementById('clientConnType').textContent = (conn.effectiveType || conn.type || 'Bilinmiyor').toUpperCase();
-    document.getElementById('clientDownlink').textContent = conn.downlink ? conn.downlink : '—';
-  } else {
-    document.getElementById('clientConnType').textContent = 'Desteklenmiyor';
-  }
-
-  if(window.performance && window.performance.getEntriesByType) {
-    let totalBytes = 0;
-    const resources = window.performance.getEntriesByType('resource');
-    resources.forEach(r => {
-      totalBytes += r.transferSize || r.decodedBodySize || 0;
-    });
-    const navs = window.performance.getEntriesByType('navigation');
-    if(navs.length > 0) {
-      totalBytes += navs[0].transferSize || navs[0].decodedBodySize || 0;
-    }
-    
-    const mb = (totalBytes / (1024 * 1024)).toFixed(2);
-    document.getElementById('clientDataUsage').textContent = mb > 0 ? mb + ' MB' : (totalBytes / 1024).toFixed(1) + ' KB';
-  } else {
-    document.getElementById('clientDataUsage').textContent = 'Desteklenmiyor';
-  }
 }
 
 // ===================== İZİN YÖNETİMİ =====================
@@ -1664,7 +1671,6 @@ document.addEventListener('click', function(e) {
 </div>
 <!-- ════════════════════════════════════════════════════════════════════════ -->
 
-
 <script>
 // ═══════════════════════════════════════════════════════════════════════════
 //  AI MODU — GEMMA 4 STREAMING CHAT
@@ -1672,8 +1678,8 @@ document.addEventListener('click', function(e) {
 
 let _aiOpen         = false;
 let _aiStreaming     = false;
-let _currentThinkEl = null;   // aktif düşünme bloğu
-let _currentBubble  = null;   // aktif yanıt balonu
+let _currentThinkEl = null;   
+let _currentBubble  = null;   
 
 // ── Panel aç/kapat ────────────────────────────────────────────────────────
 function toggleAIPanel() {
@@ -1736,7 +1742,7 @@ function createAssistantSlot() {
   typing.className = 'ai-typing-indicator';
   typing.innerHTML = '<span></span><span></span><span></span>';
 
-  // Yanıt balonu (başlangıçta boş, typing gösterilecek)
+  // Yanıt balonu 
   const msgDiv = document.createElement('div');
   msgDiv.className = 'ai-msg assistant';
 
@@ -1810,7 +1816,6 @@ async function sendAIMessage() {
         try { chunk = JSON.parse(raw); } catch { continue; }
 
         if (chunk.type === 'thinking') {
-          // Düşünme bloğunu göster ve metni ekle
           thinkBlock.style.display = 'block';
           thinkText += chunk.text;
           thinkBlock.querySelector('.ai-thinking-body').textContent = thinkText;
@@ -1818,10 +1823,8 @@ async function sendAIMessage() {
           _scrollBottom();
 
         } else if (chunk.type === 'text') {
-          // İlk metin geldiğinde typing'i kaldır, balonu oluştur
           if (!bubble) {
             typing.remove();
-            // Düşünme bitişini işaretle
             if (thinkBlock.style.display !== 'none') {
               const spinner = thinkBlock.querySelector('.think-spinner');
               if (spinner) spinner.style.animation = 'none';
@@ -1848,11 +1851,9 @@ async function sendAIMessage() {
       }
     }
 
-    // Yanıtta action JSON var mı? Bul ve kart oluştur
     if (responseText) {
       const action = _parseAction(responseText);
       if (action) {
-        // Yanıt balonundan action JSON'u temizle
         const cleanText = responseText.replace(/\{[\s\S]*?"action"[\s\S]*?\}[\s]*$/, '').trim();
         if (bubble) bubble.textContent = cleanText || responseText;
         _appendActionCard(msgDiv, action);
@@ -1874,9 +1875,7 @@ async function sendAIMessage() {
   }
 }
 
-// ── Action JSON'u parse et ────────────────────────────────────────────────
 function _parseAction(text) {
-  // Yanıtın sonundaki JSON bloğunu bul
   const match = text.match(/\{[\s\S]*?"action"[\s\S]*?\}[\s]*$/);
   if (!match) return null;
   try {
@@ -1886,7 +1885,6 @@ function _parseAction(text) {
   }
 }
 
-// ── Action kart oluştur ───────────────────────────────────────────────────
 function _appendActionCard(parent, action) {
   const labels = {
     search_track:    '🔍 Şarkı ID ara',
@@ -1909,7 +1907,6 @@ function _appendActionCard(parent, action) {
   parent.appendChild(card);
 }
 
-// ── Action çalıştır ───────────────────────────────────────────────────────
 async function executeAIAction(btn, action) {
   btn.disabled = true;
   btn.textContent = '⏳';
@@ -1918,7 +1915,6 @@ async function executeAIAction(btn, action) {
     let result = '';
 
     if (action.action === 'search_track') {
-      // Spotify arama
       const q = encodeURIComponent(`${action.track} ${action.artist || ''}`);
       const res = await fetch(`/api/ai/search-track?q=${q}`);
       const data = await res.json();
@@ -1964,7 +1960,6 @@ async function executeAIAction(btn, action) {
   }
 }
 
-// ── Geçmişi temizle ───────────────────────────────────────────────────────
 async function clearAIHistory() {
   if (!confirm('Sohbet geçmişini temizlemek istiyor musun?')) return;
   await fetch('/api/ai/history', { method: 'DELETE' });
@@ -1972,7 +1967,6 @@ async function clearAIHistory() {
   _showWelcome();
 }
 
-// ── Yardımcılar ───────────────────────────────────────────────────────────
 function _scrollBottom() {
   const msgs = document.getElementById('aiMessages');
   msgs.scrollTop = msgs.scrollHeight;
