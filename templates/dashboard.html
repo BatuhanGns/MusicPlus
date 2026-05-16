@@ -2106,10 +2106,10 @@ async function openLimitsModal() {
     const res  = await fetch('/api/ai/limits');
     const data = await res.json();
 
-    document.getElementById('limitsModalUsed').textContent      = (data.total_used || 0).toLocaleString('tr-TR');
-    document.getElementById('limitsModalRemaining').textContent  = (data.remaining || 0).toLocaleString('tr-TR');
+    document.getElementById('limitsModalUsed').textContent     = (data.total_used || 0).toLocaleString('tr-TR');
+    document.getElementById('limitsModalRemaining').textContent = (data.remaining || 0).toLocaleString('tr-TR');
     const pct = Math.max(0, Math.min(100, ((data.total_used || 0) / (data.total_limit || 3000)) * 100));
-    document.getElementById('limitsModalBar').style.width = pct + '%';
+    document.getElementById('limitsModalBar').style.width      = pct + '%';
     document.getElementById('limitsModalBar').style.background = pct > 80 ? '#ff6b6b' : pct > 50 ? '#ffa94d' : 'var(--green)';
 
     const users = data.users || [];
@@ -2118,25 +2118,30 @@ async function openLimitsModal() {
       return;
     }
 
-    // Kullanıcıları toplam kullanıma göre sırala
     users.sort((a, b) => b.total - a.total);
 
     let html = '<div style="display:flex;flex-direction:column;gap:10px;">';
     users.forEach(u => {
-      const modelRows = (u.models || []).map(m =>
-        `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);padding:2px 0 2px 8px;border-left:1px solid var(--border);">
-          <span>${m.model || 'gemma-4'}</span>
-          <span>${m.count.toLocaleString('tr-TR')} istek</span>
-        </div>`
-      ).join('');
+      // Model satırları — bugün / toplam
+      const modelRows = (u.models || []).filter(m => m.total > 0).map(m => {
+        const todayStr = m.today > 0 ? `<span style="color:var(--green)">+${m.today} bugün</span>` : '';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);padding:4px 0 4px 10px;border-left:1px solid var(--border);">
+          <span style="color:var(--text)">${_esc(m.model || 'Gemma 4')}</span>
+          <span style="display:flex;gap:8px;align-items:center;">${todayStr}<span>${(m.total||0).toLocaleString('tr-TR')} toplam</span></span>
+        </div>`;
+      }).join('');
+
+      const todayBadge = u.today > 0
+        ? `<span style="font-size:10px;background:rgba(29,185,84,.15);color:var(--green);padding:2px 7px;margin-left:6px;">+${u.today} bugün</span>`
+        : '';
 
       html += `
         <div style="background:var(--surface2);padding:12px 14px;border-left:3px solid var(--green);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <span style="font-weight:700;font-size:13px;">${_esc(u.display_name || u.user_id)}</span>
-            <span style="font-size:13px;font-weight:700;color:var(--green);">${(u.total||0).toLocaleString('tr-TR')} istek</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span style="font-weight:700;font-size:13px;">${_esc(u.display_name || u.user_id)}${todayBadge}</span>
+            <span style="font-size:13px;font-weight:700;color:var(--green);">${(u.total||0).toLocaleString('tr-TR')} toplam</span>
           </div>
-          ${modelRows}
+          ${modelRows || '<div style="font-size:10px;color:var(--muted);padding-left:10px;">—</div>'}
           <div style="font-size:10px;color:var(--muted);margin-top:6px;">Son kullanım: ${u.last_used || '—'}</div>
         </div>`;
     });
