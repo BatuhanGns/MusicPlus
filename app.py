@@ -68,31 +68,47 @@ def get_uptimerobot_data():
                     status_str = "BİLİNMİYOR"
 
                 # ── Yanıt süreleri (son 24 ölçüm) ────────────────────────────
+                # response_times listesi boş gelebilir; average_response_time ayrı string alandır
                 rt_raw = m.get("response_times", [])
                 response_times = []
-                for rt in rt_raw:
-                    response_times.append({
-                        "value": rt.get("value", 0),
-                        "datetime": rt.get("datetime", 0),
-                    })
+                if isinstance(rt_raw, list):
+                    for rt in rt_raw:
+                        if isinstance(rt, dict):
+                            response_times.append({
+                                "value":    int(rt.get("value", 0)),
+                                "datetime": int(rt.get("datetime", 0)),
+                            })
 
-                # Ortalama yanıt süresi
+                # Ortalama yanıt süresi — önce liste, yoksa average_response_time string alanı
                 avg_response = 0
                 if response_times:
                     avg_response = round(sum(r["value"] for r in response_times) / len(response_times))
+                else:
+                    try:
+                        avg_response = round(float(m.get("average_response_time", 0) or 0))
+                    except (ValueError, TypeError):
+                        avg_response = 0
 
-                # ── Özel uptime oranları (1g / 7g / 30g) ─────────────────────
-                custom_ratios_raw = m.get("custom_uptime_ratio", "")
-                # "99.9-98.5-97.2" formatında gelir
+                # ── Özel uptime oranları ──────────────────────────────────────
+                # API "100.000-98.727-99.703-99.976" STRING döndürüyor (1g-7g-30g-alltime)
+                custom_ratios_raw = m.get("custom_uptime_ratio", "") or ""
                 ratio_parts = str(custom_ratios_raw).split("-") if custom_ratios_raw else []
-                uptime_1d  = ratio_parts[0] if len(ratio_parts) > 0 else "—"
-                uptime_7d  = ratio_parts[1] if len(ratio_parts) > 1 else "—"
-                uptime_30d = ratio_parts[2] if len(ratio_parts) > 2 else "—"
+                uptime_1d  = ratio_parts[0].strip() if len(ratio_parts) > 0 else "—"
+                uptime_7d  = ratio_parts[1].strip() if len(ratio_parts) > 1 else "—"
+                uptime_30d = ratio_parts[2].strip() if len(ratio_parts) > 2 else "—"
 
                 # ── Toplam up/down süreleri ───────────────────────────────────
-                durations = m.get("all_time_uptime_durations", {})
-                total_up_sec   = int(durations.get("up_duration",   0))
-                total_down_sec = int(durations.get("down_duration", 0))
+                # API "up_sn-down_sn-paused_sn" STRING döndürüyor (dict değil!)
+                durations_raw = m.get("all_time_uptime_durations", "") or ""
+                dur_parts = str(durations_raw).split("-") if durations_raw else []
+                try:
+                    total_up_sec = int(dur_parts[0]) if len(dur_parts) > 0 else 0
+                except (ValueError, IndexError):
+                    total_up_sec = 0
+                try:
+                    total_down_sec = int(dur_parts[1]) if len(dur_parts) > 1 else 0
+                except (ValueError, IndexError):
+                    total_down_sec = 0
 
                 def _fmt_dur(secs):
                     if secs <= 0:
