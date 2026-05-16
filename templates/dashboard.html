@@ -94,6 +94,14 @@
   .action-btn.danger:hover {background:#ff444411; border-left-color:#ff4444;}
 
   footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+
+  /* GRAFİKSEL ANALİZ */
+  .grf-period-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:8px 16px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;cursor:pointer;transition:all .2s;text-transform:uppercase;}
+  .grf-period-btn:hover{border-color:var(--green);color:var(--text);}
+  .grf-period-btn.active{background:var(--green-dim);border-color:var(--green);color:var(--green);}
+
+  /* İSTAT ALT MENÜ */
+  .menu-item.sub{padding-left:20px;font-size:12px;letter-spacing:1.5px;border-bottom-color:var(--surface2);}
   .loading{color:var(--muted);font-size:13px;padding:24px 0;}
 
   /* MODAL VE GRAFİKLER */
@@ -422,7 +430,13 @@
     <h2>MENÜ</h2>
     <button style="background:none;border:none;color:var(--text);font-size:24px;cursor:pointer" onclick="toggleMenu()">✕</button>
   </div>
-  <a class="menu-item active" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler">İstatistiklerim</a>
+  <a class="menu-item active" onclick="toggleIstatSubMenu()" id="nav-istatistikler" style="display:flex;align-items:center;justify-content:space-between;">
+    <span>İstatistiklerim</span><span id="istatArrow" style="transition:transform .25s;font-size:12px;">▼</span>
+  </a>
+  <div id="istatSubMenu" style="overflow:hidden;max-height:0;transition:max-height .3s ease;background:var(--surface2);border-left:2px solid var(--green);">
+    <a class="menu-item" style="padding-left:20px;font-size:12px;letter-spacing:1.5px;" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler-genel">Genel Analiz</a>
+    <a class="menu-item" style="padding-left:20px;font-size:12px;letter-spacing:1.5px;" onclick="switchView('grafik-analiz');toggleMenu()" id="nav-grafik-analiz">Grafiksel Analiz</a>
+  </div>
   <a class="menu-item" onclick="switchView('topluluk');toggleMenu()" id="nav-topluluk">İstatistikleriniz</a>
   <a class="menu-item" onclick="switchView('duzenle');toggleMenu()" id="nav-duzenle">Çalma Listeleri</a>
   <a class="menu-item" onclick="switchView('kullanim');toggleMenu()" id="nav-kullanim">Kullanım ve Limitler</a>
@@ -512,6 +526,82 @@
     </div>
   </div>
 
+  <!-- GRAFİKSEL ANALİZ EKRANI -->
+  <div id="view-grafik-analiz" class="view-section">
+
+    <!-- Zaman filtresi -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:28px;flex-wrap:wrap;">
+      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-right:8px;">DÖNEM</div>
+      <button class="grf-period-btn active" data-period="week" onclick="setGrfPeriod('week',this)">Bu Hafta</button>
+      <button class="grf-period-btn" data-period="month" onclick="setGrfPeriod('month',this)">Bu Ay</button>
+      <button class="grf-period-btn" data-period="year" onclick="setGrfPeriod('year',this)">Bu Yıl</button>
+      <button class="grf-period-btn" data-period="all" onclick="setGrfPeriod('all',this)">Tüm Zamanlar</button>
+      <div style="margin-left:auto;font-size:10px;color:var(--muted);letter-spacing:1px;" id="grfPeriodLabel">—</div>
+    </div>
+
+    <!-- Özet kartları -->
+    <div class="stats-row" id="grfSummaryRow" style="margin-bottom:28px">
+      <div class="stat-card"><div class="label">Toplam Dinlenme</div><div class="value" id="grfTotal">—</div><div class="sub">kayıt</div></div>
+      <div class="stat-card"><div class="label">Toplam Süre</div><div class="value" id="grfSure">—</div><div class="sub">saat</div></div>
+      <div class="stat-card"><div class="label">Farklı Şarkı</div><div class="value" id="grfSarki">—</div><div class="sub">adet</div></div>
+      <div class="stat-card"><div class="label">Farklı Sanatçı</div><div class="value" id="grfSanatci">—</div><div class="sub">adet</div></div>
+    </div>
+
+    <!-- Grafik 1: Günlük Dinlenme Trendi -->
+    <div style="background:var(--surface);border:1px solid var(--border);padding:24px;margin-bottom:2px">
+      <div class="section-title" style="margin-bottom:20px;margin-top:0">Günlük Dinlenme Trendi</div>
+      <div id="grfDailyChart" style="display:flex;align-items:flex-end;gap:2px;height:80px;"></div>
+      <div id="grfDailyLabels" style="display:flex;gap:2px;margin-top:6px;overflow:hidden;"></div>
+    </div>
+
+    <!-- Grafik 2: Saat Dağılımı -->
+    <div style="background:var(--surface);border:1px solid var(--border);padding:24px;margin-bottom:2px">
+      <div class="section-title" style="margin-bottom:20px;margin-top:0">Saat Dağılımı</div>
+      <div id="grfHourChart" style="display:grid;grid-template-columns:repeat(24,1fr);gap:2px;align-items:flex-end;height:72px;"></div>
+      <div style="display:grid;grid-template-columns:repeat(24,1fr);gap:2px;margin-top:4px;">
+        <div style="grid-column:1;font-size:8px;color:var(--muted);text-align:center">0</div>
+        <div style="grid-column:7;font-size:8px;color:var(--muted);text-align:center">6</div>
+        <div style="grid-column:13;font-size:8px;color:var(--muted);text-align:center">12</div>
+        <div style="grid-column:19;font-size:8px;color:var(--muted);text-align:center">18</div>
+        <div style="grid-column:24;font-size:8px;color:var(--muted);text-align:center">23</div>
+      </div>
+    </div>
+
+    <!-- Grafik 3+4: Top Şarkı & Sanatçı -->
+    <div class="two-col" style="margin-bottom:2px">
+      <div style="background:var(--surface);border:1px solid var(--border);padding:24px;">
+        <div class="section-title" style="margin-bottom:16px;margin-top:0">En Çok Dinlenen Şarkılar</div>
+        <div id="grfTopTracks" class="rank-list"></div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);padding:24px;">
+        <div class="section-title" style="margin-bottom:16px;margin-top:0">En Çok Dinlenen Sanatçılar</div>
+        <div id="grfTopArtists" class="rank-list"></div>
+      </div>
+    </div>
+
+    <!-- Grafik 5: Gün bazlı ısı haritası (hafta × gün) -->
+    <div style="background:var(--surface);border:1px solid var(--border);padding:24px;margin-bottom:2px">
+      <div class="section-title" style="margin-bottom:16px;margin-top:0">Haftanın Günlerine Göre Dağılım</div>
+      <div id="grfWeekdayChart" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;"></div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:4px;">
+        <div style="font-size:9px;color:var(--muted);text-align:center">Pzt</div>
+        <div style="font-size:9px;color:var(--muted);text-align:center">Sal</div>
+        <div style="font-size:9px;color:var(--muted);text-align:center">Çar</div>
+        <div style="font-size:9px;color:var(--muted);text-align:center">Per</div>
+        <div style="font-size:9px;color:var(--muted);text-align:center">Cum</div>
+        <div style="font-size:9px;color:var(--muted);text-align:center">Cmt</div>
+        <div style="font-size:9px;color:var(--muted);text-align:center">Paz</div>
+      </div>
+    </div>
+
+    <!-- Grafik 6: Vakit Dağılımı bar -->
+    <div style="background:var(--surface);border:1px solid var(--border);padding:24px">
+      <div class="section-title" style="margin-bottom:16px;margin-top:0">Vakit Dağılımı</div>
+      <div id="grfVakitChart" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+
+  </div>
+
   <div id="view-topluluk" class="view-section">
     <div id="toplulukContent">
       <div class="loading" id="toplulukLoading">Yükleniyor...</div>
@@ -530,46 +620,38 @@
     </div>
   </div>
 
-  <!-- KULLANIM VE LİMİTLER EKRANI (GÜNCELLENDİ) -->
+  <!-- KULLANIM VE LİMİTLER EKRANI -->
   <div id="view-kullanim" class="view-section">
-    <div class="section-title">Sunucu (Render) Durumu</div>
-    <div class="stats-row" id="serverStatsRow">
-      <div class="stat-card">
-        <div class="label">CPU Kullanımı</div>
-        <div class="value" id="sysCpu">—</div>
-        <div class="bar-wrap" style="margin-top:10px; background:var(--surface2)"><div class="bar-fill" id="sysCpuBar" style="width:0%"></div></div>
-      </div>
-      <div class="stat-card">
-        <div class="label">RAM Kullanımı</div>
-        <div class="value" id="sysRam">—</div>
-        <div class="sub" id="sysRamDetail">— MB / — MB</div>
-        <div class="bar-wrap" style="margin-top:10px; background:var(--surface2)"><div class="bar-fill" id="sysRamBar" style="width:0%"></div></div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Ağ Trafiği (G/Ç)</div>
-        <div class="value" id="sysNet" style="font-size:16px">—</div>
-        <div class="sub">Sunucu veri trafiği</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Uptime (Çalışma)</div>
-        <div class="value" id="sysUptime" style="font-size:18px">—</div>
-        <div class="sub">Son yeniden başlatmadan beri</div>
-      </div>
-    </div>
 
-    <!-- AI LIMITLERI -->
-    <div class="section-title" style="margin-top:32px">AI Hizmetleri (Gemini API)</div>
+    <!-- AI LIMITLERI (sadece Gemini) -->
+    <div class="section-title">Gemini API Limitleri</div>
     <div class="stats-row" id="aiStatsRow">
       <div class="stat-card">
         <div class="label">Kalan İstek Hakkı</div>
         <div class="value" id="aiRemaining">—</div>
         <div class="sub">Toplam 3.000 limit üzerinden (tüm uygulama)</div>
-        <div class="bar-wrap" style="margin-top:10px; background:var(--surface2)"><div class="bar-fill" id="aiRemainingBar" style="width:0%"></div></div>
+        <div class="bar-wrap" style="margin-top:10px;background:var(--surface2)"><div class="bar-fill" id="aiRemainingBar" style="width:0%"></div></div>
       </div>
       <div class="stat-card" style="cursor:pointer" onclick="openLimitsModal()">
-        <div class="label">Kullanıcı Bazlı Detay</div>
+        <div class="label">Kullanıcı Bazlı Detay ↗</div>
         <div class="value" style="font-size:22px" id="aiUsedTotal">—</div>
-        <div class="sub">Toplam kullanılan istek · detay için tıkla</div>
+        <div class="sub">Toplam kullanılan · detay için tıkla</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Limit Sıfırlanıyor</div>
+        <div class="value" id="resetCountdown" style="font-size:26px;font-family:'DM Mono',monospace">—</div>
+        <div class="sub">Her gün 00:00 UTC'de sıfırlanır</div>
+      </div>
+    </div>
+
+    <!-- Günün ilerleme çubuğu -->
+    <div style="background:var(--surface);border:1px solid var(--border);padding:20px 24px;margin-bottom:32px">
+      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Günün İlerlemesi (UTC)</div>
+      <div class="bar-wrap" style="height:6px;background:var(--surface2)">
+        <div class="bar-fill" id="resetDayBar" style="width:0%;height:6px;background:var(--green)"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px">
+        <span>00:00</span><span id="resetNowUtc">—</span><span>23:59</span>
       </div>
     </div>
 
@@ -579,115 +661,13 @@
         <button onclick="closeLimitsModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;">✕</button>
         <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:16px;margin-bottom:4px;">AI Kullanım Detayı</div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:20px;">Tüm kullanıcıların model bazlı istek sayıları</div>
-        <div id="limitsModalBody">
-          <div style="color:var(--muted);font-size:12px;">Yükleniyor...</div>
-        </div>
+        <div id="limitsModalBody"><div style="color:var(--muted);font-size:12px;">Yükleniyor...</div></div>
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:12px;align-items:center;">
-          <div style="flex:1;">
-            <div style="font-size:11px;color:var(--muted);">TOPLAM KULLANILAN</div>
-            <div style="font-size:24px;font-weight:800;font-family:'Syne',sans-serif;" id="limitsModalUsed">—</div>
-          </div>
-          <div style="flex:1;">
-            <div style="font-size:11px;color:var(--muted);">KALAN</div>
-            <div style="font-size:24px;font-weight:800;font-family:'Syne',sans-serif;color:var(--green);" id="limitsModalRemaining">—</div>
-          </div>
-          <div style="flex:1;">
-            <div style="font-size:11px;color:var(--muted);">LİMİT</div>
-            <div style="font-size:24px;font-weight:800;font-family:'Syne',sans-serif;color:var(--muted);">3.000</div>
-          </div>
+          <div style="flex:1;"><div style="font-size:11px;color:var(--muted);">TOPLAM KULLANILAN</div><div style="font-size:24px;font-weight:800;font-family:'Syne',sans-serif;" id="limitsModalUsed">—</div></div>
+          <div style="flex:1;"><div style="font-size:11px;color:var(--muted);">KALAN</div><div style="font-size:24px;font-weight:800;font-family:'Syne',sans-serif;color:var(--green);" id="limitsModalRemaining">—</div></div>
+          <div style="flex:1;"><div style="font-size:11px;color:var(--muted);">LİMİT</div><div style="font-size:24px;font-weight:800;font-family:'Syne',sans-serif;color:var(--muted);">3.000</div></div>
         </div>
-        <div style="margin-top:12px;">
-          <div style="background:var(--surface2);height:6px;width:100%;">
-            <div id="limitsModalBar" style="background:var(--green);height:6px;width:0%;transition:width .6s;"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- UPTIMEROBOT DURUMU -->
-    <div class="section-title" style="margin-top:32px">UptimeRobot — Erişilebilirlik & Performans</div>
-
-    <!-- Üst satır: Durum / Yanıt süresi / Up / Down -->
-    <div class="stats-row" id="uptimeStatsRow" style="margin-bottom:1px">
-      <div class="stat-card">
-        <div class="label">Anlık Durum</div>
-        <div class="value" id="urStatus" style="font-size:18px">—</div>
-        <div class="sub" id="urMonitorName">UptimeRobot API</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Ort. Yanıt Süresi</div>
-        <div class="value" id="urAvgMs">—</div>
-        <div class="sub">ms · son 24 ölçüm</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Toplam Aktif Süre</div>
-        <div class="value" id="urTotalUp" style="font-size:18px">—</div>
-        <div class="sub">Tüm zamanlar UP</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Toplam Kesinti</div>
-        <div class="value" id="urTotalDown" style="font-size:18px; color:#ff6b6b">—</div>
-        <div class="sub">Tüm zamanlar DOWN</div>
-      </div>
-    </div>
-
-    <!-- Uptime oranları -->
-    <div class="stats-row" style="margin-bottom:1px">
-      <div class="stat-card">
-        <div class="label">Bugün Uptime</div>
-        <div class="value" id="urRatio1d">—</div>
-        <div class="sub" id="urRatioAllTime">Tüm zamanlar: —</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Son 7 Gün Uptime</div>
-        <div class="value" id="urRatio7d">—</div>
-        <div class="sub">7 günlük oran</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Son 30 Gün Uptime</div>
-        <div class="value" id="urRatio30d">—</div>
-        <div class="sub">30 günlük oran</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Kontrol Aralığı</div>
-        <div class="value" id="urInterval" style="font-size:18px">—</div>
-        <div class="sub">saniyede bir ping</div>
-      </div>
-    </div>
-
-    <!-- Yanıt süresi grafiği -->
-    <div style="background:var(--surface);border:1px solid var(--border);padding:20px 24px;margin-bottom:1px">
-      <div class="section-title" style="margin-bottom:14px;margin-top:0">Yanıt Süresi — Son 24 Ölçüm</div>
-      <div id="urRtChart" style="display:flex;align-items:flex-end;gap:3px;height:64px;">
-        <div style="color:var(--muted);font-size:12px;">Veri bekleniyor...</div>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--muted);">
-        <span>En Eski</span><span>En Yeni</span>
-      </div>
-    </div>
-
-    <!-- Son kesinti logları -->
-    <div style="background:var(--surface);border:1px solid var(--border);padding:20px 24px">
-      <div class="section-title" style="margin-bottom:14px;margin-top:0">Son Olaylar</div>
-      <div id="urLogs"><div style="color:var(--muted);font-size:12px;">Yükleniyor...</div></div>
-    </div>
-
-    <!-- AI Reset Geri Sayımı -->
-    <div class="section-title" style="margin-top:32px">Limit Sıfırlama</div>
-    <div style="background:var(--surface);border:1px solid var(--border);padding:24px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
-      <div>
-        <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Sıfırlanmaya Kalan Süre</div>
-        <div style="font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:var(--green);line-height:1" id="resetCountdown">—</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:6px">Her gün 00:00 UTC'de günlük limit sıfırlanır</div>
-      </div>
-      <div style="flex:1;min-width:180px">
-        <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Günün İlerlemesi</div>
-        <div class="bar-wrap" style="height:8px;background:var(--surface2)">
-          <div class="bar-fill" id="resetDayBar" style="width:0%;height:8px;background:var(--green)"></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px">
-          <span>00:00 UTC</span><span id="resetNowUtc">—</span><span>23:59 UTC</span>
-        </div>
+        <div style="margin-top:12px;"><div style="background:var(--surface2);height:6px;width:100%;"><div id="limitsModalBar" style="background:var(--green);height:6px;width:0%;transition:width .6s;"></div></div></div>
       </div>
     </div>
   </div>
@@ -705,6 +685,28 @@
     <button class="action-btn danger" onclick="if(confirm('Çıkış yapmak istediğine emin misin?')) window.location.href='/logout'">Sistemden Çıkış Yap</button>
 
     <div class="section-title" style="margin-top:32px">Görünüm Ayarları</div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);padding:20px 24px;margin-bottom:8px;">
+      <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:4px;">Grafik Türü</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.6;">Grafiksel Analizde kullanılacak görsel tür</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="grf-period-btn" id="grfTypeBtnBar" onclick="setGrfType('bar',this)" style="font-size:10px;padding:6px 14px;">▊ Bar</button>
+        <button class="grf-period-btn" id="grfTypeBtnLine" onclick="setGrfType('line',this)" style="font-size:10px;padding:6px 14px;">╱ Çizgi</button>
+        <button class="grf-period-btn" id="grfTypeBtnHeat" onclick="setGrfType('heat',this)" style="font-size:10px;padding:6px 14px;">▒ Isı Haritası</button>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);padding:20px 24px;margin-bottom:8px;">
+      <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:4px;">Varsayılan Dönem</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.6;">Grafiksel Analiz açıldığında hangi dönem seçili gelsin</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="grf-period-btn" id="defPeriodWeek" onclick="setDefaultPeriod('week',this)" style="font-size:10px;padding:6px 14px;">Bu Hafta</button>
+        <button class="grf-period-btn active" id="defPeriodMonth" onclick="setDefaultPeriod('month',this)" style="font-size:10px;padding:6px 14px;">Bu Ay</button>
+        <button class="grf-period-btn" id="defPeriodYear" onclick="setDefaultPeriod('year',this)" style="font-size:10px;padding:6px 14px;">Bu Yıl</button>
+        <button class="grf-period-btn" id="defPeriodAll" onclick="setDefaultPeriod('all',this)" style="font-size:10px;padding:6px 14px;">Tüm Zamanlar</button>
+      </div>
+    </div>
+
     <div class="setting-row" onclick="toggleSetting('syncedLyrics')">
       <div class="setting-info">
         <div class="setting-name">Desteklenen Sözleri Göster</div>
@@ -760,194 +762,393 @@ let sysStatsInterval = null;
 
 function switchView(viewId) {
   document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-  document.getElementById('view-' + viewId).classList.add('active');
+  const viewEl = document.getElementById('view-' + viewId);
+  if (viewEl) viewEl.classList.add('active');
+
+  // Aktif nav — grafik-analiz için istatistikler navını aktif yap
   document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
-  document.getElementById('nav-' + viewId).classList.add('active');
+  const navEl = document.getElementById('nav-' + viewId);
+  if (navEl) navEl.classList.add('active');
+  // Eğer grafik-analiz açıldıysa üst menü de aktif görünsün
+  if (viewId === 'grafik-analiz') {
+    const parentNav = document.getElementById('nav-istatistikler');
+    if (parentNav) parentNav.classList.add('active');
+  }
+
   const titles = {
-    'istatistikler': 'Kişisel Spotify Verilerin',
-    'topluluk':      'Topluluk İstatistikleri',
-    'duzenle':       'Çalma Listesi Yönetimi',
-    'kullanim':      'Kullanım ve Limitler',
-    'profil':        'Hesap ve Ayarlar'
+    'istatistikler':  'Genel Analiz',
+    'grafik-analiz':  'Grafiksel Analiz',
+    'topluluk':       'Topluluk İstatistikleri',
+    'duzenle':        'Çalma Listesi Yönetimi',
+    'kullanim':       'Kullanım ve Limitler',
+    'profil':         'Hesap ve Ayarlar'
   };
   document.getElementById('headerSubtitle').textContent = titles[viewId] || '';
-  
-  if (viewId === 'topluluk') loadTopluluk();
-  if (viewId === 'duzenle') loadPlaylists();
-  
-  // "Kullanım" ekranındayken verileri güncelle (istemci durumu artık yok)
+
+  if (viewId === 'topluluk')     loadTopluluk();
+  if (viewId === 'duzenle')      loadPlaylists();
+  if (viewId === 'grafik-analiz') loadGrfAnaliz();
+
   if (viewId === 'kullanim') {
-    loadSystemStats();
+    loadGeminiStats();
     _startResetCountdown();
-    if(!sysStatsInterval) {
-      sysStatsInterval = setInterval(() => {
-        loadSystemStats();
-      }, 3000); // 3 saniyede bir güncelle
+    if (!sysStatsInterval) {
+      sysStatsInterval = setInterval(loadGeminiStats, 10000);
     }
   } else {
-    if(sysStatsInterval) {
-      clearInterval(sysStatsInterval);
-      sysStatsInterval = null;
-    }
+    if (sysStatsInterval) { clearInterval(sysStatsInterval); sysStatsInterval = null; }
     _stopResetCountdown();
   }
 }
 
-// ===================== SİSTEM METRİKLERİ FONKSİYONLARI (GÜNCELLENDİ) =====================
-async function loadSystemStats() {
+// ── Alt menü aç/kapat ─────────────────────────────────────────────────────
+function toggleIstatSubMenu() {
+  const sub   = document.getElementById('istatSubMenu');
+  const arrow = document.getElementById('istatArrow');
+  const isOpen = sub.style.maxHeight !== '0px' && sub.style.maxHeight !== '';
+  if (isOpen) {
+    sub.style.maxHeight = '0px';
+    if (arrow) arrow.style.transform = 'rotate(0deg)';
+  } else {
+    sub.style.maxHeight = '200px';
+    if (arrow) arrow.style.transform = 'rotate(180deg)';
+    // İlk açılışta genel analiz yüklensin
+    if (document.getElementById('view-istatistikler').className.indexOf('active') === -1) {
+      switchView('istatistikler');
+    }
+  }
+}
+
+// ===================== GEMİNİ LİMİT FONKSİYONLARI =====================
+async function loadGeminiStats() {
   try {
     const res = await fetch('/api/system-stats');
-    if(!res.ok) return;
+    if (!res.ok) return;
     const data = await res.json();
-    if(data.status === 'ok') {
-      // 1) Sunucu Durumu
-      document.getElementById('sysCpu').textContent = data.cpu_percent + '%';
-      document.getElementById('sysCpuBar').style.width = data.cpu_percent + '%';
-      
-      document.getElementById('sysRam').textContent = data.ram_percent + '%';
-      document.getElementById('sysRamDetail').textContent = data.ram_used_mb + ' MB / ' + data.ram_total_mb + ' MB';
-      document.getElementById('sysRamBar').style.width = data.ram_percent + '%';
-      
-      document.getElementById('sysNet').textContent = data.net_sent_mb + ' MB 🔼 / ' + data.net_recv_mb + ' MB 🔽';
-      document.getElementById('sysUptime').textContent = data.uptime;
-
-      // 2) AI Limitleri
-      if (data.ai_remaining !== undefined) {
-        document.getElementById('aiRemaining').textContent = data.ai_remaining.toLocaleString('tr-TR');
-        const used = (data.ai_total || 3000) - data.ai_remaining;
-        const usedEl = document.getElementById('aiUsedTotal');
-        if (usedEl) usedEl.textContent = used.toLocaleString('tr-TR');
-        const pct = Math.max(0, Math.min(100, (data.ai_remaining / data.ai_total) * 100));
-        const bar = document.getElementById('aiRemainingBar');
-        bar.style.width = pct + '%';
-        if (pct < 10) bar.style.background = '#ff4444';
-        else bar.style.background = 'var(--green)';
-      }
-
-      // 3) UptimeRobot Durumu — Zenginleştirilmiş
-      if (data.uptimerobot) {
-        const ur = data.uptimerobot;
-
-        // Anlık durum
-        const urStatusEl = document.getElementById('urStatus');
-        if (urStatusEl) {
-          urStatusEl.textContent = ur.status || '—';
-          if ((ur.status || '').includes('UP'))   urStatusEl.style.color = 'var(--green)';
-          else if ((ur.status || '').includes('DOWN')) urStatusEl.style.color = '#ff4444';
-          else urStatusEl.style.color = 'var(--text)';
-        }
-
-        // Monitor adı ve kontrol aralığı
-        const monEl = document.getElementById('urMonitorName');
-        if (monEl) monEl.textContent = ur.monitor_name || 'UptimeRobot API';
-        const intEl = document.getElementById('urInterval');
-        if (intEl) intEl.textContent = ur.check_interval ? ur.check_interval + 's' : '—';
-
-        // Ortalama yanıt süresi
-        const avgEl = document.getElementById('urAvgMs');
-        if (avgEl) avgEl.textContent = ur.avg_response_ms ? ur.avg_response_ms + ' ms' : '—';
-
-        // Toplam up / down
-        const upEl = document.getElementById('urTotalUp');
-        if (upEl) upEl.textContent = ur.total_up || '—';
-        const downEl = document.getElementById('urTotalDown');
-        if (downEl) downEl.textContent = ur.total_down || '—';
-
-        // Uptime oranları
-        const r1d  = document.getElementById('urRatio1d');
-        const r7d  = document.getElementById('urRatio7d');
-        const r30d = document.getElementById('urRatio30d');
-        const rAll = document.getElementById('urRatioAllTime');
-        if (r1d)  r1d.textContent  = ur.uptime_1d  && ur.uptime_1d  !== '—' ? '%' + parseFloat(ur.uptime_1d).toFixed(2)  : '—';
-        if (r7d)  r7d.textContent  = ur.uptime_7d  && ur.uptime_7d  !== '—' ? '%' + parseFloat(ur.uptime_7d).toFixed(2)  : '—';
-        if (r30d) r30d.textContent = ur.uptime_30d && ur.uptime_30d !== '—' ? '%' + parseFloat(ur.uptime_30d).toFixed(2) : '—';
-        if (rAll) rAll.textContent = ur.uptime_ratio && ur.uptime_ratio !== '—' ? 'Tüm zamanlar: %' + ur.uptime_ratio : 'Tüm zamanlar: —';
-
-        // Yanıt süresi grafiği
-        const rtData = ur.response_times || [];
-        const rtChart = document.getElementById('urRtChart');
-        if (rtChart && rtData.length > 0) {
-          const maxVal = Math.max(...rtData.map(r => r.value || 0), 1);
-          rtChart.innerHTML = rtData.map((r, i) => {
-            const h = Math.max(4, Math.round((r.value / maxVal) * 60));
-            const color = r.value > 1000 ? '#ff4444' : r.value > 500 ? '#ffaa00' : 'var(--green)';
-            const dt = r.datetime ? new Date(r.datetime * 1000).toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'}) : '';
-            return `<div title="${r.value} ms${dt ? ' · ' + dt : ''}" style="flex:1;background:${color};height:${h}px;border-radius:1px 1px 0 0;cursor:pointer;transition:opacity .15s;opacity:.85;min-width:4px" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.85"></div>`;
-          }).join('');
-        } else if (rtChart) {
-          rtChart.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0;">Yanıt süresi verisi alınamadı.</div>';
-        }
-
-        // Son kesinti logları
-        const logsEl = document.getElementById('urLogs');
-        if (logsEl) {
-          const logs = ur.logs || [];
-          if (logs.length === 0) {
-            logsEl.innerHTML = '<div style="color:var(--muted);font-size:12px;">Kayıtlı olay yok.</div>';
-          } else {
-            logsEl.innerHTML = logs.map(lg => {
-              const color = lg.color === 'down' ? '#ff6b6b' : lg.color === 'up' ? 'var(--green)' : 'var(--muted)';
-              const border = lg.color === 'down' ? '#ff6b6b' : lg.color === 'up' ? 'var(--green)' : 'var(--border)';
-              const dt = lg.datetime ? new Date(lg.datetime * 1000).toLocaleString('tr-TR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-              const durBadge = lg.duration ? `<span style="font-size:10px;background:rgba(255,107,107,.12);color:#ff9999;padding:1px 7px;margin-left:8px;">${lg.duration}</span>` : '';
-              return `<div style="display:flex;align-items:center;gap:14px;padding:11px 16px;border-left:3px solid ${border};background:var(--surface2);margin-bottom:2px;">
-                <span style="color:${color};font-size:13px;min-width:150px;">${lg.label}${durBadge}</span>
-                <span style="font-size:11px;color:var(--muted);">${dt}</span>
-              </div>`;
-            }).join('');
-          }
-        }
-      }
-
-      // 4) Reset Geri Sayımı
-      _updateResetCountdown();
+    if (data.status === 'ok' && data.ai_remaining !== undefined) {
+      const el = document.getElementById('aiRemaining');
+      if (el) el.textContent = data.ai_remaining.toLocaleString('tr-TR');
+      const used = (data.ai_total || 3000) - data.ai_remaining;
+      const usedEl = document.getElementById('aiUsedTotal');
+      if (usedEl) usedEl.textContent = used.toLocaleString('tr-TR');
+      const pct = Math.max(0, Math.min(100, (data.ai_remaining / (data.ai_total || 3000)) * 100));
+      const bar = document.getElementById('aiRemainingBar');
+      if (bar) { bar.style.width = pct + '%'; bar.style.background = pct < 10 ? '#ff4444' : 'var(--green)'; }
     }
   } catch(e) {}
 }
 
-// ── Reset geri sayım (interval ile de çağrılır) ─────────────────────────────
+// ── Reset geri sayım ──────────────────────────────────────────────────────
 let _resetCountdownInterval = null;
 
 function _updateResetCountdown() {
   const now = new Date();
-  // UTC gece yarısı (bir sonraki 00:00 UTC)
-  const nextReset = new Date(Date.UTC(
-    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0
-  ));
-  const diffMs = nextReset - now;
+  const nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
+  const diffMs   = nextReset - now;
   const totalDay = 24 * 60 * 60 * 1000;
-
+  const pad = n => String(n).padStart(2, '0');
   const hh = Math.floor(diffMs / 3600000);
   const mm = Math.floor((diffMs % 3600000) / 60000);
   const ss = Math.floor((diffMs % 60000) / 1000);
-  const pad = n => String(n).padStart(2, '0');
-
   const cdEl = document.getElementById('resetCountdown');
   if (cdEl) cdEl.textContent = `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
-
-  // Gün içi ilerleme
-  const elapsed = totalDay - diffMs;
-  const pct = Math.min(100, Math.max(0, (elapsed / totalDay) * 100));
+  const pct = Math.min(100, Math.max(0, ((totalDay - diffMs) / totalDay) * 100));
   const barEl = document.getElementById('resetDayBar');
   if (barEl) barEl.style.width = pct.toFixed(1) + '%';
-
-  // Şu an UTC saati
   const nowUtcEl = document.getElementById('resetNowUtc');
   if (nowUtcEl) nowUtcEl.textContent = `${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())} UTC`;
 }
 
 function _startResetCountdown() {
   _updateResetCountdown();
-  if (!_resetCountdownInterval) {
-    _resetCountdownInterval = setInterval(_updateResetCountdown, 1000);
+  if (!_resetCountdownInterval) _resetCountdownInterval = setInterval(_updateResetCountdown, 1000);
+}
+function _stopResetCountdown() {
+  if (_resetCountdownInterval) { clearInterval(_resetCountdownInterval); _resetCountdownInterval = null; }
+}
+
+// ===================== GRAFİKSEL ANALİZ FONKSİYONLARI =====================
+let _grfPeriod    = 'week';
+let _grfDataCache = {};
+
+// Dönem başlangıç tarihini hesapla (yılın başı = yılın 1 Ocak 00:00'ı)
+function _grfStartDate(period) {
+  const now = new Date();
+  if (period === 'week') {
+    // Bu haftanın Pazartesi'si
+    const d = new Date(now);
+    const day = d.getDay(); // 0=Pazar
+    const diff = (day === 0 ? -6 : 1 - day);
+    d.setDate(d.getDate() + diff);
+    d.setHours(0,0,0,0);
+    return d;
+  }
+  if (period === 'month') {
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  if (period === 'year') {
+    return new Date(now.getFullYear(), 0, 1); // 1 Ocak — yılın başı, geçen yıla girmez
+  }
+  return null; // all
+}
+
+function _grfPeriodLabel(period) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  if (period === 'week') {
+    const start = _grfStartDate('week');
+    return `${pad(start.getDate())}.${pad(start.getMonth()+1)} – ${pad(now.getDate())}.${pad(now.getMonth()+1)}.${now.getFullYear()}`;
+  }
+  if (period === 'month') {
+    return `${pad(1)}.${pad(now.getMonth()+1)}.${now.getFullYear()} – Bugün`;
+  }
+  if (period === 'year') {
+    return `01.01.${now.getFullYear()} – Bugün`;
+  }
+  return 'Tüm Zamanlar';
+}
+
+function setGrfPeriod(period, btn) {
+  _grfPeriod = period;
+  document.querySelectorAll('.grf-period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const labelEl = document.getElementById('grfPeriodLabel');
+  if (labelEl) labelEl.textContent = _grfPeriodLabel(period);
+  _renderGrfFromCache();
+}
+
+async function loadGrfAnaliz() {
+  // Dönem etiketi
+  const labelEl = document.getElementById('grfPeriodLabel');
+  if (labelEl) labelEl.textContent = _grfPeriodLabel(_grfPeriod);
+
+  // Yükleniyor göster
+  ['grfTotal','grfSure','grfSarki','grfSanatci'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = '—';
+  });
+  ['grfDailyChart','grfHourChart','grfTopTracks','grfTopArtists','grfWeekdayChart','grfVakitChart'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.innerHTML = '<div class="loading">Yükleniyor...</div>';
+  });
+
+  try {
+    // Dashboard verisini ve tüm şarkı/sanatçı verilerini paralel çek
+    const [dashRes, sarkiRes, sanatciRes] = await Promise.all([
+      fetch('/api/dashboard'),
+      fetch('/api/tum-sarkilar'),
+      fetch('/api/tum-sanatcilar'),
+    ]);
+    const dash    = dashRes.ok    ? await dashRes.json()    : {};
+    const sarkis  = sarkiRes.ok   ? await sarkiRes.json()   : {};
+    const sanatcs = sanatciRes.ok ? await sanatciRes.json() : {};
+
+    _grfDataCache = { dash, sarkis, sanatcs };
+    _renderGrfFromCache();
+  } catch(e) {
+    document.getElementById('grfDailyChart').innerHTML = '<div style="color:#ff6b6b;font-size:12px">Veri yüklenemedi: ' + e.message + '</div>';
   }
 }
 
-function _stopResetCountdown() {
-  if (_resetCountdownInterval) {
-    clearInterval(_resetCountdownInterval);
-    _resetCountdownInterval = null;
+function _filterByPeriod(records, period) {
+  if (period === 'all') return records;
+  const start = _grfStartDate(period);
+  if (!start) return records;
+  return records.filter(r => {
+    // r.tarih "YYYY-MM-DD" veya "YYYY-MM-DD HH:MM:SS" formatında
+    const d = new Date(r.tarih || r.ts || '');
+    return d >= start;
+  });
+}
+
+function _renderGrfFromCache() {
+  const { dash, sarkis, sanatcs } = _grfDataCache;
+  if (!dash || !sarkis || !sanatcs) return;
+
+  const period = _grfPeriod;
+  const labelEl = document.getElementById('grfPeriodLabel');
+  if (labelEl) labelEl.textContent = _grfPeriodLabel(period);
+
+  // Haftalık veriyi kullan (dash.hafta) + tüm şarkı/sanatçıları filtrele
+  // dash.aylar içindeki verilerden dönem bazlı hesap yap
+  const aylar = dash.aylar || [];
+  const hafta = dash.hafta || [];
+
+  // ── Dönem bazlı sarki/sanatci filtrelemesi (count bazlı, tarih yok ama kullanabiliriz)
+  // API'da tarihli raw veri olmadığı için dönem etiketi göster, genel istatistikleri sergile
+  // En çok dinlenen şarkı/sanatçılar için mevcut top listeyi kullan
+
+  // Özet — dönem bağımsız genel istatistikler (API kısıtlaması nedeniyle)
+  const totalKayit = dash.toplam_kayit || 0;
+  const totalSure  = Math.floor((dash.toplam_sure_sn || 0) / 3600);
+  const farkliSarki   = sarkis.toplam || 0;
+  const farkliSanatci = sanatcs.toplam || 0;
+
+  // Kart değerleri
+  const el = id => document.getElementById(id);
+  if (el('grfTotal'))   el('grfTotal').textContent   = totalKayit.toLocaleString('tr-TR');
+  if (el('grfSure'))    el('grfSure').textContent     = totalSure.toLocaleString('tr-TR') + 's';
+  if (el('grfSarki'))   el('grfSarki').textContent    = farkliSarki.toLocaleString('tr-TR');
+  if (el('grfSanatci')) el('grfSanatci').textContent  = farkliSanatci.toLocaleString('tr-TR');
+
+  // ── 1) Günlük Trend — hafta verisinden, diğer dönemler için aylar
+  _renderGrfDaily(period, hafta, aylar);
+
+  // ── 2) Saat Dağılımı — dashboard global saat verisi
+  _renderGrfHours(dash.global_saatler || []);
+
+  // ── 3) Top Şarkılar & Sanatçılar
+  _renderGrfTopList('grfTopTracks',  (sarkis.sarkilar  || []).slice(0,8), 'sarki',   'sanatci', 'count');
+  _renderGrfTopList('grfTopArtists', (sanatcs.sanatcilar || []).slice(0,8), 'sanatci', null,     'count');
+
+  // ── 4) Haftanın günleri dağılımı
+  _renderGrfWeekdays(hafta);
+
+  // ── 5) Vakit dağılımı
+  _renderGrfVakit(dash.global_vakitler || []);
+}
+
+function _renderGrfDaily(period, hafta, aylar) {
+  const container = document.getElementById('grfDailyChart');
+  const labels    = document.getElementById('grfDailyLabels');
+  if (!container) return;
+
+  let bars = [];
+
+  if (period === 'week') {
+    // Haftalık — 7 gün
+    bars = hafta.map(g => ({ label: g.tarih ? g.tarih.slice(5) : '', val: g.sure_sn || 0 }));
+  } else if (period === 'month') {
+    // Bu ay — aylar içinden bu ayı bul
+    const now = new Date();
+    const ayLabel = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    // Ay verisi tek satır; günlük kırılım yok — haftaları göster
+    bars = hafta.map(g => ({ label: g.tarih ? g.tarih.slice(5) : '', val: g.sure_sn || 0 }));
+  } else {
+    // Yıl veya tümü — aylık kırılım
+    const now = new Date();
+    const filtered = period === 'year'
+      ? aylar.filter(a => a.ay && a.ay.startsWith(String(now.getFullYear())))
+      : aylar;
+    bars = [...filtered].map(a => ({ label: a.ay ? a.ay.slice(0,7) : '', val: parseInt(a.kayit_sayisi || 0) }));
   }
+
+  if (!bars.length) { container.innerHTML = '<div style="color:var(--muted);font-size:12px">Veri yok</div>'; return; }
+  const max = Math.max(...bars.map(b => b.val), 1);
+  container.innerHTML = bars.map(b => {
+    const h = Math.max(3, Math.round((b.val / max) * 76));
+    return `<div title="${b.label}: ${b.val}" style="flex:1;background:var(--green);height:${h}px;border-radius:1px 1px 0 0;opacity:.8;min-width:4px;cursor:pointer;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.8"></div>`;
+  }).join('');
+  if (labels) {
+    const step = Math.ceil(bars.length / 7);
+    labels.innerHTML = bars.map((b,i) => `<div style="flex:1;font-size:8px;color:var(--muted);text-align:center;overflow:hidden;">${i % step === 0 ? b.label : ''}</div>`).join('');
+  }
+}
+
+function _renderGrfHours(saatler) {
+  const container = document.getElementById('grfHourChart');
+  if (!container) return;
+  if (!saatler.length) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:12px;grid-column:1/-1;">Saat verisi yok</div>';
+    return;
+  }
+  const max = Math.max(...saatler.map(s => s.count || 0), 1);
+  container.innerHTML = saatler.map(s => {
+    const h = Math.max(2, Math.round(((s.count || 0) / max) * 68));
+    const color = (s.count || 0) > max * 0.7 ? 'var(--green)' : (s.count || 0) > max * 0.3 ? '#1aa34a' : 'var(--muted2)';
+    return `<div title="${s.saat}: ${s.count} kez" style="background:${color};height:${h}px;border-radius:1px 1px 0 0;align-self:flex-end;cursor:pointer;transition:opacity .15s;opacity:.85" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.85"></div>`;
+  }).join('');
+}
+
+function _renderGrfTopList(containerId, items, nameKey, subKey, countKey) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  if (!items.length) { container.innerHTML = '<div class="loading">Veri yok</div>'; return; }
+  const max = items[0]?.[countKey] || 1;
+  container.innerHTML = items.map((item, i) => `
+    <div class="rank-item" style="cursor:default">
+      <div class="num">${String(i+1).padStart(2,'0')}</div>
+      <div class="info">
+        <div class="name">${_esc(item[nameKey] || '—')}</div>
+        ${subKey && item[subKey] ? `<div class="sub-info">${_esc(item[subKey])}</div>` : ''}
+        <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round((item[countKey]||0)/max*100)}%"></div></div>
+      </div>
+      <div class="count"><div><strong>${item[countKey]}</strong>kez</div></div>
+    </div>`).join('');
+}
+
+function _renderGrfWeekdays(hafta) {
+  const container = document.getElementById('grfWeekdayChart');
+  if (!container) return;
+  // JS'de haftanın günlerini Pazartesi başlangıçlı sırala
+  const gunMap = { 'Pazartesi':0,'Salı':1,'Çarşamba':2,'Perşembe':3,'Cuma':4,'Cumartesi':5,'Pazar':6 };
+  const vals = [0,0,0,0,0,0,0];
+  hafta.forEach(g => {
+    const idx = gunMap[g.gun];
+    if (idx !== undefined) vals[idx] = g.sure_sn || 0;
+  });
+  const max = Math.max(...vals, 1);
+  container.innerHTML = vals.map((v, i) => {
+    const opacity = Math.max(0.1, v / max);
+    return `<div title="${['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'][i]}: ${Math.floor(v/60)} dk" style="height:36px;background:var(--green);opacity:${opacity.toFixed(2)};border-radius:2px;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=${opacity.toFixed(2)}"></div>`;
+  }).join('');
+}
+
+function _renderGrfVakit(vakitler) {
+  const container = document.getElementById('grfVakitChart');
+  if (!container) return;
+  if (!vakitler.length) { container.innerHTML = '<div style="color:var(--muted);font-size:12px">Veri yok</div>'; return; }
+  const max = Math.max(...vakitler.map(v => v.count || 0), 1);
+  container.innerHTML = vakitler.map(v => `
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="font-size:12px;color:var(--muted);min-width:80px;">${_esc(v.vakit)}</div>
+      <div style="flex:1;height:8px;background:var(--surface2);">
+        <div style="height:8px;background:var(--green);width:${Math.round((v.count||0)/max*100)}%;transition:width .5s ease;"></div>
+      </div>
+      <div style="font-size:12px;font-family:'Syne',sans-serif;font-weight:700;color:var(--green);min-width:40px;text-align:right">${v.count}</div>
+    </div>`).join('');
+}
+
+// ===================== GRAFİK AYARLARI =====================
+let _grfType = 'bar'; // bar | line | heat
+
+function setGrfType(type, btn) {
+  _grfType = type;
+  ['Bar','Line','Heat'].forEach(t => {
+    const b = document.getElementById('grfTypeBtn' + t);
+    if (b) b.classList.remove('active');
+  });
+  if (btn) btn.classList.add('active');
+  try { localStorage.setItem('grfType', type); } catch(e) {}
+  if (document.getElementById('view-grafik-analiz')?.classList.contains('active')) {
+    _renderGrfFromCache();
+  }
+}
+
+function setDefaultPeriod(period, btn) {
+  _grfPeriod = period;
+  ['Week','Month','Year','All'].forEach(p => {
+    const b = document.getElementById('defPeriod' + p);
+    if (b) b.classList.remove('active');
+  });
+  if (btn) btn.classList.add('active');
+  // Grafik analiz açıksa hemen uygula
+  document.querySelectorAll('.grf-period-btn[data-period]').forEach(b => {
+    b.classList.toggle('active', b.dataset.period === period);
+  });
+  const labelEl = document.getElementById('grfPeriodLabel');
+  if (labelEl) labelEl.textContent = _grfPeriodLabel(period);
+  try { localStorage.setItem('grfDefaultPeriod', period); } catch(e) {}
+  if (document.getElementById('view-grafik-analiz')?.classList.contains('active')) {
+    _renderGrfFromCache();
+  }
+}
+
+function _loadGrfPrefs() {
+  try {
+    const t = localStorage.getItem('grfType');
+    if (t) { _grfType = t; const b = document.getElementById('grfTypeBtn' + t.charAt(0).toUpperCase() + t.slice(1)); if (b) { document.querySelectorAll('[id^=grfTypeBtn]').forEach(x => x.classList.remove('active')); b.classList.add('active'); } }
+    const p = localStorage.getItem('grfDefaultPeriod');
+    if (p) { _grfPeriod = p; const b = document.getElementById('defPeriod' + p.charAt(0).toUpperCase() + p.slice(1)); if (b) { document.querySelectorAll('[id^=defPeriod]').forEach(x => x.classList.remove('active')); b.classList.add('active'); } document.querySelectorAll('.grf-period-btn[data-period]').forEach(b2 => b2.classList.toggle('active', b2.dataset.period === p)); }
+  } catch(e) {}
 }
 
 // ===================== İZİN YÖNETİMİ =====================
@@ -1438,6 +1639,7 @@ updateNpTime = function() {
 
 initSettings();
 loadIzin();
+_loadGrfPrefs();
 
 const _lyricStyle = document.createElement('style');
 _lyricStyle.textContent = `.lyric-lines{padding:20px 28px;}.lyric-line{font-family:'DM Mono',monospace;font-size:13px;line-height:2.2;color:var(--muted);cursor:default;transition:color .3s,font-size .3s;}.lyric-line.lyric-active{color:var(--green);font-size:15px;font-weight:700;font-family:'Syne',sans-serif;}`;
