@@ -754,7 +754,7 @@ async function loadSystemStats() {
       // 2) AI Limitleri
       if (data.ai_remaining !== undefined) {
         document.getElementById('aiRemaining').textContent = data.ai_remaining.toLocaleString('tr-TR');
-        const used = (data.ai_total || 3000) - data.ai_remaining;
+        const used = (data.ai_total || 3500) - data.ai_remaining;
         const usedEl = document.getElementById('aiUsedTotal');
         if (usedEl) usedEl.textContent = used.toLocaleString('tr-TR');
         const pct = Math.max(0, Math.min(100, (data.ai_remaining / data.ai_total) * 100));
