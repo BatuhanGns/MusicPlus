@@ -11,7 +11,7 @@ from flask import Flask, jsonify, render_template, request, Response, stream_wit
 from apscheduler.schedulers.background import BackgroundScheduler
 from spotify_client import SpotifyClient
 from sheets_client import SheetsClient
-from gemini_client import GeminiClient, LIMIT_THINKING, LIMIT_FAST, LIMIT_TOTAL
+from gemini_client import GeminiClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 SERVER_START_TIME = time.time()
 
 # ── AI LIMIT VE UPTIMEROBOT ────────────────────────────────────────────────
-AI_MAX_REQUESTS = LIMIT_TOTAL  # 3500 — toplam günlük limit (Hızlı 500 + Düşünen 3000)
+AI_MAX_REQUESTS = 3000
 ai_requests_used = 0
 _ai_total_cache = {"value": 0, "ts": 0}  # Sheets toplamı için cache (60sn TTL)
 
@@ -28,7 +28,7 @@ _ur_cache = {"data": {"status": "Sorgulanıyor...", "uptime_ratio": "—"}, "las
 def get_uptimerobot_data():
     global _ur_cache
     now = time.time()
-    # 60 saniyelik önbellek (Rate Limit'e takılmamak ve paneli hızlı yüklemek için)
+    # 60 saniyelik önbellek
     if now - _ur_cache["last_fetch"] < 60:
         return _ur_cache["data"]
 
@@ -37,15 +37,26 @@ def get_uptimerobot_data():
         return {"status": "API Key Bekleniyor", "uptime_ratio": "—"}
 
     try:
-        resp = requests.post("https://api.uptimerobot.com/v2/getMonitors", 
-                             data={"api_key": ur_api_key, "format": "json"}, 
-                             timeout=3)
+        resp = requests.post(
+            "https://api.uptimerobot.com/v2/getMonitors",
+            data={
+                "api_key": ur_api_key,
+                "format": "json",
+                "response_times": 1,
+                "response_times_limit": 24,
+                "logs": 1,
+                "logs_limit": 10,
+                "custom_uptime_ratios": "1-7-30",
+                "all_time_uptime_durations": 1,
+            },
+            timeout=5,
+        )
         if resp.status_code == 200:
             data = resp.json()
             if data.get("stat") == "ok" and data.get("monitors"):
                 m = data["monitors"][0]
                 s_code = m.get("status")
-                
+
                 # UptimeRobot status kodları: 0=Paused, 2=Up, 8=Seems Down, 9=Down
                 if s_code == 2:
                     status_str = "AKTİF (UP)"
@@ -55,10 +66,86 @@ def get_uptimerobot_data():
                     status_str = "DURAKLATILDI"
                 else:
                     status_str = "BİLİNMİYOR"
-                    
+
+                # ── Yanıt süreleri (son 24 ölçüm) ────────────────────────────
+                rt_raw = m.get("response_times", [])
+                response_times = []
+                for rt in rt_raw:
+                    response_times.append({
+                        "value": rt.get("value", 0),
+                        "datetime": rt.get("datetime", 0),
+                    })
+
+                # Ortalama yanıt süresi
+                avg_response = 0
+                if response_times:
+                    avg_response = round(sum(r["value"] for r in response_times) / len(response_times))
+
+                # ── Özel uptime oranları (1g / 7g / 30g) ─────────────────────
+                custom_ratios_raw = m.get("custom_uptime_ratio", "")
+                # "99.9-98.5-97.2" formatında gelir
+                ratio_parts = str(custom_ratios_raw).split("-") if custom_ratios_raw else []
+                uptime_1d  = ratio_parts[0] if len(ratio_parts) > 0 else "—"
+                uptime_7d  = ratio_parts[1] if len(ratio_parts) > 1 else "—"
+                uptime_30d = ratio_parts[2] if len(ratio_parts) > 2 else "—"
+
+                # ── Toplam up/down süreleri ───────────────────────────────────
+                durations = m.get("all_time_uptime_durations", {})
+                total_up_sec   = int(durations.get("up_duration",   0))
+                total_down_sec = int(durations.get("down_duration", 0))
+
+                def _fmt_dur(secs):
+                    if secs <= 0:
+                        return "0dk"
+                    d = secs // 86400
+                    h = (secs % 86400) // 3600
+                    mn = (secs % 3600) // 60
+                    if d > 0:
+                        return f"{d}g {h}s"
+                    if h > 0:
+                        return f"{h}s {mn}dk"
+                    return f"{mn}dk"
+
+                # ── Son kesinti logları ───────────────────────────────────────
+                logs_raw = m.get("logs", [])
+                logs = []
+                for lg in logs_raw:
+                    lg_type = lg.get("type")
+                    # 1=Down, 2=Up, 98=Started, 99=Paused
+                    if lg_type == 1:
+                        lg_label = "⬇ Kesinti Başladı"
+                        lg_color = "down"
+                    elif lg_type == 2:
+                        lg_label = "⬆ Geri Döndü"
+                        lg_color = "up"
+                    elif lg_type == 98:
+                        lg_label = "▶ İzleme Başladı"
+                        lg_color = "info"
+                    else:
+                        lg_label = "⏸ Duraklatıldı"
+                        lg_color = "info"
+
+                    dur_sec = int(lg.get("duration", 0))
+                    logs.append({
+                        "label":    lg_label,
+                        "color":    lg_color,
+                        "datetime": lg.get("datetime", 0),
+                        "duration": _fmt_dur(dur_sec) if dur_sec > 0 else "",
+                    })
+
                 _ur_cache["data"] = {
-                    "status": status_str,
-                    "uptime_ratio": m.get("all_time_uptime_ratio", "—")
+                    "status":          status_str,
+                    "uptime_ratio":    m.get("all_time_uptime_ratio", "—"),
+                    "uptime_1d":       uptime_1d,
+                    "uptime_7d":       uptime_7d,
+                    "uptime_30d":      uptime_30d,
+                    "avg_response_ms": avg_response,
+                    "response_times":  response_times[-24:],   # en fazla 24 nokta
+                    "total_up":        _fmt_dur(total_up_sec),
+                    "total_down":      _fmt_dur(total_down_sec),
+                    "logs":            logs[:10],
+                    "monitor_name":    m.get("friendly_name", "Monitor"),
+                    "check_interval":  m.get("interval", 300),
                 }
                 _ur_cache["last_fetch"] = now
     except Exception as e:
@@ -1035,11 +1122,6 @@ def api_ai_chat():
     if not user_message:
         return jsonify({"error": "Mesaj boş"}), 400
 
-    # Mod: "thinking" (varsayılan) veya "fast"
-    mode = body.get("mode", "thinking")
-    if mode not in ("thinking", "fast"):
-        mode = "thinking"
-
     history = _ai_history.get(uid, [])
     history.append({"role": "user", "content": user_message})
 
@@ -1108,7 +1190,7 @@ def api_ai_chat():
         used_model = ""
         
         try:
-            for raw in gemini.stream_chat(history, spotify_context, mode=mode):
+            for raw in gemini.stream_chat(history, spotify_context):
                 chunk = _json.loads(raw)
                 if chunk.get("type") == "text":
                     full_response += chunk["text"]
@@ -1128,13 +1210,13 @@ def api_ai_chat():
             
             if request_successful:
                 ai_requests_used += 1
-                _ai_total_cache["ts"] = 0  # cache geçersiz kıl
+                # Cache'i geçersiz kıl — bir sonraki system-stats isteğinde Sheets'ten taze okusun
+                _ai_total_cache["ts"] = 0
+                # Sheets Limits sayfasına logla (arkaplanda, hata olursa yoksay)
                 try:
                     display_name = get_current_user_name()
-                    pretty_label = GeminiClient.pretty_model_label(used_model) if used_model else (
-                        "Gemini 3.1 Flash Lite" if mode == "fast" else "Gemma 4"
-                    )
-                    sheets.log_ai_request(uid, display_name, pretty_label)
+                    model_label = used_model if used_model else "gemma-4"
+                    sheets.log_ai_request(uid, display_name, model_label)
                 except Exception as log_err:
                     logger.warning(f"⚠️ Limits log hatası: {log_err}")
 
@@ -1264,59 +1346,42 @@ def api_ai_edit_playlist():
 
 @app.route("/api/ai/limits")
 def api_ai_limits():
+    """Toplam AI kullanım limitini ve kullanıcı bazlı dökümü döndürür."""
     uid = get_current_user_id()
     if not uid:
         return jsonify({"error": "Giriş yapılmamış"}), 401
 
     summary = sheets.get_limits_summary()
 
-    def _mode_of(model_label: str) -> str:
-        return "fast" if "flash" in model_label.lower() else "thinking"
-
-    user_totals    = {}
-    grand_thinking = 0
-    grand_fast     = 0
-
+    # Kullanıcı bazlı gruplama — today_used ve total_used ayrı ayrı
+    user_totals = {}
     for row in summary:
         u     = row.get("user_id", "")
         dn    = row.get("display_name", u)
         m     = row.get("model", "")
         today = int(row.get("today_used", 0))  if str(row.get("today_used",  "0")).isdigit() else 0
         total = int(row.get("total_used", 0))  if str(row.get("total_used",  "0")).isdigit() else 0
+        # Eski Limits sayfasıyla uyumluluk (requests_used sütunu varsa)
         if total == 0 and str(row.get("requests_used", "0")).isdigit():
             total = int(row.get("requests_used", 0))
             today = total
-        lst = row.get("last_used", "")
-        mod = _mode_of(m)
-
-        if mod == "fast":
-            grand_fast     += total
-        else:
-            grand_thinking += total
-
+        lst   = row.get("last_used", "")
         if u not in user_totals:
-            user_totals[u] = {"user_id": u, "display_name": dn,
-                              "thinking": 0, "fast": 0, "total": 0,
-                              "models": [], "last_used": lst}
-        user_totals[u][mod]     += total
+            user_totals[u] = {"user_id": u, "display_name": dn, "today": 0, "total": 0, "models": [], "last_used": lst}
+        user_totals[u]["today"] += today
         user_totals[u]["total"] += total
-        user_totals[u]["models"].append({"model": m, "mode": mod, "today": today, "total": total, "last_used": lst})
+        user_totals[u]["models"].append({"model": m, "today": today, "total": total, "last_used": lst})
         if lst > user_totals[u]["last_used"]:
             user_totals[u]["last_used"] = lst
 
-    grand_total = grand_thinking + grand_fast
+    # Toplam = Sheets'teki bütün total_used satırlarının gerçek toplamı
+    grand_total = sum(u["total"] for u in user_totals.values())
 
     return jsonify({
-        "total_used":           grand_total,
-        "total_limit":          LIMIT_TOTAL,
-        "remaining":            max(0, LIMIT_TOTAL     - grand_total),
-        "thinking_used":        grand_thinking,
-        "thinking_limit":       LIMIT_THINKING,
-        "thinking_remaining":   max(0, LIMIT_THINKING  - grand_thinking),
-        "fast_used":            grand_fast,
-        "fast_limit":           LIMIT_FAST,
-        "fast_remaining":       max(0, LIMIT_FAST      - grand_fast),
-        "users":                list(user_totals.values()),
+        "total_used":  grand_total,
+        "total_limit": AI_MAX_REQUESTS,
+        "remaining":   max(0, AI_MAX_REQUESTS - grand_total),
+        "users":       list(user_totals.values()),
     })
 
 
