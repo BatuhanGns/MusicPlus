@@ -213,8 +213,12 @@ def api_system_stats():
         uptime_hours = uptime_sec // 3600
         uptime_mins = (uptime_sec % 3600) // 60
         
-        # Limit hesaplaması
-        ai_remaining = max(0, AI_MAX_REQUESTS - ai_requests_used)
+        # Limit hesaplaması — Sheets'teki gerçek toplam kullanımdan hesapla
+        try:
+            grand_total = sheets.get_total_used_from_sheets()
+        except Exception:
+            grand_total = ai_requests_used  # fallback: in-memory
+        ai_remaining = max(0, AI_MAX_REQUESTS - grand_total)
         
         return jsonify({
             "status": "ok",
