@@ -4,8 +4,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Model öncelik sırası — ilk başarısız olursa diğerine geçilir
-MODELS = ["gemma-4-31b-it", "gemma-4-26b-a4b-it"]
+# ── Model tanımları ───────────────────────────────────────────────────────────
+THINKING_MODELS = ["gemma-4-31b-it", "gemma-4-26b-a4b-it"]  # Düşünen — yedekli
+FAST_MODEL      = "gemini-2.5-flash-lite-preview-06-17"      # Hızlı
+
+# ── Limit tanımları ───────────────────────────────────────────────────────────
+LIMIT_THINKING = 3000
+LIMIT_FAST     = 500
+LIMIT_TOTAL    = 3500
+
+MODE_LABELS = {"thinking": "Düşünen", "fast": "Hızlı"}
 
 SYSTEM_PROMPT = """Sen Music+ uygulamasının yapay zeka müzik asistanısın. Kullanıcının Spotify dinleme geçmişini ve alışkanlıklarını analiz ederek yardımcı olursun.
 
@@ -55,7 +63,7 @@ class GeminiClient:
         return SYSTEM_PROMPT
 
     @staticmethod
-    def build_spotify_context(now_playing: dict | None, recent_tracks: list | None) -> str:
+    def build_spotify_context(now_playing, recent_tracks):
         lines = []
         if now_playing and now_playing.get("playing"):
             durum = "çalıyor" if now_playing.get("is_playing") else "duraklatıldı"
@@ -66,21 +74,27 @@ class GeminiClient:
                 lines.append(f"  • {t['track_name']} — {t['artist_name']}")
         return "\n".join(lines)
 
-    def stream_chat(self, messages: list, spotify_context: str = ""):
-        """
-        Generator: her chunk için SSE-uyumlu JSON satırı yield eder.
+    @staticmethod
+    def pretty_model_label(model: str) -> str:
+        m = model.lower()
+        if "31b" in m:
+            return "Gemma 4 31B"
+        if "26b" in m or "27b" in m:
+            return "Gemma 4 26B"
+        if "flash-lite" in m or "flash_lite" in m:
+            return "Gemini 3.1 Flash Lite"
+        if "flash" in m:
+            return "Gemini Flash"
+        if "gemma" in m:
+            return "Gemma 4"
+        return model
 
-        Chunk tipleri:
-          {"type":"thinking", "text":"..."}   — düşünme süreci (collapsible)
-          {"type":"text",     "text":"..."}   — asıl yanıt (stream)
-          {"type":"done",  "model":"..."}     — tamamlandı
-          {"type":"error",    "text":"..."}   — hata
-        """
+    def stream_chat(self, messages: list, spotify_context: str = "", mode: str = "thinking"):
         try:
             from google import genai
             from google.genai import types
         except ImportError:
-            yield json.dumps({"type": "error", "text": "google-genai paketi eksik. Lütfen sunucuya yükleyin: pip install google-genai"})
+            yield json.dumps({"type": "error", "text": "google-genai paketi eksik."})
             return
 
         if not self.api_key:
@@ -89,7 +103,6 @@ class GeminiClient:
 
         client = genai.Client(api_key=self.api_key)
 
-        # Mesajları Gemini formatına çevir
         gemini_contents = []
         for msg in messages:
             role = "user" if msg["role"] == "user" else "model"
@@ -99,21 +112,23 @@ class GeminiClient:
 
         system_prompt = self._build_system_prompt(spotify_context)
 
-        last_error = None
-        for model in MODELS:
-            try:
-                logger.info(f"🤖 Gemini isteği: {model}, {len(messages)} mesaj")
+        if mode == "fast":
+            yield from self._stream_fast(client, types, gemini_contents, system_prompt)
+        else:
+            yield from self._stream_thinking(client, types, gemini_contents, system_prompt)
 
+    def _stream_thinking(self, client, types, contents, system_prompt):
+        last_error = None
+        for model in THINKING_MODELS:
+            try:
+                logger.info(f"🧠 Düşünen mod: {model}")
                 config = types.GenerateContentConfig(
                     system_instruction=system_prompt,
                     thinking_config=types.ThinkingConfig(thinking_level="HIGH"),
                     temperature=0.9,
                 )
-
                 for chunk in client.models.generate_content_stream(
-                    model=model,
-                    contents=gemini_contents,
-                    config=config,
+                    model=model, contents=contents, config=config
                 ):
                     if not chunk.candidates:
                         continue
@@ -124,22 +139,53 @@ class GeminiClient:
                         text = getattr(part, "text", "") or ""
                         if not text:
                             continue
-                        is_thought = getattr(part, "thought", False)
-                        if is_thought:
+                        if getattr(part, "thought", False):
                             yield json.dumps({"type": "thinking", "text": text}, ensure_ascii=False)
                         else:
                             yield json.dumps({"type": "text", "text": text}, ensure_ascii=False)
 
-                yield json.dumps({"type": "done", "model": model}, ensure_ascii=False)
+                yield json.dumps({"type": "done", "model": model, "mode": "thinking"}, ensure_ascii=False)
                 return
 
             except Exception as e:
-                logger.warning(f"⚠️ Model {model} başarısız: {e}")
+                logger.warning(f"⚠️ Düşünen model {model} başarısız: {e}")
                 last_error = str(e)
-                # Bir sonraki modele geç
                 continue
 
         yield json.dumps(
-            {"type": "error", "text": f"Tüm modeller başarısız oldu. Son hata: {last_error}"},
+            {"type": "error", "text": f"Tüm düşünen modeller başarısız. Son hata: {last_error}"},
             ensure_ascii=False,
         )
+
+    def _stream_fast(self, client, types, contents, system_prompt):
+        model = FAST_MODEL
+        try:
+            logger.info(f"⚡ Hızlı mod: {model}")
+            config = types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+                temperature=0.7,
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+            )
+            for chunk in client.models.generate_content_stream(
+                model=model, contents=contents, config=config
+            ):
+                if not chunk.candidates:
+                    continue
+                content = chunk.candidates[0].content
+                if not content or not content.parts:
+                    continue
+                for part in content.parts:
+                    text = getattr(part, "text", "") or ""
+                    if not text:
+                        continue
+                    if getattr(part, "thought", False):
+                        yield json.dumps({"type": "thinking", "text": text}, ensure_ascii=False)
+                    else:
+                        yield json.dumps({"type": "text", "text": text}, ensure_ascii=False)
+
+            yield json.dumps({"type": "done", "model": model, "mode": "fast"}, ensure_ascii=False)
+
+        except Exception as e:
+            logger.error(f"❌ Hızlı model başarısız: {e}")
+            yield json.dumps({"type": "error", "text": str(e)}, ensure_ascii=False)

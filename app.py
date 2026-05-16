@@ -11,7 +11,7 @@ from flask import Flask, jsonify, render_template, request, Response, stream_wit
 from apscheduler.schedulers.background import BackgroundScheduler
 from spotify_client import SpotifyClient
 from sheets_client import SheetsClient
-from gemini_client import GeminiClient
+from gemini_client import GeminiClient, LIMIT_THINKING, LIMIT_FAST, LIMIT_TOTAL
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 SERVER_START_TIME = time.time()
 
 # ── AI LIMIT VE UPTIMEROBOT ────────────────────────────────────────────────
-AI_MAX_REQUESTS = 3000
+AI_MAX_REQUESTS = LIMIT_TOTAL  # 3500 — toplam günlük limit (Hızlı 500 + Düşünen 3000)
 ai_requests_used = 0
 _ai_total_cache = {"value": 0, "ts": 0}  # Sheets toplamı için cache (60sn TTL)
 
@@ -1035,6 +1035,11 @@ def api_ai_chat():
     if not user_message:
         return jsonify({"error": "Mesaj boş"}), 400
 
+    # Mod: "thinking" (varsayılan) veya "fast"
+    mode = body.get("mode", "thinking")
+    if mode not in ("thinking", "fast"):
+        mode = "thinking"
+
     history = _ai_history.get(uid, [])
     history.append({"role": "user", "content": user_message})
 
@@ -1103,7 +1108,7 @@ def api_ai_chat():
         used_model = ""
         
         try:
-            for raw in gemini.stream_chat(history, spotify_context):
+            for raw in gemini.stream_chat(history, spotify_context, mode=mode):
                 chunk = _json.loads(raw)
                 if chunk.get("type") == "text":
                     full_response += chunk["text"]
@@ -1123,13 +1128,13 @@ def api_ai_chat():
             
             if request_successful:
                 ai_requests_used += 1
-                # Cache'i geçersiz kıl — bir sonraki system-stats isteğinde Sheets'ten taze okusun
-                _ai_total_cache["ts"] = 0
-                # Sheets Limits sayfasına logla (arkaplanda, hata olursa yoksay)
+                _ai_total_cache["ts"] = 0  # cache geçersiz kıl
                 try:
                     display_name = get_current_user_name()
-                    model_label = used_model if used_model else "gemma-4"
-                    sheets.log_ai_request(uid, display_name, model_label)
+                    pretty_label = GeminiClient.pretty_model_label(used_model) if used_model else (
+                        "Gemini 3.1 Flash Lite" if mode == "fast" else "Gemma 4"
+                    )
+                    sheets.log_ai_request(uid, display_name, pretty_label)
                 except Exception as log_err:
                     logger.warning(f"⚠️ Limits log hatası: {log_err}")
 
@@ -1259,42 +1264,59 @@ def api_ai_edit_playlist():
 
 @app.route("/api/ai/limits")
 def api_ai_limits():
-    """Toplam AI kullanım limitini ve kullanıcı bazlı dökümü döndürür."""
     uid = get_current_user_id()
     if not uid:
         return jsonify({"error": "Giriş yapılmamış"}), 401
 
     summary = sheets.get_limits_summary()
 
-    # Kullanıcı bazlı gruplama — today_used ve total_used ayrı ayrı
-    user_totals = {}
+    def _mode_of(model_label: str) -> str:
+        return "fast" if "flash" in model_label.lower() else "thinking"
+
+    user_totals    = {}
+    grand_thinking = 0
+    grand_fast     = 0
+
     for row in summary:
         u     = row.get("user_id", "")
         dn    = row.get("display_name", u)
         m     = row.get("model", "")
         today = int(row.get("today_used", 0))  if str(row.get("today_used",  "0")).isdigit() else 0
         total = int(row.get("total_used", 0))  if str(row.get("total_used",  "0")).isdigit() else 0
-        # Eski Limits sayfasıyla uyumluluk (requests_used sütunu varsa)
         if total == 0 and str(row.get("requests_used", "0")).isdigit():
             total = int(row.get("requests_used", 0))
             today = total
-        lst   = row.get("last_used", "")
+        lst = row.get("last_used", "")
+        mod = _mode_of(m)
+
+        if mod == "fast":
+            grand_fast     += total
+        else:
+            grand_thinking += total
+
         if u not in user_totals:
-            user_totals[u] = {"user_id": u, "display_name": dn, "today": 0, "total": 0, "models": [], "last_used": lst}
-        user_totals[u]["today"] += today
+            user_totals[u] = {"user_id": u, "display_name": dn,
+                              "thinking": 0, "fast": 0, "total": 0,
+                              "models": [], "last_used": lst}
+        user_totals[u][mod]     += total
         user_totals[u]["total"] += total
-        user_totals[u]["models"].append({"model": m, "today": today, "total": total, "last_used": lst})
+        user_totals[u]["models"].append({"model": m, "mode": mod, "today": today, "total": total, "last_used": lst})
         if lst > user_totals[u]["last_used"]:
             user_totals[u]["last_used"] = lst
 
-    # Toplam = Sheets'teki bütün total_used satırlarının gerçek toplamı
-    grand_total = sum(u["total"] for u in user_totals.values())
+    grand_total = grand_thinking + grand_fast
 
     return jsonify({
-        "total_used":  grand_total,
-        "total_limit": AI_MAX_REQUESTS,
-        "remaining":   max(0, AI_MAX_REQUESTS - grand_total),
-        "users":       list(user_totals.values()),
+        "total_used":           grand_total,
+        "total_limit":          LIMIT_TOTAL,
+        "remaining":            max(0, LIMIT_TOTAL     - grand_total),
+        "thinking_used":        grand_thinking,
+        "thinking_limit":       LIMIT_THINKING,
+        "thinking_remaining":   max(0, LIMIT_THINKING  - grand_thinking),
+        "fast_used":            grand_fast,
+        "fast_limit":           LIMIT_FAST,
+        "fast_remaining":       max(0, LIMIT_FAST      - grand_fast),
+        "users":                list(user_totals.values()),
     })
 
 
