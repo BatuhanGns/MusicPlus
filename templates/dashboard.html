@@ -253,6 +253,20 @@
   }
   .ai-header-btn:hover { border-color: var(--green); color: var(--green); }
 
+  /* Mod toggle */
+  .ai-mode-toggle {
+    display: flex; border: 1px solid var(--border); overflow: hidden;
+  }
+  .ai-mode-btn {
+    background: none; border: none; color: var(--muted);
+    padding: 4px 10px; font-family: 'DM Mono', monospace; font-size: 10px;
+    cursor: pointer; letter-spacing: .5px; transition: all .15s; white-space: nowrap;
+  }
+  .ai-mode-btn.active {
+    background: var(--green); color: #000; font-weight: 700;
+  }
+  .ai-mode-btn:not(.active):hover { color: var(--green); }
+
   .ai-messages {
     flex: 1; overflow-y: auto; padding: 16px;
     display: flex; flex-direction: column; gap: 12px;
@@ -1705,6 +1719,11 @@ document.addEventListener('click', function(e) {
       AI MODU
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <!-- Mod seçici -->
+      <div class="ai-mode-toggle" id="aiModeToggle" title="Mod değiştir">
+        <button class="ai-mode-btn active" id="modeBtnThinking" onclick="setAIMode('thinking')">🧠 Düşünen</button>
+        <button class="ai-mode-btn"        id="modeBtnFast"     onclick="setAIMode('fast')">⚡ Hızlı</button>
+      </div>
       <div class="ai-header-btns">
         <button class="ai-header-btn" onclick="clearAIHistory()" title="Sohbeti Temizle">🗑</button>
         <button class="ai-header-btn" onclick="toggleAIPanel()" title="Kapat">✕</button>
@@ -1743,8 +1762,17 @@ document.addEventListener('click', function(e) {
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════════
-//  AI MODU — GEMMA 4 STREAMING CHAT
+//  AI MODU — GEMMA 4 / FLASH STREAMING CHAT
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ── Mod yönetimi ─────────────────────────────────────────────────────────────
+let _currentAIMode = 'thinking';
+
+function setAIMode(mode) {
+  _currentAIMode = mode;
+  document.getElementById('modeBtnThinking').classList.toggle('active', mode === 'thinking');
+  document.getElementById('modeBtnFast').classList.toggle('active', mode === 'fast');
+}
 
 let _aiOpen         = false;
 let _aiStreaming     = false;
@@ -1883,7 +1911,7 @@ async function sendAIMessage(hiddenText) {
     const resp = await fetch('/api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ message: text, mode: _currentAIMode }),
     });
 
     if (!resp.ok) {
@@ -2106,42 +2134,62 @@ async function openLimitsModal() {
     const res  = await fetch('/api/ai/limits');
     const data = await res.json();
 
-    document.getElementById('limitsModalUsed').textContent     = (data.total_used || 0).toLocaleString('tr-TR');
-    document.getElementById('limitsModalRemaining').textContent = (data.remaining || 0).toLocaleString('tr-TR');
-    const pct = Math.max(0, Math.min(100, ((data.total_used || 0) / (data.total_limit || 3000)) * 100));
-    document.getElementById('limitsModalBar').style.width      = pct + '%';
-    document.getElementById('limitsModalBar').style.background = pct > 80 ? '#ff6b6b' : pct > 50 ? '#ffa94d' : 'var(--green)';
+    // Alt bilgi: toplam
+    document.getElementById('limitsModalUsed').textContent      = (data.total_used || 0).toLocaleString('tr-TR');
+    document.getElementById('limitsModalRemaining').textContent  = (data.remaining  || 0).toLocaleString('tr-TR');
+    const pct = Math.max(0, Math.min(100, ((data.total_used || 0) / (data.total_limit || 3500)) * 100));
+    document.getElementById('limitsModalBar').style.width       = pct + '%';
+    document.getElementById('limitsModalBar').style.background  = pct > 80 ? '#ff6b6b' : pct > 50 ? '#ffa94d' : 'var(--green)';
+
+    // Limit özeti — Düşünen / Hızlı ayrı
+    const summaryHtml = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+        <div style="background:var(--surface2);padding:10px 12px;border-left:3px solid var(--green);">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">🧠 DÜŞÜNEN</div>
+          <div style="font-size:18px;font-weight:800;">${(data.thinking_used||0).toLocaleString('tr-TR')}<span style="font-size:11px;color:var(--muted);font-weight:400;"> / ${(data.thinking_limit||3000).toLocaleString('tr-TR')}</span></div>
+          <div style="font-size:10px;color:var(--green);">Kalan: ${(data.thinking_remaining||0).toLocaleString('tr-TR')}</div>
+        </div>
+        <div style="background:var(--surface2);padding:10px 12px;border-left:3px solid #4fc3f7;">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">⚡ HIZLI</div>
+          <div style="font-size:18px;font-weight:800;">${(data.fast_used||0).toLocaleString('tr-TR')}<span style="font-size:11px;color:var(--muted);font-weight:400;"> / ${(data.fast_limit||500).toLocaleString('tr-TR')}</span></div>
+          <div style="font-size:10px;color:#4fc3f7;">Kalan: ${(data.fast_remaining||0).toLocaleString('tr-TR')}</div>
+        </div>
+      </div>`;
 
     const users = data.users || [];
     if (!users.length) {
-      document.getElementById('limitsModalBody').innerHTML = '<div style="color:var(--muted);font-size:12px;">Henüz kayıtlı kullanım yok.</div>';
+      document.getElementById('limitsModalBody').innerHTML = summaryHtml + '<div style="color:var(--muted);font-size:12px;">Henüz kayıtlı kullanım yok.</div>';
       return;
     }
 
     users.sort((a, b) => b.total - a.total);
 
-    let html = '<div style="display:flex;flex-direction:column;gap:10px;">';
+    let html = summaryHtml + '<div style="display:flex;flex-direction:column;gap:10px;">';
     users.forEach(u => {
-      // Model satırları — bugün / toplam
-      const modelRows = (u.models || []).filter(m => m.total > 0).map(m => {
-        const todayStr = m.today > 0 ? `<span style="color:var(--green)">+${m.today} bugün</span>` : '';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);padding:4px 0 4px 10px;border-left:1px solid var(--border);">
-          <span style="color:var(--text)">${_esc(m.model || 'Gemma 4')}</span>
-          <span style="display:flex;gap:8px;align-items:center;">${todayStr}<span>${(m.total||0).toLocaleString('tr-TR')} toplam</span></span>
-        </div>`;
-      }).join('');
-
-      const todayBadge = u.today > 0
-        ? `<span style="font-size:10px;background:rgba(29,185,84,.15);color:var(--green);padding:2px 7px;margin-left:6px;">+${u.today} bugün</span>`
-        : '';
+      // Düşünen ve Hızlı toplam
+      const thinkingTotal = u.thinking || 0;
+      const fastTotal     = u.fast     || 0;
+      const modRows = [];
+      if (thinkingTotal > 0) modRows.push(
+        `<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0 4px 10px;border-left:1px solid var(--border);">
+          <span style="color:var(--text)">🧠 Düşünen</span>
+          <span style="color:var(--green)">${thinkingTotal.toLocaleString('tr-TR')} istek</span>
+        </div>`
+      );
+      if (fastTotal > 0) modRows.push(
+        `<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0 4px 10px;border-left:1px solid var(--border);">
+          <span style="color:var(--text)">⚡ Hızlı</span>
+          <span style="color:#4fc3f7">${fastTotal.toLocaleString('tr-TR')} istek</span>
+        </div>`
+      );
 
       html += `
         <div style="background:var(--surface2);padding:12px 14px;border-left:3px solid var(--green);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <span style="font-weight:700;font-size:13px;">${_esc(u.display_name || u.user_id)}${todayBadge}</span>
+            <span style="font-weight:700;font-size:13px;">${_esc(u.display_name || u.user_id)}</span>
             <span style="font-size:13px;font-weight:700;color:var(--green);">${(u.total||0).toLocaleString('tr-TR')} toplam</span>
           </div>
-          ${modelRows || '<div style="font-size:10px;color:var(--muted);padding-left:10px;">—</div>'}
+          ${modRows.join('') || '<div style="font-size:10px;color:var(--muted);padding-left:10px;">—</div>'}
           <div style="font-size:10px;color:var(--muted);margin-top:6px;">Son kullanım: ${u.last_used || '—'}</div>
         </div>`;
     });
