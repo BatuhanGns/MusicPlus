@@ -76,7 +76,56 @@ class SheetsClient:
             ws = self.sh.add_worksheet(title="Settings", rows=100, cols=6)
             ws.append_row(["user_id", "display_name", "stats_permission", "last_sync", "refresh_token"], value_input_option="RAW")
             logger.info("✅ Settings sayfası oluşturuldu.")
+        self._ensure_limits_sheet()
         return ws
+
+    def _ensure_limits_sheet(self):
+        """Limits sayfasını oluşturur — yoksa"""
+        if not self.sh:
+            return None
+        ws = self._find_sheet("Limits")
+        if not ws:
+            ws = self.sh.add_worksheet(title="Limits", rows=500, cols=6)
+            ws.append_row(
+                ["user_id", "display_name", "model", "requests_used", "last_used", "updated_at"],
+                value_input_option="RAW"
+            )
+            logger.info("✅ Limits sayfası oluşturuldu.")
+        return ws
+
+    def log_ai_request(self, user_id: str, display_name: str, model: str):
+        """Kullanıcının AI isteğini Limits sayfasına kaydeder / günceller"""
+        try:
+            ws = self._find_sheet("Limits") or self._ensure_limits_sheet()
+            if not ws:
+                return
+            now_str = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M")
+            records = ws.get_all_values()
+            # user_id + model kombinasyonunu ara
+            for i, row in enumerate(records[1:], start=2):
+                if len(row) >= 3 and row[0] == user_id and row[2] == model:
+                    used = int(row[3]) + 1 if len(row) > 3 and row[3].isdigit() else 1
+                    ws.update(f"A{i}:F{i}", [[user_id, display_name, model, used, now_str, now_str]])
+                    return
+            # Yeni satır ekle
+            ws.append_row([user_id, display_name, model, 1, now_str, now_str], value_input_option="RAW")
+        except Exception as e:
+            logger.warning(f"⚠️ Limits log hatası: {e}")
+
+    def get_limits_summary(self) -> list:
+        """Limits sayfasındaki tüm kayıtları döndürür"""
+        try:
+            ws = self._find_sheet("Limits")
+            if not ws:
+                return []
+            rows = ws.get_all_values()
+            if len(rows) < 2:
+                return []
+            headers = rows[0]
+            return [dict(zip(headers, row)) for row in rows[1:] if row and row[0]]
+        except Exception as e:
+            logger.warning(f"⚠️ Limits okuma hatası: {e}")
+            return []
 
     def get_user_permission(self, user_id: str) -> bool:
         """Kullanıcının istatistikler sayfası izni var mı?"""

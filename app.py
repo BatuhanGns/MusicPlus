@@ -1077,6 +1077,7 @@ def api_ai_chat():
         global ai_requests_used
         full_response = ""
         request_successful = False
+        used_model = ""
         
         try:
             for raw in gemini.stream_chat(history, spotify_context):
@@ -1084,7 +1085,8 @@ def api_ai_chat():
                 if chunk.get("type") == "text":
                     full_response += chunk["text"]
                 elif chunk.get("type") == "done":
-                    request_successful = True # AI başarıyla sonuç döndürdü
+                    request_successful = True
+                    used_model = chunk.get("model", "")
                     
                 yield f"data: {raw}\n\n"
         except Exception as e:
@@ -1096,9 +1098,15 @@ def api_ai_chat():
             trimmed = history[-AI_MAX_HISTORY:]
             _ai_history[uid] = trimmed
             
-            # Eğer istek başarıyla tamamlandıysa, limiti 1 eksilt
             if request_successful:
                 ai_requests_used += 1
+                # Sheets Limits sayfasına logla (arkaplanda, hata olursa yoksay)
+                try:
+                    display_name = get_current_user_name()
+                    model_label = used_model if used_model else "gemma-4"
+                    sheets.log_ai_request(uid, display_name, model_label)
+                except Exception as log_err:
+                    logger.warning(f"⚠️ Limits log hatası: {log_err}")
 
     return Response(
         stream_with_context(generate()),
@@ -1222,6 +1230,37 @@ def api_ai_edit_playlist():
     except Exception as e:
         logger.error(f"❌ Playlist düzenleme hatası: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/ai/limits")
+def api_ai_limits():
+    """Toplam AI kullanım limitini ve kullanıcı bazlı dökümü döndürür"""
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giriş yapılmamış"}), 401
+    summary = sheets.get_limits_summary()
+    user_totals = {}
+    for row in summary:
+        u   = row.get("user_id", "")
+        dn  = row.get("display_name", u)
+        m   = row.get("model", "")
+        cnt = int(row.get("requests_used", 0)) if str(row.get("requests_used", 0)).isdigit() else 0
+        lst = row.get("last_used", "")
+        if u not in user_totals:
+            user_totals[u] = {"user_id": u, "display_name": dn, "total": 0, "models": [], "last_used": lst}
+        user_totals[u]["total"] += cnt
+        user_totals[u]["models"].append({"model": m, "count": cnt, "last_used": lst})
+        if lst > user_totals[u]["last_used"]:
+            user_totals[u]["last_used"] = lst
+
+    total_used = ai_requests_used
+    return jsonify({
+        "total_used":  total_used,
+        "total_limit": AI_MAX_REQUESTS,
+        "remaining":   max(0, AI_MAX_REQUESTS - total_used),
+        "users":       list(user_totals.values()),
+    })
+
 
 def scheduled_sync_all():
     try:
