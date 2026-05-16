@@ -226,14 +226,24 @@ class SheetsClient:
             return []
 
     def get_total_used_from_sheets(self) -> int:
-        """Sheets'teki total_used sütununun gerçek toplamını döndürür."""
+        """Sheets'teki gerçek toplam kullanımı döndürür.
+        Hem yeni format (total_used) hem eski format (requests_used) desteklenir."""
         try:
             summary = self.get_limits_summary()
-            return sum(
-                int(r.get("total_used", 0))
-                for r in summary
-                if str(r.get("total_used", "0")).isdigit()
-            )
+            if not summary:
+                return 0
+            total = 0
+            for r in summary:
+                # Yeni format
+                v = r.get("total_used", "")
+                if str(v).isdigit():
+                    total += int(v)
+                    continue
+                # Eski format fallback
+                v2 = r.get("requests_used", "")
+                if str(v2).isdigit():
+                    total += int(v2)
+            return total
         except Exception:
             return 0
 

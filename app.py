@@ -21,6 +21,7 @@ SERVER_START_TIME = time.time()
 # ── AI LIMIT VE UPTIMEROBOT ────────────────────────────────────────────────
 AI_MAX_REQUESTS = 3000
 ai_requests_used = 0
+_ai_total_cache = {"value": 0, "ts": 0}  # Sheets toplamı için cache (60sn TTL)
 
 _ur_cache = {"data": {"status": "Sorgulanıyor...", "uptime_ratio": "—"}, "last_fetch": 0}
 
@@ -213,12 +214,15 @@ def api_system_stats():
         uptime_hours = uptime_sec // 3600
         uptime_mins = (uptime_sec % 3600) // 60
         
-        # Limit hesaplaması — Sheets'teki gerçek toplam kullanımdan hesapla
-        try:
-            grand_total = sheets.get_total_used_from_sheets()
-        except Exception:
-            grand_total = ai_requests_used  # fallback: in-memory
-        ai_remaining = max(0, AI_MAX_REQUESTS - grand_total)
+        # Limit hesaplaması — Sheets'teki gerçek toplam (60sn cache)
+        now_ts = time.time()
+        if now_ts - _ai_total_cache["ts"] > 60:
+            try:
+                _ai_total_cache["value"] = sheets.get_total_used_from_sheets()
+                _ai_total_cache["ts"]    = now_ts
+            except Exception:
+                pass  # eski cache değerini kullan
+        ai_remaining = max(0, AI_MAX_REQUESTS - _ai_total_cache["value"])
         
         return jsonify({
             "status": "ok",
@@ -1119,6 +1123,8 @@ def api_ai_chat():
             
             if request_successful:
                 ai_requests_used += 1
+                # Cache'i geçersiz kıl — bir sonraki system-stats isteğinde Sheets'ten taze okusun
+                _ai_total_cache["ts"] = 0
                 # Sheets Limits sayfasına logla (arkaplanda, hata olursa yoksay)
                 try:
                     display_name = get_current_user_name()
