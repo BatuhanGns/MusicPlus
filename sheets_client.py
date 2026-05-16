@@ -80,40 +80,138 @@ class SheetsClient:
         return ws
 
     def _ensure_limits_sheet(self):
-        """Limits sayfasını oluşturur — yoksa"""
+        """Limits sayfasını oluşturur — yoksa.
+        Sütunlar: user_id | display_name | model | today_used | total_used | last_used | reset_date
+        """
         if not self.sh:
             return None
         ws = self._find_sheet("Limits")
         if not ws:
-            ws = self.sh.add_worksheet(title="Limits", rows=500, cols=6)
+            ws = self.sh.add_worksheet(title="Limits", rows=500, cols=7)
             ws.append_row(
-                ["user_id", "display_name", "model", "requests_used", "last_used", "updated_at"],
+                ["user_id", "display_name", "model", "today_used", "total_used", "last_used", "reset_date"],
                 value_input_option="RAW"
             )
             logger.info("✅ Limits sayfası oluşturuldu.")
         return ws
 
+    def _ensure_monthly_archive_sheet(self):
+        """Aylık_Arsiv sayfasını oluşturur — yoksa.
+        Sütunlar: ay | user_id | display_name | model | requests
+        """
+        if not self.sh:
+            return None
+        ws = self._find_sheet("Aylık_Arşiv")
+        if not ws:
+            ws = self.sh.add_worksheet(title="Aylık_Arşiv", rows=2000, cols=5)
+            ws.append_row(
+                ["ay", "user_id", "display_name", "model", "requests"],
+                value_input_option="RAW"
+            )
+            logger.info("✅ Aylık_Arşiv sayfası oluşturuldu.")
+        return ws
+
+    @staticmethod
+    def _pretty_model(model: str) -> str:
+        """Ham model adını okunabilir hale getirir."""
+        m = model.lower()
+        if "31b" in m:
+            return "Gemma 4 31B"
+        if "26b" in m or "27b" in m:
+            return "Gemma 4 26B"
+        if "gemma" in m:
+            return "Gemma 4"
+        return model  # bilinmeyen → olduğu gibi
+
     def log_ai_request(self, user_id: str, display_name: str, model: str):
-        """Kullanıcının AI isteğini Limits sayfasına kaydeder / günceller"""
+        """Kullanıcının AI isteğini Limits sayfasına kaydeder.
+        - today_used: bugünkü UTC güne ait istek sayısı (sıfırlanabilir)
+        - total_used: hiç sıfırlanmayan kümülatif toplam
+        """
         try:
             ws = self._find_sheet("Limits") or self._ensure_limits_sheet()
             if not ws:
                 return
+            pretty  = self._pretty_model(model)
+            today   = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             now_str = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M")
             records = ws.get_all_values()
-            # user_id + model kombinasyonunu ara
+            # user_id + pretty_model kombinasyonunu ara
             for i, row in enumerate(records[1:], start=2):
-                if len(row) >= 3 and row[0] == user_id and row[2] == model:
-                    used = int(row[3]) + 1 if len(row) > 3 and row[3].isdigit() else 1
-                    ws.update(f"A{i}:F{i}", [[user_id, display_name, model, used, now_str, now_str]])
+                if len(row) >= 3 and row[0] == user_id and row[2] == pretty:
+                    prev_today = int(row[3]) if len(row) > 3 and row[3].isdigit() else 0
+                    prev_total = int(row[4]) if len(row) > 4 and row[4].isdigit() else 0
+                    reset_date = row[6] if len(row) > 6 else ""
+                    # Gün değiştiyse today_used sıfırla
+                    if reset_date != today:
+                        prev_today = 0
+                    ws.update(
+                        f"A{i}:G{i}",
+                        [[user_id, display_name, pretty, prev_today + 1, prev_total + 1, now_str, today]]
+                    )
                     return
-            # Yeni satır ekle
-            ws.append_row([user_id, display_name, model, 1, now_str, now_str], value_input_option="RAW")
+            # Yeni satır
+            ws.append_row(
+                [user_id, display_name, pretty, 1, 1, now_str, today],
+                value_input_option="RAW"
+            )
         except Exception as e:
             logger.warning(f"⚠️ Limits log hatası: {e}")
 
+    def reset_daily_limits(self):
+        """Her gün 00:00 UTC'de today_used sütununu sıfırlar.
+        Sıfırlamadan önce geçen günün verisini Aylık_Arşiv'e yazar.
+        """
+        try:
+            ws = self._find_sheet("Limits") or self._ensure_limits_sheet()
+            if not ws:
+                return
+            archive_ws = self._find_sheet("Aylık_Arşiv") or self._ensure_monthly_archive_sheet()
+            records    = ws.get_all_values()
+            if len(records) < 2:
+                return
+
+            yesterday  = (datetime.now(timezone.utc).replace(hour=0, minute=0, second=0) 
+                          - __import__('datetime').timedelta(days=1))
+            ay_label   = yesterday.strftime("%Y-%m")  # örn. "2026-05"
+            now_str    = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M")
+            today      = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+            archive_rows = []
+            updates      = []
+
+            for i, row in enumerate(records[1:], start=2):
+                if not row or not row[0]:
+                    continue
+                uid  = row[0]
+                dn   = row[1] if len(row) > 1 else uid
+                mdl  = row[2] if len(row) > 2 else ""
+                td   = int(row[3]) if len(row) > 3 and row[3].isdigit() else 0
+                tot  = int(row[4]) if len(row) > 4 and row[4].isdigit() else 0
+
+                if td > 0:
+                    archive_rows.append([ay_label, uid, dn, mdl, td])
+
+                updates.append({
+                    "range": f"D{i}:G{i}",
+                    "values": [[0, tot, now_str, today]]
+                })
+
+            # Arşive yaz
+            if archive_rows and archive_ws:
+                archive_ws.append_rows(archive_rows, value_input_option="RAW")
+                logger.info(f"📦 Aylık arşive {len(archive_rows)} satır yazıldı ({ay_label})")
+
+            # Limits sayfasında today_used sıfırla
+            if updates:
+                ws.batch_update(updates)
+                logger.info(f"🔄 Günlük limit sıfırlandı ({len(updates)} satır)")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Günlük sıfırlama hatası: {e}")
+
     def get_limits_summary(self) -> list:
-        """Limits sayfasındaki tüm kayıtları döndürür"""
+        """Limits sayfasındaki güncel kayıtları döndürür."""
         try:
             ws = self._find_sheet("Limits")
             if not ws:
@@ -126,6 +224,18 @@ class SheetsClient:
         except Exception as e:
             logger.warning(f"⚠️ Limits okuma hatası: {e}")
             return []
+
+    def get_total_used_from_sheets(self) -> int:
+        """Sheets'teki total_used sütununun gerçek toplamını döndürür."""
+        try:
+            summary = self.get_limits_summary()
+            return sum(
+                int(r.get("total_used", 0))
+                for r in summary
+                if str(r.get("total_used", "0")).isdigit()
+            )
+        except Exception:
+            return 0
 
     def get_user_permission(self, user_id: str) -> bool:
         """Kullanıcının istatistikler sayfası izni var mı?"""

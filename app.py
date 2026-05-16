@@ -1249,30 +1249,41 @@ def api_ai_edit_playlist():
 
 @app.route("/api/ai/limits")
 def api_ai_limits():
-    """Toplam AI kullanım limitini ve kullanıcı bazlı dökümü döndürür"""
+    """Toplam AI kullanım limitini ve kullanıcı bazlı dökümü döndürür."""
     uid = get_current_user_id()
     if not uid:
         return jsonify({"error": "Giriş yapılmamış"}), 401
+
     summary = sheets.get_limits_summary()
+
+    # Kullanıcı bazlı gruplama — today_used ve total_used ayrı ayrı
     user_totals = {}
     for row in summary:
-        u   = row.get("user_id", "")
-        dn  = row.get("display_name", u)
-        m   = row.get("model", "")
-        cnt = int(row.get("requests_used", 0)) if str(row.get("requests_used", 0)).isdigit() else 0
-        lst = row.get("last_used", "")
+        u     = row.get("user_id", "")
+        dn    = row.get("display_name", u)
+        m     = row.get("model", "")
+        today = int(row.get("today_used", 0))  if str(row.get("today_used",  "0")).isdigit() else 0
+        total = int(row.get("total_used", 0))  if str(row.get("total_used",  "0")).isdigit() else 0
+        # Eski Limits sayfasıyla uyumluluk (requests_used sütunu varsa)
+        if total == 0 and str(row.get("requests_used", "0")).isdigit():
+            total = int(row.get("requests_used", 0))
+            today = total
+        lst   = row.get("last_used", "")
         if u not in user_totals:
-            user_totals[u] = {"user_id": u, "display_name": dn, "total": 0, "models": [], "last_used": lst}
-        user_totals[u]["total"] += cnt
-        user_totals[u]["models"].append({"model": m, "count": cnt, "last_used": lst})
+            user_totals[u] = {"user_id": u, "display_name": dn, "today": 0, "total": 0, "models": [], "last_used": lst}
+        user_totals[u]["today"] += today
+        user_totals[u]["total"] += total
+        user_totals[u]["models"].append({"model": m, "today": today, "total": total, "last_used": lst})
         if lst > user_totals[u]["last_used"]:
             user_totals[u]["last_used"] = lst
 
-    total_used = ai_requests_used
+    # Toplam = Sheets'teki bütün total_used satırlarının gerçek toplamı
+    grand_total = sum(u["total"] for u in user_totals.values())
+
     return jsonify({
-        "total_used":  total_used,
+        "total_used":  grand_total,
         "total_limit": AI_MAX_REQUESTS,
-        "remaining":   max(0, AI_MAX_REQUESTS - total_used),
+        "remaining":   max(0, AI_MAX_REQUESTS - grand_total),
         "users":       list(user_totals.values()),
     })
 
@@ -1299,7 +1310,13 @@ def scheduled_sync_all():
 if __name__ == "__main__":
     scheduler = BackgroundScheduler()
     scheduler.add_job(scheduled_sync_all, "cron", minute="0,30", id="spotify_sync")
+    # Her gün 00:00 UTC'de günlük AI limit sıfırla + aylık arşive yaz
+    scheduler.add_job(
+        lambda: sheets.reset_daily_limits(),
+        "cron", hour=0, minute=0, id="daily_limit_reset",
+        timezone="UTC"
+    )
     scheduler.start()
-    logger.info("⏰ Scheduler başlatıldı (her 30 dakika, tüm kullanıcılar)")
+    logger.info("⏰ Scheduler başlatıldı (her 30 dakika sync + 00:00 UTC limit sıfırlama)")
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
