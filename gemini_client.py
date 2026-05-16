@@ -41,6 +41,7 @@ KURALLAR:
 - JSON komutunu yanıtın en sonuna yaz, başka yerde yazma
 - Kullanıcının dinleme geçmişine dayalı kişiselleştirilmiş öneriler sun
 - Tam detaylı analiz yapman istendiğinde ay bazlı trendleri, sanatçı profilini ve dinleme kalıplarını kapsamlı şekilde açıkla
+- Playlist düzenleme veya şarkı ekleme işlemlerinde MUTLAKA sağlanan playlist listesindeki gerçek ID'yi kullan. Playlist adını asla playlist_id olarak kullanma. ID her zaman "ID: XXXX" formatında sağlanır.
 """
 
 

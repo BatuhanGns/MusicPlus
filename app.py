@@ -1073,6 +1073,21 @@ def api_ai_chat():
 
     spotify_context = GeminiClient.build_spotify_context(now_playing, recent_tracks) + full_stats_context
 
+    # Playlist listesini context'e ekle (ID'leriyle birlikte)
+    playlist_context = ""
+    try:
+        playlists = spotify.get_playlists()
+        if playlists:
+            pl_lines = "\n".join(
+                f"  - \"{p['name']}\" → ID: {p['id']} ({p['track_count']} şarkı)"
+                for p in playlists
+            )
+            playlist_context = f"\n\nKULLANICININ SPOTİFY PLAYLİSTLERİ (düzenleme için MUTLAKA bu ID'leri kullan):\n{pl_lines}"
+    except Exception:
+        pass
+
+    spotify_context += playlist_context
+
     def generate():
         global ai_requests_used
         full_response = ""
