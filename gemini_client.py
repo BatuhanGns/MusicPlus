@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 # ── Model tanımları ───────────────────────────────────────────────────────────
 THINKING_MODELS = ["gemma-4-31b-it", "gemma-4-26b-a4b-it"]  # Düşünen — yedekli
-FAST_MODEL      = "gemini-2.5-flash-lite-preview-06-17"      # Hızlı
+FAST_MODEL      = "gemini-3.1-flash-lite"      # Hızlı
 
 # ── Limit tanımları ───────────────────────────────────────────────────────────
 LIMIT_THINKING = 3000
