@@ -28,7 +28,7 @@ _ur_cache = {"data": {"status": "Sorgulanıyor...", "uptime_ratio": "—"}, "las
 def get_uptimerobot_data():
     global _ur_cache
     now = time.time()
-    # 60 saniyelik önbellek
+    # 60 saniyelik önbellek (Rate Limit'e takılmamak ve paneli hızlı yüklemek için)
     if now - _ur_cache["last_fetch"] < 60:
         return _ur_cache["data"]
 
@@ -37,26 +37,15 @@ def get_uptimerobot_data():
         return {"status": "API Key Bekleniyor", "uptime_ratio": "—"}
 
     try:
-        resp = requests.post(
-            "https://api.uptimerobot.com/v2/getMonitors",
-            data={
-                "api_key": ur_api_key,
-                "format": "json",
-                "response_times": 1,
-                "response_times_limit": 24,
-                "logs": 1,
-                "logs_limit": 10,
-                "custom_uptime_ratios": "1-7-30",
-                "all_time_uptime_durations": 1,
-            },
-            timeout=5,
-        )
+        resp = requests.post("https://api.uptimerobot.com/v2/getMonitors", 
+                             data={"api_key": ur_api_key, "format": "json"}, 
+                             timeout=3)
         if resp.status_code == 200:
             data = resp.json()
             if data.get("stat") == "ok" and data.get("monitors"):
                 m = data["monitors"][0]
                 s_code = m.get("status")
-
+                
                 # UptimeRobot status kodları: 0=Paused, 2=Up, 8=Seems Down, 9=Down
                 if s_code == 2:
                     status_str = "AKTİF (UP)"
@@ -66,102 +55,10 @@ def get_uptimerobot_data():
                     status_str = "DURAKLATILDI"
                 else:
                     status_str = "BİLİNMİYOR"
-
-                # ── Yanıt süreleri (son 24 ölçüm) ────────────────────────────
-                # response_times listesi boş gelebilir; average_response_time ayrı string alandır
-                rt_raw = m.get("response_times", [])
-                response_times = []
-                if isinstance(rt_raw, list):
-                    for rt in rt_raw:
-                        if isinstance(rt, dict):
-                            response_times.append({
-                                "value":    int(rt.get("value", 0)),
-                                "datetime": int(rt.get("datetime", 0)),
-                            })
-
-                # Ortalama yanıt süresi — önce liste, yoksa average_response_time string alanı
-                avg_response = 0
-                if response_times:
-                    avg_response = round(sum(r["value"] for r in response_times) / len(response_times))
-                else:
-                    try:
-                        avg_response = round(float(m.get("average_response_time", 0) or 0))
-                    except (ValueError, TypeError):
-                        avg_response = 0
-
-                # ── Özel uptime oranları ──────────────────────────────────────
-                # API "100.000-98.727-99.703-99.976" STRING döndürüyor (1g-7g-30g-alltime)
-                custom_ratios_raw = m.get("custom_uptime_ratio", "") or ""
-                ratio_parts = str(custom_ratios_raw).split("-") if custom_ratios_raw else []
-                uptime_1d  = ratio_parts[0].strip() if len(ratio_parts) > 0 else "—"
-                uptime_7d  = ratio_parts[1].strip() if len(ratio_parts) > 1 else "—"
-                uptime_30d = ratio_parts[2].strip() if len(ratio_parts) > 2 else "—"
-
-                # ── Toplam up/down süreleri ───────────────────────────────────
-                # API "up_sn-down_sn-paused_sn" STRING döndürüyor (dict değil!)
-                durations_raw = m.get("all_time_uptime_durations", "") or ""
-                dur_parts = str(durations_raw).split("-") if durations_raw else []
-                try:
-                    total_up_sec = int(dur_parts[0]) if len(dur_parts) > 0 else 0
-                except (ValueError, IndexError):
-                    total_up_sec = 0
-                try:
-                    total_down_sec = int(dur_parts[1]) if len(dur_parts) > 1 else 0
-                except (ValueError, IndexError):
-                    total_down_sec = 0
-
-                def _fmt_dur(secs):
-                    if secs <= 0:
-                        return "0dk"
-                    d = secs // 86400
-                    h = (secs % 86400) // 3600
-                    mn = (secs % 3600) // 60
-                    if d > 0:
-                        return f"{d}g {h}s"
-                    if h > 0:
-                        return f"{h}s {mn}dk"
-                    return f"{mn}dk"
-
-                # ── Son kesinti logları ───────────────────────────────────────
-                logs_raw = m.get("logs", [])
-                logs = []
-                for lg in logs_raw:
-                    lg_type = lg.get("type")
-                    # 1=Down, 2=Up, 98=Started, 99=Paused
-                    if lg_type == 1:
-                        lg_label = "⬇ Kesinti Başladı"
-                        lg_color = "down"
-                    elif lg_type == 2:
-                        lg_label = "⬆ Geri Döndü"
-                        lg_color = "up"
-                    elif lg_type == 98:
-                        lg_label = "▶ İzleme Başladı"
-                        lg_color = "info"
-                    else:
-                        lg_label = "⏸ Duraklatıldı"
-                        lg_color = "info"
-
-                    dur_sec = int(lg.get("duration", 0))
-                    logs.append({
-                        "label":    lg_label,
-                        "color":    lg_color,
-                        "datetime": lg.get("datetime", 0),
-                        "duration": _fmt_dur(dur_sec) if dur_sec > 0 else "",
-                    })
-
+                    
                 _ur_cache["data"] = {
-                    "status":          status_str,
-                    "uptime_ratio":    m.get("all_time_uptime_ratio", "—"),
-                    "uptime_1d":       uptime_1d,
-                    "uptime_7d":       uptime_7d,
-                    "uptime_30d":      uptime_30d,
-                    "avg_response_ms": avg_response,
-                    "response_times":  response_times[-24:],   # en fazla 24 nokta
-                    "total_up":        _fmt_dur(total_up_sec),
-                    "total_down":      _fmt_dur(total_down_sec),
-                    "logs":            logs[:10],
-                    "monitor_name":    m.get("friendly_name", "Monitor"),
-                    "check_interval":  m.get("interval", 300),
+                    "status": status_str,
+                    "uptime_ratio": m.get("all_time_uptime_ratio", "—")
                 }
                 _ur_cache["last_fetch"] = now
     except Exception as e:
@@ -369,12 +266,14 @@ def compute_stats(headers, rows):
 
     idx_sarki   = headers.index("Şarkı Adı")
     idx_sanatci = headers.index("Sanatçı")
+    idx_album   = headers.index("Albüm") if "Albüm" in headers else -1
     idx_sure    = headers.index("Süre (sn)")
     idx_tarih   = headers.index("Dinlenme Tarihi")
     idx_iso     = headers.index("_played_at_iso") if "_played_at_iso" in headers else -1
 
-    track_counts  = defaultdict(lambda: {"count": 0, "sanatci": "", "sure": 0, "ilk_iso": None})
+    track_counts  = defaultdict(lambda: {"count": 0, "sanatci": "", "album": "", "sure": 0, "ilk_iso": None})
     artist_counts = defaultdict(lambda: {"count": 0, "sure": 0, "ilk_iso": None})
+    album_counts  = defaultdict(lambda: {"count": 0, "sanatci": "", "sure": 0, "ilk_iso": None})
     gun_sure      = defaultdict(int)
     ay_stats      = defaultdict(lambda: {"sure": 0, "kayit": 0, "gunler": set()})
     toplam_sure   = 0
@@ -389,6 +288,7 @@ def compute_stats(headers, rows):
             continue
         sarki   = row[idx_sarki].strip()
         sanatci = row[idx_sanatci].strip()
+        album   = row[idx_album].strip() if idx_album != -1 and len(row) > idx_album else ""
         tarih   = row[idx_tarih].strip()
         try: sure = int(row[idx_sure])
         except: sure = 0
@@ -409,6 +309,7 @@ def compute_stats(headers, rows):
             track_counts[sarki]["count"]  += 1
             track_counts[sarki]["sure"]   += sure
             track_counts[sarki]["sanatci"] = sanatci
+            track_counts[sarki]["album"]   = album
             if iso and iso != "—":
                 if track_counts[sarki]["ilk_iso"] is None or iso < track_counts[sarki]["ilk_iso"]:
                     track_counts[sarki]["ilk_iso"] = iso
@@ -419,6 +320,14 @@ def compute_stats(headers, rows):
             if iso and iso != "—":
                 if artist_counts[sanatci]["ilk_iso"] is None or iso < artist_counts[sanatci]["ilk_iso"]:
                     artist_counts[sanatci]["ilk_iso"] = iso
+
+        if album:
+            album_counts[album]["count"]   += 1
+            album_counts[album]["sure"]    += sure
+            album_counts[album]["sanatci"]  = sanatci
+            if iso and iso != "—":
+                if album_counts[album]["ilk_iso"] is None or iso < album_counts[album]["ilk_iso"]:
+                    album_counts[album]["ilk_iso"] = iso
 
         if tarih:
             gun_sure[tarih] += sure
@@ -438,7 +347,8 @@ def compute_stats(headers, rows):
         except: return None
 
     top_sarkilar = sorted(
-        [{"sarki": k, "sanatci": v["sanatci"], "count": v["count"], "sure": v["sure"], "kac_gundur": calc_days(v["ilk_iso"])}
+        [{"sarki": k, "sanatci": v["sanatci"], "album": v["album"], "count": v["count"],
+          "sure": v["sure"], "kac_gundur": calc_days(v["ilk_iso"])}
          for k, v in track_counts.items()],
         key=lambda x: -x["count"]
     )[:10]
@@ -446,6 +356,13 @@ def compute_stats(headers, rows):
     top_sanatcilar = sorted(
         [{"sanatci": k, "count": v["count"], "sure": v["sure"], "kac_gundur": calc_days(v["ilk_iso"])}
          for k, v in artist_counts.items()],
+        key=lambda x: -x["count"]
+    )[:10]
+
+    top_albumler = sorted(
+        [{"album": k, "sanatci": v["sanatci"], "count": v["count"],
+          "sure": v["sure"], "kac_gundur": calc_days(v["ilk_iso"])}
+         for k, v in album_counts.items()],
         key=lambda x: -x["count"]
     )[:10]
 
@@ -476,15 +393,280 @@ def compute_stats(headers, rows):
         "toplam_kayit":   len(rows),
         "farkli_sarki":   len(track_counts),
         "farkli_sanatci": len(artist_counts),
+        "farkli_album":   len(album_counts),
         "toplam_sure_sn": toplam_sure,
         "ilk_kayit_tarihi": ilk_tarih_str,
         "top_sarkilar":   top_sarkilar,
         "top_sanatcilar": top_sanatcilar,
+        "top_albumler":   top_albumler,
         "hafta":          hafta,
         "aylar":          aylar,
         "genel_saatler":  [{"saat": f"{h:02d}:00", "count": global_saat_counts.get(h, 0)} for h in range(24)],
         "genel_vakitler": [{"vakit": k, "count": v} for k, v in sorted(global_vakit_counts.items(), key=lambda x: -x[1])],
     }
+
+# ══════════════════════════════════════════════════════════════════════════════
+# YENİ: Dönem bazlı analiz fonksiyonu — /api/analiz?period=week|month|year|all
+# Kullanıcı veya topluluk verisi için, ISO tarih filtrelemesiyle
+# ══════════════════════════════════════════════════════════════════════════════
+
+def compute_analiz(headers, rows, period="all", scope="user"):
+    """
+    period: 'week' | 'month' | 'year' | 'all'
+    - week  → bu haftanın Pazartesi 00:00 UTC'sinden itibaren
+    - month → bu ayın 1. günü 00:00 UTC'sinden itibaren
+    - year  → bu yılın 1 Ocak 00:00 UTC'sinden itibaren (geçen yıla girmez)
+    - all   → filtresiz
+    scope: kullanıcı sayfasında 'user', toplulukta 'community'
+    """
+    if not rows:
+        return None
+
+    try:
+        idx_sarki   = headers.index("Şarkı Adı")
+        idx_sanatci = headers.index("Sanatçı")
+        idx_album   = headers.index("Albüm")
+        idx_sure    = headers.index("Süre (sn)")
+        idx_tarih   = headers.index("Dinlenme Tarihi")
+        idx_iso     = headers.index("_played_at_iso") if "_played_at_iso" in headers else -1
+    except ValueError as e:
+        logger.error(f"Analiz header hatası: {e}")
+        return None
+
+    # Dönem sınırı (UTC)
+    now_utc = datetime.now(timezone.utc)
+    if period == "week":
+        # Bu haftanın Pazartesi'si (weekday=0)
+        days_since_mon = now_utc.weekday()  # 0=Mon
+        start_dt = (now_utc - timedelta(days=days_since_mon)).replace(
+            hour=0, minute=0, second=0, microsecond=0)
+    elif period == "month":
+        start_dt = now_utc.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif period == "year":
+        start_dt = now_utc.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start_dt = None  # all
+
+    track_counts  = defaultdict(lambda: {"count":0,"sanatci":"","album":"","sure":0,"ilk_iso":None})
+    artist_counts = defaultdict(lambda: {"count":0,"sure":0,"ilk_iso":None,"albumler":set()})
+    album_counts  = defaultdict(lambda: {"count":0,"sure":0,"sanatci":"","ilk_iso":None})
+    gun_sure      = defaultdict(int)
+    gun_kayit     = defaultdict(int)
+    saat_counts   = defaultdict(int)
+    vakit_counts  = defaultdict(int)
+    hafta_gunu    = defaultdict(int)  # 0=Pzt..6=Paz
+    toplam_sure   = 0
+    toplam_kayit  = 0
+    bugun_date    = now_utc.date()
+
+    for row in rows:
+        if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_tarih):
+            continue
+        sarki   = row[idx_sarki].strip()
+        sanatci = row[idx_sanatci].strip()
+        album   = row[idx_album].strip() if len(row) > idx_album else ""
+        tarih   = row[idx_tarih].strip()
+        try: sure = int(row[idx_sure])
+        except: sure = 0
+        iso = row[idx_iso].strip() if idx_iso != -1 and len(row) > idx_iso else ""
+
+        # ISO parse + dönem filtresi
+        row_dt = None
+        if iso and iso != "—":
+            try:
+                row_dt = datetime.strptime(iso[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+            except:
+                try:
+                    row_dt = datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M").replace(tzinfo=timezone.utc)
+                except: pass
+
+        # Dönem filtresi
+        if start_dt:
+            if row_dt is None:
+                # ISO yoksa tarih sütunundan dene
+                try:
+                    g, ay, yil = tarih.split(".")
+                    row_date = datetime(int(yil), int(ay), int(g), tzinfo=timezone.utc)
+                    if row_date < start_dt:
+                        continue
+                except: continue
+            else:
+                if row_dt < start_dt:
+                    continue
+
+        toplam_kayit += 1
+        toplam_sure  += sure
+
+        if row_dt:
+            saat_counts[row_dt.hour] += 1
+            vakit_counts[get_vakit(row_dt.hour)] += 1
+            hafta_gunu[row_dt.weekday()] += 1  # 0=Pzt
+            gun_key = row_dt.strftime("%d.%m.%Y")
+            gun_sure[gun_key]  += sure
+            gun_kayit[gun_key] += 1
+        elif tarih:
+            gun_sure[tarih]  += sure
+            gun_kayit[tarih] += 1
+
+        if sarki:
+            track_counts[sarki]["count"]  += 1
+            track_counts[sarki]["sure"]   += sure
+            track_counts[sarki]["sanatci"] = sanatci
+            track_counts[sarki]["album"]   = album
+            if iso and (track_counts[sarki]["ilk_iso"] is None or iso < track_counts[sarki]["ilk_iso"]):
+                track_counts[sarki]["ilk_iso"] = iso
+
+        if sanatci:
+            artist_counts[sanatci]["count"] += 1
+            artist_counts[sanatci]["sure"]  += sure
+            if album:
+                artist_counts[sanatci]["albumler"].add(album)
+            if iso and (artist_counts[sanatci]["ilk_iso"] is None or iso < artist_counts[sanatci]["ilk_iso"]):
+                artist_counts[sanatci]["ilk_iso"] = iso
+
+        if album:
+            album_counts[album]["count"]  += 1
+            album_counts[album]["sure"]   += sure
+            album_counts[album]["sanatci"] = sanatci
+            if iso and (album_counts[album]["ilk_iso"] is None or iso < album_counts[album]["ilk_iso"]):
+                album_counts[album]["ilk_iso"] = iso
+
+    if toplam_kayit == 0:
+        return {"toplam_kayit": 0, "mesaj": "Bu dönemde veri yok"}
+
+    def calc_days(iso_str):
+        if not iso_str: return None
+        try:
+            dt = datetime.strptime(iso_str[:10], "%Y-%m-%d").date()
+            return max(0, (bugun_date - dt).days)
+        except: return None
+
+    # Top listeler
+    top_sarkilar = sorted(
+        [{"sarki": k, "sanatci": v["sanatci"], "album": v["album"],
+          "count": v["count"], "sure_fmt": fmt_sure(v["sure"]),
+          "kac_gundur": calc_days(v["ilk_iso"])}
+         for k, v in track_counts.items()],
+        key=lambda x: -x["count"]
+    )[:10]
+
+    top_sanatcilar = sorted(
+        [{"sanatci": k, "count": v["count"], "sure_fmt": fmt_sure(v["sure"]),
+          "album_sayisi": len(v["albumler"]), "kac_gundur": calc_days(v["ilk_iso"])}
+         for k, v in artist_counts.items()],
+        key=lambda x: -x["count"]
+    )[:10]
+
+    top_albumler = sorted(
+        [{"album": k, "sanatci": v["sanatci"], "count": v["count"],
+          "sure_fmt": fmt_sure(v["sure"]), "kac_gundur": calc_days(v["ilk_iso"])}
+         for k, v in album_counts.items()],
+        key=lambda x: -x["count"]
+    )[:10]
+
+    # Günlük trend — tarihe göre sıralı
+    gunluk_trend = []
+    for tarih_key in sorted(gun_sure.keys()):
+        try:
+            g, ay, yil = tarih_key.split(".")
+            ts = f"{yil}-{ay}-{g}"
+        except:
+            ts = tarih_key
+        gunluk_trend.append({
+            "tarih": tarih_key,
+            "tarih_iso": ts,
+            "sure_sn": gun_sure[tarih_key],
+            "kayit": gun_kayit.get(tarih_key, 0)
+        })
+
+    # Saat dağılımı
+    saatler = [{"saat": f"{h:02d}:00", "count": saat_counts.get(h, 0)} for h in range(24)]
+
+    # Vakit dağılımı
+    vakit_sirali = sorted(vakit_counts.items(), key=lambda x: -x[1])
+    vakitler = [{"vakit": k, "count": v} for k, v in vakit_sirali]
+
+    # Haftanın günleri (0=Pzt → 6=Paz)
+    haftanin_gunleri = [
+        {"gun": TR_GUNLER[i], "gun_idx": i, "count": hafta_gunu.get(i, 0)}
+        for i in range(7)
+    ]
+
+    # Sanatçı dinlenme oranı (toplam içindeki %)
+    for s in top_sanatcilar:
+        s["oran"] = round(s["count"] / toplam_kayit * 100, 1) if toplam_kayit else 0
+
+    # Şarkı dinlenme oranı
+    for s in top_sarkilar:
+        s["oran"] = round(s["count"] / toplam_kayit * 100, 1) if toplam_kayit else 0
+
+    # Albüm dinlenme oranı
+    for a in top_albumler:
+        a["oran"] = round(a["count"] / toplam_kayit * 100, 1) if toplam_kayit else 0
+
+    return {
+        "period": period,
+        "toplam_kayit":   toplam_kayit,
+        "farkli_sarki":   len(track_counts),
+        "farkli_sanatci": len(artist_counts),
+        "farkli_album":   len(album_counts),
+        "toplam_sure_sn": toplam_sure,
+        "top_sarkilar":   top_sarkilar,
+        "top_sanatcilar": top_sanatcilar,
+        "top_albumler":   top_albumler,
+        "gunluk_trend":   gunluk_trend,
+        "saatler":        saatler,
+        "vakitler":       vakitler,
+        "haftanin_gunleri": haftanin_gunleri,
+    }
+
+
+@app.route("/api/analiz")
+def api_analiz():
+    """Dönem bazlı analiz — kişisel veri"""
+    try:
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+        period = request.args.get("period", "all")
+        if period not in ("week", "month", "year", "all"):
+            period = "all"
+        headers, rows = get_cached_data(uid)
+        if not rows:
+            load_user_data(uid)
+            headers, rows = get_cached_data(uid)
+        result = compute_analiz(headers, rows, period=period, scope="user")
+        if not result:
+            return jsonify({"error": "Veri yok"})
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"❌ Analiz API hatası: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/topluluk-analiz")
+def api_topluluk_analiz():
+    """Dönem bazlı analiz — topluluk verisi"""
+    try:
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+        period = request.args.get("period", "all")
+        if period not in ("week", "month", "year", "all"):
+            period = "all"
+        permitted = sheets.get_all_permitted_users()
+        if not permitted:
+            return jsonify({"error": "Henüz kimse izin vermemiş"})
+        headers, rows = sheets.get_combined_data(permitted)
+        result = compute_analiz(headers, rows, period=period, scope="community")
+        if not result:
+            return jsonify({"error": "Veri yok"})
+        result["katilimci_sayisi"] = len(permitted)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"❌ Topluluk analiz hatası: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/api/dashboard")
 def api_dashboard():
