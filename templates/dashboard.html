@@ -115,13 +115,25 @@
   .grf-item-sub{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;flex-shrink:0;}
 
   /* CHART PANELLER */
-  .chart-panel{background:var(--surface);border:1px solid var(--border);padding:24px;margin-bottom:2px;}
-  .chart-panel-title{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:20px;display:flex;align-items:center;gap:12px;}
+  .chart-panel{background:var(--surface);border:1px solid var(--border);padding:22px 24px;margin-bottom:2px;}
+  .chart-panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:8px;}
+  .chart-panel-title{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:12px;flex:1;}
   .chart-panel-title::after{content:'';flex:1;height:1px;background:var(--border);}
   .chart-wrap{position:relative;width:100%;}
   .chart-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:2px;}
   .chart-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-bottom:2px;}
   @media(max-width:700px){.chart-grid-2,.chart-grid-3{grid-template-columns:1fr;}}
+
+  /* PER-CHART TÜR MENÜSÜ (3 nokta) */
+  .cmt-wrap{position:relative;flex-shrink:0;}
+  .cmt-btn{background:none;border:1px solid var(--border);color:var(--muted);width:26px;height:26px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .2s;letter-spacing:1px;line-height:1;}
+  .cmt-btn:hover{border-color:var(--green);color:var(--green);}
+  .cmt-menu{position:absolute;top:calc(100% + 4px);right:0;min-width:160px;background:var(--surface);border:1px solid var(--green);z-index:200;display:none;box-shadow:0 8px 24px rgba(0,0,0,.7);}
+  .cmt-menu.open{display:block;}
+  .cmt-item{padding:10px 14px;cursor:pointer;font-size:11px;letter-spacing:.5px;transition:background .15s;border-bottom:1px solid var(--border);}
+  .cmt-item:last-child{border-bottom:none;}
+  .cmt-item:hover{background:var(--surface2);}
+  .cmt-item.active{color:var(--green);background:var(--green-dim);}
 
   /* Genel analiz dönem butonları */
   .grf-period-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:7px 14px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;cursor:pointer;transition:all .2s;text-transform:uppercase;}
@@ -520,14 +532,21 @@
       </div>
     </div>
 
-    <!-- Dönem filtresi -->
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-right:4px;">DÖNEM</div>
-      <button class="grf-period-btn active" data-period="week"  onclick="setGenelPeriod('week',this)">Bu Hafta</button>
-      <button class="grf-period-btn"        data-period="month" onclick="setGenelPeriod('month',this)">Bu Ay</button>
-      <button class="grf-period-btn"        data-period="year"  onclick="setGenelPeriod('year',this)">Bu Yıl</button>
-      <button class="grf-period-btn"        data-period="all"   onclick="setGenelPeriod('all',this)">Tüm Zamanlar</button>
-      <div style="margin-left:auto;font-size:10px;color:var(--muted);" id="genelPeriodLabel">—</div>
+    <!-- Dönem filtresi — açılır menü -->
+    <div class="grf-header" style="margin-bottom:20px">
+      <div class="grf-period-dropdown" id="genelDropdown">
+        <button class="grf-period-trigger" onclick="toggleGrfDropdown('genelDropdown')">
+          <span class="grf-trigger-label" id="genelTriggerLabel">Bu Yıl</span>
+          <span class="grf-trigger-arrow">▾</span>
+        </button>
+        <div class="grf-dropdown-menu" id="genelDropdownMenu">
+          <div class="grf-dropdown-item" onclick="setGenelPeriod('week')"><span>Bu Hafta</span><span class="grf-item-sub" id="genelSub_week">—</span></div>
+          <div class="grf-dropdown-item" onclick="setGenelPeriod('month')"><span>Bu Ay</span><span class="grf-item-sub" id="genelSub_month">—</span></div>
+          <div class="grf-dropdown-item active" onclick="setGenelPeriod('year')"><span>Bu Yıl</span><span class="grf-item-sub" id="genelSub_year">—</span></div>
+          <div class="grf-dropdown-item" onclick="setGenelPeriod('all')"><span>Tüm Zamanlar</span><span class="grf-item-sub" id="genelSub_all">Tüm kayıtlar</span></div>
+        </div>
+      </div>
+      <div class="grf-period-range" id="genelPeriodLabel">—</div>
     </div>
 
     <div class="stats-row" id="statsRow">
@@ -870,12 +889,32 @@ function _stopResetCountdown() {
 // ===================== GENEL ANALİZ DÖNEM FİLTRESİ =====================
 let _genelPeriod = 'all';
 
-function setGenelPeriod(period, btn) {
+function setGenelPeriod(period) {
   _genelPeriod = period;
-  document.querySelectorAll('#view-istatistikler .grf-period-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
+  const labels = { week:'Bu Hafta', month:'Bu Ay', year:'Bu Yıl', all:'Tüm Zamanlar' };
+  const trigEl = document.getElementById('genelTriggerLabel');
+  if (trigEl) trigEl.textContent = labels[period] || period;
   const labelEl = document.getElementById('genelPeriodLabel');
   if (labelEl) labelEl.textContent = _periodLabel(period);
+  // Aktif item
+  const menu = document.getElementById('genelDropdownMenu');
+  if (menu) menu.querySelectorAll('.grf-dropdown-item').forEach(item => {
+    const txt = item.querySelector('span')?.textContent;
+    item.classList.toggle('active', txt === labels[period]);
+  });
+  document.getElementById('genelDropdown')?.classList.remove('open');
+  // Dropdown sub etiketleri
+  const now = new Date();
+  const subs = {
+    week: 'Pzt – Bugün',
+    month: '01.' + String(now.getMonth()+1).padStart(2,'0') + ' – Bugün',
+    year:  '01.01.' + now.getFullYear() + ' – Bugün',
+    all:   'Tüm kayıtlar',
+  };
+  Object.entries(subs).forEach(([p, lbl]) => {
+    const el = document.getElementById('genelSub_' + p);
+    if (el) el.textContent = lbl;
+  });
   loadIstatistiklerData();
 }
 
@@ -990,8 +1029,8 @@ async function loadGrfData(scope) {
       return;
     }
     container.innerHTML = _buildGrfHTML(d, scope);
-    // Kısa gecikme — DOM'un render olması için
-    requestAnimationFrame(() => _initCharts(d, scope));
+    // DOM'un tamamen render olması için 2 frame bekle
+    setTimeout(() => _initCharts(d, scope), 80);
   } catch(e) {
     container.innerHTML = `<div class="loading" style="color:#ff6b6b">Bağlantı hatası: ${e.message}</div>`;
   }
@@ -1012,332 +1051,309 @@ function _updateDropdownSubs(scope, activePeriod) {
   });
 }
 
-function _buildGrfHTML(d, scope) {
-  const pfx = scope === 'user' ? 'u' : 'c';
-  const communityNote = scope === 'community' && d.katilimci_sayisi
-    ? `<div style="font-size:11px;color:var(--muted);margin-bottom:20px;padding:10px 16px;border-left:2px solid var(--green)">${d.katilimci_sayisi} katılımcının verileri birleştirildi</div>`
-    : '';
+// ─────────────────────────────────────────────────────────────────────────────
+// GRAFIK HTML BUILDER + CHART.JS INIT
+// ─────────────────────────────────────────────────────────────────────────────
 
-  return `${communityNote}
+// Her grafiğin aktif tipi: chartId → 'bar'|'line'|'doughnut' vb.
+const _chartTypes = {};
 
-  <!-- Özet kartlar -->
-  <div class="stats-row" style="margin-bottom:2px">
-    <div class="stat-card"><div class="label">Toplam Dinlenme</div><div class="value">${(d.toplam_kayit||0).toLocaleString('tr-TR')}</div><div class="sub">kayıt</div></div>
-    <div class="stat-card"><div class="label">Toplam Süre</div><div class="value">${Math.floor((d.toplam_sure_sn||0)/3600).toLocaleString('tr-TR')}</div><div class="sub">saat</div></div>
-    <div class="stat-card"><div class="label">Farklı Şarkı</div><div class="value">${(d.farkli_sarki||0).toLocaleString('tr-TR')}</div><div class="sub">adet</div></div>
-    <div class="stat-card"><div class="label">Farklı Sanatçı</div><div class="value">${(d.farkli_sanatci||0).toLocaleString('tr-TR')}</div><div class="sub">adet</div></div>
-    <div class="stat-card"><div class="label">Farklı Albüm</div><div class="value">${(d.farkli_album||0).toLocaleString('tr-TR')}</div><div class="sub">adet</div></div>
-  </div>
-
-  <!-- Günlük trend — Bar Chart -->
-  <div class="chart-panel">
-    <div class="chart-panel-title">Günlük Dinlenme Trendi</div>
-    <div class="chart-wrap" style="height:200px"><canvas id="${pfx}_dailyChart"></canvas></div>
-  </div>
-
-  <!-- 2 kolon: Saat + Haftanın günleri -->
-  <div class="chart-grid-2">
-    <div class="chart-panel">
-      <div class="chart-panel-title">Hangi Saatte Aktifsin?</div>
-      <div class="chart-wrap" style="height:180px"><canvas id="${pfx}_hourChart"></canvas></div>
-    </div>
-    <div class="chart-panel">
-      <div class="chart-panel-title">Haftanın Günleri</div>
-      <div class="chart-wrap" style="height:180px"><canvas id="${pfx}_weekdayChart"></canvas></div>
-    </div>
-  </div>
-
-  <!-- 3 kolon: Pie — Şarkı / Sanatçı / Albüm oranı -->
-  <div class="chart-grid-3">
-    <div class="chart-panel">
-      <div class="chart-panel-title">Top Şarkı Dağılımı</div>
-      <div class="chart-wrap" style="height:220px"><canvas id="${pfx}_trackPie"></canvas></div>
-    </div>
-    <div class="chart-panel">
-      <div class="chart-panel-title">Top Sanatçı Dağılımı</div>
-      <div class="chart-wrap" style="height:220px"><canvas id="${pfx}_artistPie"></canvas></div>
-    </div>
-    <div class="chart-panel">
-      <div class="chart-panel-title">Top Albüm Dağılımı</div>
-      <div class="chart-wrap" style="height:220px"><canvas id="${pfx}_albumPie"></canvas></div>
-    </div>
-  </div>
-
-  <!-- Vakit dağılımı — Horizontal Bar -->
-  <div class="chart-panel">
-    <div class="chart-panel-title">Vakit Dağılımı</div>
-    <div class="chart-wrap" style="height:160px"><canvas id="${pfx}_vakitChart"></canvas></div>
-  </div>
-
-  <!-- Top Listeler -->
-  <div class="chart-grid-2">
-    <div class="chart-panel">
-      <div class="chart-panel-title">Best Tracks</div>
-      ${_renderRankBlock(d.top_sarkilar||[], 'sarki', 'sanatci', 'count', 'oran')}
-    </div>
-    <div class="chart-panel">
-      <div class="chart-panel-title">Best Artists</div>
-      ${_renderRankBlock(d.top_sanatcilar||[], 'sanatci', null, 'count', 'oran')}
-    </div>
-  </div>
-  <div class="chart-panel">
-    <div class="chart-panel-title">Best Albums</div>
-    ${_renderRankBlock(d.top_albumler||[], 'album', 'sanatci', 'count', 'oran', true)}
-  </div>`;
-}
-
-// ── Chart.js başlatma ─────────────────────────────────────────────────────────
-const _CHARTJS_DEFAULTS = {
-  color: '#555',
-  borderColor: '#222',
-  font: { family: "'DM Mono', monospace", size: 11 },
+// Grafik tipi menü seçenekleri per grafik
+const _CHART_TYPE_OPTIONS = {
+  daily:   [['bar','▊ Bar'],['line','╱ Çizgi']],
+  hour:    [['bar','▊ Bar'],['line','╱ Çizgi']],
+  weekday: [['bar','▊ Bar'],['line','╱ Çizgi']],
+  trackPie:  [['doughnut','◎ Doughnut'],['pie','◉ Pie'],['bar','▊ Bar']],
+  artistPie: [['doughnut','◎ Doughnut'],['pie','◉ Pie'],['bar','▊ Bar']],
+  albumPie:  [['doughnut','◎ Doughnut'],['pie','◉ Pie'],['bar','▊ Bar']],
+  vakit:   [['bar','▊ Bar (Yatay)'],['line','╱ Çizgi']],
 };
 
-function _chartDefaults() {
-  return {
+function _defaultChartType(key) {
+  const defaults = { daily:'bar', hour:'bar', weekday:'bar', trackPie:'doughnut', artistPie:'doughnut', albumPie:'doughnut', vakit:'bar' };
+  return defaults[key] || 'bar';
+}
+
+function _buildGrfHTML(d, scope) {
+  const pfx = scope === 'user' ? 'u' : 'c';
+
+  const communityNote = scope === 'community' && d.katilimci_sayisi
+    ? '<div style="font-size:11px;color:var(--muted);margin-bottom:20px;padding:10px 16px;border-left:2px solid var(--green)">' + d.katilimci_sayisi + ' katılımcının verileri birleştirildi</div>'
+    : '';
+
+  // Her grafik için varsayılan tipi ayarla
+  ['daily','hour','weekday','trackPie','artistPie','albumPie','vakit'].forEach(k => {
+    const cid = pfx + '_' + k;
+    if (!_chartTypes[cid]) _chartTypes[cid] = _defaultChartType(k);
+  });
+
+  function chartPanel(key, title, height, content) {
+    const cid = pfx + '_' + key;
+    const opts = (_CHART_TYPE_OPTIONS[key] || []).map(([t,l]) =>
+      '<div class="cmt-item' + (_chartTypes[cid]===t?' active':'') + '" onclick="_changeChartType(\'' + cid + '\',\'' + t + '\')">' + l + '</div>'
+    ).join('');
+    return '<div class="chart-panel">'
+      + '<div class="chart-panel-header">'
+      + '<div class="chart-panel-title">' + title + '</div>'
+      + (opts ? '<div class="cmt-wrap"><button class="cmt-btn" onclick="_toggleCmt(\'' + cid + '_menu\')" title="Grafik türü">⋯</button>'
+        + '<div class="cmt-menu" id="' + cid + '_menu">' + opts + '</div></div>' : '')
+      + '</div>'
+      + content
+      + '</div>';
+  }
+
+  function canvasPanel(key, title, height) {
+    const cid = pfx + '_' + key;
+    return chartPanel(key, title, height,
+      '<div class="chart-wrap" style="height:' + height + 'px"><canvas id="' + cid + '"></canvas></div>'
+    );
+  }
+
+  return communityNote
+    + '<div class="stats-row" style="margin-bottom:2px">'
+    + '<div class="stat-card"><div class="label">Toplam Dinlenme</div><div class="value">' + (d.toplam_kayit||0).toLocaleString('tr-TR') + '</div><div class="sub">kayıt</div></div>'
+    + '<div class="stat-card"><div class="label">Toplam Süre</div><div class="value">' + Math.floor((d.toplam_sure_sn||0)/3600).toLocaleString('tr-TR') + '</div><div class="sub">saat</div></div>'
+    + '<div class="stat-card"><div class="label">Farklı Şarkı</div><div class="value">' + (d.farkli_sarki||0).toLocaleString('tr-TR') + '</div><div class="sub">adet</div></div>'
+    + '<div class="stat-card"><div class="label">Farklı Sanatçı</div><div class="value">' + (d.farkli_sanatci||0).toLocaleString('tr-TR') + '</div><div class="sub">adet</div></div>'
+    + '<div class="stat-card"><div class="label">Farklı Albüm</div><div class="value">' + (d.farkli_album||0).toLocaleString('tr-TR') + '</div><div class="sub">adet</div></div>'
+    + '</div>'
+
+    + canvasPanel('daily',   'Günlük Dinlenme Trendi', 200)
+
+    + '<div class="chart-grid-2">'
+    + canvasPanel('hour',    'Hangi Saatte Aktifsin?', 180)
+    + canvasPanel('weekday', 'Haftanın Günleri',       180)
+    + '</div>'
+
+    + '<div class="chart-grid-3">'
+    + canvasPanel('trackPie',  'Top Şarkı Dağılımı',   220)
+    + canvasPanel('artistPie', 'Top Sanatçı Dağılımı', 220)
+    + canvasPanel('albumPie',  'Top Albüm Dağılımı',   220)
+    + '</div>'
+
+    + canvasPanel('vakit', 'Vakit Dağılımı', 160)
+
+    + '<div class="chart-grid-2">'
+    + chartPanel('tracks', 'Best Tracks', 0, _renderRankBlock(d.top_sarkilar||[], 'sarki', 'sanatci', 'count', 'oran'))
+    + chartPanel('artists','Best Artists', 0, _renderRankBlock(d.top_sanatcilar||[], 'sanatci', null, 'count', 'oran'))
+    + '</div>'
+
+    + chartPanel('albums', 'Best Albums', 0, _renderRankBlock(d.top_albumler||[], 'album', 'sanatci', 'count', 'oran', true));
+}
+
+// ── 3-nokta menüsü ──────────────────────────────────────────────────────────
+function _toggleCmt(menuId) {
+  const menu = document.getElementById(menuId);
+  if (!menu) return;
+  const isOpen = menu.classList.contains('open');
+  document.querySelectorAll('.cmt-menu.open').forEach(m => m.classList.remove('open'));
+  if (!isOpen) menu.classList.add('open');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.cmt-wrap')) {
+    document.querySelectorAll('.cmt-menu.open').forEach(m => m.classList.remove('open'));
+  }
+});
+
+function _changeChartType(chartId, newType) {
+  _chartTypes[chartId] = newType;
+  // Menü item'larını güncelle
+  const menu = document.getElementById(chartId + '_menu');
+  if (menu) {
+    menu.querySelectorAll('.cmt-item').forEach(item => {
+      item.classList.toggle('active', item.textContent.trim().startsWith(
+        {'bar':'▊','line':'╱','doughnut':'◎','pie':'◉'}[newType] || '?'
+      ));
+    });
+    menu.classList.remove('open');
+  }
+  // Grafiği yeniden çiz — _lastGrfData'dan al
+  const scope = chartId.startsWith('u_') ? 'user' : 'community';
+  const data  = _lastGrfData[scope];
+  if (data) _redrawChart(chartId, data, scope);
+}
+
+// Son yüklenen veriyi sakla (chart type değişince kullan)
+const _lastGrfData = {};
+
+function _redrawChart(chartId, d, scope) {
+  const pfx = scope === 'user' ? 'u' : 'c';
+  const key  = chartId.replace(pfx + '_', '');
+  const canvas = document.getElementById(chartId);
+  if (!canvas) return;
+  if (_activeCharts[chartId]) { _activeCharts[chartId].destroy(); delete _activeCharts[chartId]; }
+  _drawSingleChart(chartId, key, d);
+}
+
+// ── Chart.js init ────────────────────────────────────────────────────────────
+const _activeCharts = {};
+
+const GREEN   = '#1db954';
+const GREEN_A = 'rgba(29,185,84,.18)';
+const PALETTE = ['#1db954','#17a045','#0f6b30','#1ed760','#2ee85a','#3a9e60','#145c35','#22c952','#0d4a28','#5dbb84'];
+
+function _baseOpts(indexAxis) {
+  const opts = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#111',
-        borderColor: '#1db954',
-        borderWidth: 1,
-        titleColor: '#e8e8e8',
-        bodyColor: '#888',
-        padding: 10,
-        titleFont: { family: "'Syne', sans-serif", weight: '700' },
-        bodyFont:  { family: "'DM Mono', monospace", size: 11 },
+        backgroundColor: '#111', borderColor: GREEN, borderWidth: 1,
+        titleColor: '#e8e8e8', bodyColor: '#888', padding: 10,
+        titleFont: { family:"'Syne',sans-serif", weight:'700' },
+        bodyFont:  { family:"'DM Mono',monospace", size:11 },
       },
     },
-    scales: {},
+    scales: {
+      x: { grid:{color:'#1a1a1a'}, ticks:{color:'#555',font:{size:10}}, border:{color:'#222'} },
+      y: { grid:{color:'#1a1a1a'}, ticks:{color:'#555',font:{size:10}}, border:{color:'#222'}, beginAtZero:true },
+    },
+    animation: { duration: 400 },
+  };
+  if (indexAxis) opts.indexAxis = indexAxis;
+  return opts;
+}
+
+function _pieOpts() {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    cutout: '55%',
+    plugins: {
+      legend: { display:true, position:'bottom',
+        labels:{color:'#888',font:{size:9,family:"'DM Mono',monospace"},boxWidth:10,padding:8}},
+      tooltip: {
+        backgroundColor:'#111', borderColor:GREEN, borderWidth:1,
+        titleColor:'#e8e8e8', bodyColor:'#888', padding:10,
+        callbacks:{ label: ctx => ' ' + ctx.label + ': ' + ctx.raw + ' kez' }
+      },
+    },
+    animation: { duration: 400 },
   };
 }
 
-function _mkChart(id, type, labels, datasets, extraOpts = {}) {
+function _mkChart(id, type, labels, datasets, opts) {
   const canvas = document.getElementById(id);
-  if (!canvas) return;
+  if (!canvas) { console.warn('Canvas bulunamadı:', id); return; }
   if (_activeCharts[id]) { _activeCharts[id].destroy(); }
-  const cfg = {
-    type,
-    data: { labels, datasets },
-    options: { ..._chartDefaults(), ...extraOpts },
-  };
-  _activeCharts[id] = new Chart(canvas, cfg);
+  _activeCharts[id] = new Chart(canvas, { type, data:{labels,datasets}, options:opts });
+}
+
+function _drawSingleChart(cid, key, d) {
+  const type = _chartTypes[cid] || _defaultChartType(key);
+
+  if (key === 'daily') {
+    const trend = d.gunluk_trend || [];
+    const isPie = type === 'doughnut' || type === 'pie';
+    if (isPie) {
+      _mkChart(cid, type, trend.map(t=>t.tarih?t.tarih.slice(0,5):''),
+        [{data:trend.map(t=>t.kayit||0),backgroundColor:PALETTE,borderColor:'#0a0a0a',borderWidth:2}], _pieOpts());
+    } else {
+      const opts = _baseOpts(type==='bar'?undefined:'x');
+      opts.plugins.tooltip.callbacks = { label: ctx => ' ' + ctx.raw + ' dinlenme' };
+      _mkChart(cid, type, trend.map(t=>t.tarih?t.tarih.slice(0,5):''),
+        [{data:trend.map(t=>t.kayit||0), backgroundColor:GREEN_A, borderColor:GREEN,
+          borderWidth:type==='line'?2:1, borderRadius:type==='bar'?2:0,
+          fill:type==='line', tension:.3,
+          pointBackgroundColor:GREEN, pointRadius:type==='line'?3:0,
+          hoverBackgroundColor:GREEN}], opts);
+    }
+  }
+
+  else if (key === 'hour') {
+    const saatler = d.saatler || [];
+    const maxS = Math.max(...saatler.map(s=>s.count||0),1);
+    const opts = _baseOpts();
+    opts.plugins.tooltip.callbacks = { label: ctx => ' ' + ctx.raw + ' kez' };
+    _mkChart(cid, type, saatler.map(s=>s.saat.slice(0,2)),
+      [{data:saatler.map(s=>s.count||0),
+        backgroundColor: type==='line' ? GREEN_A : saatler.map(s=>{const r=(s.count||0)/maxS;return r>.66?GREEN:r>.33?'rgba(29,185,84,.5)':GREEN_A;}),
+        borderColor:GREEN, borderWidth:type==='line'?2:0, fill:type==='line',
+        tension:.3, pointBackgroundColor:GREEN, pointRadius:type==='line'?2:0,
+        borderRadius:type==='bar'?2:0, hoverBackgroundColor:GREEN}], opts);
+  }
+
+  else if (key === 'weekday') {
+    const gunler = d.haftanin_gunleri || [];
+    const opts = _baseOpts();
+    opts.plugins.tooltip.callbacks = { label: ctx => ' ' + ctx.raw + ' dinlenme' };
+    _mkChart(cid, type, gunler.map(g=>g.gun?g.gun.slice(0,3):''),
+      [{data:gunler.map(g=>g.count||0), backgroundColor:GREEN_A, borderColor:GREEN,
+        borderWidth:type==='line'?2:1, fill:type==='line', tension:.3,
+        pointBackgroundColor:GREEN, pointRadius:type==='line'?4:0,
+        borderRadius:type==='bar'?3:0, hoverBackgroundColor:GREEN}], opts);
+  }
+
+  else if (key === 'trackPie' || key === 'artistPie' || key === 'albumPie') {
+    const srcKey = key==='trackPie' ? 'top_sarkilar' : key==='artistPie' ? 'top_sanatcilar' : 'top_albumler';
+    const nameKey = key==='trackPie' ? 'sarki' : key==='artistPie' ? 'sanatci' : 'album';
+    const items = (d[srcKey]||[]).slice(0,8);
+    const others = (d.toplam_kayit||0) - items.reduce((s,i)=>s+(i.count||0),0);
+    const labels = items.map(i=>i[nameKey]||'?');
+    const vals   = items.map(i=>i.count||0);
+    if (others > 0) { labels.push('Diğer'); vals.push(others); }
+    if (type === 'bar') {
+      const opts = _baseOpts();
+      opts.plugins.tooltip.callbacks = { label: ctx => ' ' + ctx.raw + ' kez' };
+      _mkChart(cid, 'bar', labels, [{data:vals,backgroundColor:PALETTE,borderColor:'#0a0a0a',borderWidth:1,borderRadius:2,hoverBackgroundColor:GREEN}], opts);
+    } else {
+      const pieOpts = _pieOpts();
+      pieOpts.cutout = type==='pie' ? '0%' : '55%';
+      _mkChart(cid, type, labels, [{data:vals,backgroundColor:[...PALETTE,'#222'],borderColor:'#0a0a0a',borderWidth:2,hoverOffset:6}], pieOpts);
+    }
+  }
+
+  else if (key === 'vakit') {
+    const vakitler = d.vakitler || [];
+    const opts = _baseOpts('y');
+    opts.plugins.tooltip.callbacks = { label: ctx => ' ' + ctx.raw + ' dinlenme' };
+    if (type === 'line') {
+      opts.indexAxis = undefined;
+      _mkChart(cid, 'line', vakitler.map(v=>v.vakit),
+        [{data:vakitler.map(v=>v.count||0),borderColor:GREEN,backgroundColor:GREEN_A,
+          fill:true,tension:.4,pointBackgroundColor:GREEN,pointRadius:4}], _baseOpts());
+    } else {
+      _mkChart(cid, 'bar', vakitler.map(v=>v.vakit),
+        [{data:vakitler.map(v=>v.count||0),backgroundColor:GREEN_A,borderColor:GREEN,
+          borderWidth:1,borderRadius:3,hoverBackgroundColor:GREEN}], opts);
+    }
+  }
 }
 
 function _initCharts(d, scope) {
   const pfx = scope === 'user' ? 'u' : 'c';
-  const GREEN  = '#1db954';
-  const GREEN2 = 'rgba(29,185,84,.15)';
-  const MUTED  = '#333';
-
-  // Pasta renk paleti
-  const PALETTE = [
-    '#1db954','#17a045','#0f6b30','#1ed760','#2ee85a',
-    '#3a9e60','#145c35','#22c952','#0d4a28','#5dbb84',
-  ];
-
-  // ── 1) Günlük Trend (Bar) ──────────────────────────────────────────────────
-  const trend = d.gunluk_trend || [];
-  if (trend.length) {
-    _mkChart(`${pfx}_dailyChart`, 'bar',
-      trend.map(t => t.tarih ? t.tarih.slice(0,5) : ''),
-      [{
-        data: trend.map(t => t.kayit || 0),
-        backgroundColor: GREEN2,
-        borderColor: GREEN,
-        borderWidth: 1,
-        borderRadius: 2,
-        hoverBackgroundColor: GREEN,
-      }],
-      {
-        plugins: { ..._chartDefaults().plugins, tooltip: { ..._chartDefaults().plugins.tooltip,
-          callbacks: { label: ctx => ` ${ctx.raw} dinlenme` }
-        }},
-        scales: {
-          x: { grid: { color: '#1a1a1a' }, ticks: { color: '#555', font: { size: 10 }, maxRotation: 45 } },
-          y: { grid: { color: '#1a1a1a' }, ticks: { color: '#555', font: { size: 10 } }, beginAtZero: true },
-        },
-      }
-    );
-  }
-
-  // ── 2) Saat Dağılımı (Bar) ────────────────────────────────────────────────
-  const saatler = d.saatler || [];
-  if (saatler.length) {
-    const maxSaat = Math.max(...saatler.map(s => s.count||0), 1);
-    _mkChart(`${pfx}_hourChart`, 'bar',
-      saatler.map(s => s.saat.slice(0,2)),
-      [{
-        data: saatler.map(s => s.count || 0),
-        backgroundColor: saatler.map(s => {
-          const ratio = (s.count||0) / maxSaat;
-          return ratio > .66 ? GREEN : ratio > .33 ? 'rgba(29,185,84,.5)' : 'rgba(29,185,84,.15)';
-        }),
-        borderColor: 'transparent',
-        borderRadius: 2,
-        hoverBackgroundColor: GREEN,
-      }],
-      {
-        plugins: { ..._chartDefaults().plugins, tooltip: { ..._chartDefaults().plugins.tooltip,
-          callbacks: { label: ctx => ` ${ctx.raw} kez` }
-        }},
-        scales: {
-          x: { grid: { display: false }, ticks: { color: '#555', font: { size: 9 } } },
-          y: { grid: { color: '#1a1a1a' }, ticks: { color: '#555', font: { size: 10 } }, beginAtZero: true },
-        },
-      }
-    );
-  }
-
-  // ── 3) Haftanın Günleri (Bar) ────────────────────────────────────────────
-  const gunler = d.haftanin_gunleri || [];
-  if (gunler.length) {
-    _mkChart(`${pfx}_weekdayChart`, 'bar',
-      gunler.map(g => g.gun ? g.gun.slice(0,3) : ''),
-      [{
-        data: gunler.map(g => g.count || 0),
-        backgroundColor: GREEN2,
-        borderColor: GREEN,
-        borderWidth: 1,
-        borderRadius: 3,
-        hoverBackgroundColor: GREEN,
-      }],
-      {
-        plugins: { ..._chartDefaults().plugins, tooltip: { ..._chartDefaults().plugins.tooltip,
-          callbacks: { label: ctx => ` ${ctx.raw} dinlenme` }
-        }},
-        scales: {
-          x: { grid: { display: false }, ticks: { color: '#555', font: { size: 11 } } },
-          y: { grid: { color: '#1a1a1a' }, ticks: { color: '#555', font: { size: 10 } }, beginAtZero: true },
-        },
-      }
-    );
-  }
-
-  // ── 4) Şarkı Pie ──────────────────────────────────────────────────────────
-  const topTracks = (d.top_sarkilar || []).slice(0, 8);
-  if (topTracks.length) {
-    const others = (d.toplam_kayit||0) - topTracks.reduce((s, t) => s + (t.count||0), 0);
-    const pLabels = topTracks.map(t => t.sarki || '?');
-    const pData   = topTracks.map(t => t.count || 0);
-    if (others > 0) { pLabels.push('Diğer'); pData.push(others); }
-    _mkChart(`${pfx}_trackPie`, 'doughnut', pLabels, [{
-      data: pData,
-      backgroundColor: [...PALETTE, '#222'],
-      borderColor: '#0a0a0a',
-      borderWidth: 2,
-      hoverOffset: 6,
-    }], {
-      cutout: '60%',
-      plugins: {
-        legend: { display: true, position: 'bottom',
-          labels: { color: '#888', font: { size: 9, family: "'DM Mono',monospace" }, boxWidth: 10, padding: 8 }},
-        tooltip: { ..._chartDefaults().plugins.tooltip,
-          callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} kez` }},
-      },
-    });
-  }
-
-  // ── 5) Sanatçı Pie ────────────────────────────────────────────────────────
-  const topArtists = (d.top_sanatcilar || []).slice(0, 8);
-  if (topArtists.length) {
-    const others = (d.toplam_kayit||0) - topArtists.reduce((s, a) => s + (a.count||0), 0);
-    const pLabels = topArtists.map(a => a.sanatci || '?');
-    const pData   = topArtists.map(a => a.count || 0);
-    if (others > 0) { pLabels.push('Diğer'); pData.push(others); }
-    _mkChart(`${pfx}_artistPie`, 'doughnut', pLabels, [{
-      data: pData,
-      backgroundColor: [...PALETTE, '#222'],
-      borderColor: '#0a0a0a',
-      borderWidth: 2,
-      hoverOffset: 6,
-    }], {
-      cutout: '60%',
-      plugins: {
-        legend: { display: true, position: 'bottom',
-          labels: { color: '#888', font: { size: 9, family: "'DM Mono',monospace" }, boxWidth: 10, padding: 8 }},
-        tooltip: { ..._chartDefaults().plugins.tooltip,
-          callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} kez` }},
-      },
-    });
-  }
-
-  // ── 6) Albüm Pie ──────────────────────────────────────────────────────────
-  const topAlbums = (d.top_albumler || []).slice(0, 8);
-  if (topAlbums.length) {
-    const others = (d.toplam_kayit||0) - topAlbums.reduce((s, a) => s + (a.count||0), 0);
-    const pLabels = topAlbums.map(a => a.album || '?');
-    const pData   = topAlbums.map(a => a.count || 0);
-    if (others > 0) { pLabels.push('Diğer'); pData.push(others); }
-    _mkChart(`${pfx}_albumPie`, 'doughnut', pLabels, [{
-      data: pData,
-      backgroundColor: [...PALETTE, '#222'],
-      borderColor: '#0a0a0a',
-      borderWidth: 2,
-      hoverOffset: 6,
-    }], {
-      cutout: '60%',
-      plugins: {
-        legend: { display: true, position: 'bottom',
-          labels: { color: '#888', font: { size: 9, family: "'DM Mono',monospace" }, boxWidth: 10, padding: 8 }},
-        tooltip: { ..._chartDefaults().plugins.tooltip,
-          callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} kez` }},
-      },
-    });
-  }
-
-  // ── 7) Vakit — Horizontal Bar ─────────────────────────────────────────────
-  const vakitler = d.vakitler || [];
-  if (vakitler.length) {
-    _mkChart(`${pfx}_vakitChart`, 'bar',
-      vakitler.map(v => v.vakit),
-      [{
-        data: vakitler.map(v => v.count || 0),
-        backgroundColor: GREEN2,
-        borderColor: GREEN,
-        borderWidth: 1,
-        borderRadius: 3,
-        hoverBackgroundColor: GREEN,
-      }],
-      {
-        indexAxis: 'y',
-        plugins: { ..._chartDefaults().plugins, tooltip: { ..._chartDefaults().plugins.tooltip,
-          callbacks: { label: ctx => ` ${ctx.raw} dinlenme` }
-        }},
-        scales: {
-          x: { grid: { color: '#1a1a1a' }, ticks: { color: '#555', font: { size: 10 } }, beginAtZero: true },
-          y: { grid: { display: false }, ticks: { color: '#aaa', font: { size: 12 } } },
-        },
-      }
-    );
-  }
+  _lastGrfData[scope] = d;
+  const keys = ['daily','hour','weekday','trackPie','artistPie','albumPie','vakit'];
+  keys.forEach(key => _drawSingleChart(pfx + '_' + key, key, d));
 }
 
-function _renderRankBlock(items, nameKey, subKey, countKey, oranKey, wide=false) {
-  if (!items.length) return '<div style="color:var(--muted);font-size:12px;padding:8px 0">Veri yok</div>';
-  const max = items[0]?.[countKey] || 1;
+function _renderRankBlock(items, nameKey, subKey, countKey, oranKey, wide) {
+  if (!items || !items.length) return '<div style="color:var(--muted);font-size:12px;padding:12px 0">Veri yok</div>';
+  const max = items[0][countKey] || 1;
   const cols = wide ? 'display:grid;grid-template-columns:1fr 1fr;gap:1px;' : '';
-  return `<div style="${cols}">` + items.slice(0, wide ? 10 : 8).map((item, i) => `
-    <div style="padding:9px 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
-        <div style="min-width:0;flex:1">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:10px;color:var(--muted);min-width:18px">${String(i+1).padStart(2,'0')}</span>
-            <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${_esc(item[nameKey]||'')}">${_esc(item[nameKey]||'—')}</div>
-          </div>
-          ${subKey && item[subKey] ? `<div style="font-size:10px;color:var(--muted);margin-left:26px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_esc(item[subKey])}</div>` : ''}
-        </div>
-        <div style="text-align:right;flex-shrink:0">
-          <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--green);line-height:1">${item[countKey]}</div>
-          ${oranKey && item[oranKey] !== undefined ? `<div style="font-size:9px;color:var(--muted)">%${item[oranKey]}</div>` : ''}
-        </div>
-      </div>
-      <div style="height:2px;background:var(--surface2);margin-left:26px">
-        <div style="height:2px;background:var(--green);width:${Math.round((item[countKey]||0)/max*100)}%;transition:width .6s ease"></div>
-      </div>
-    </div>`).join('') + '</div>';
+  let html = '<div style="' + cols + '">';
+  const limit = wide ? 10 : 8;
+  for (let i = 0; i < Math.min(items.length, limit); i++) {
+    const item = items[i];
+    const pct  = Math.round((item[countKey]||0)/max*100);
+    html += '<div style="padding:9px 0;border-bottom:1px solid var(--border)">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">'
+      + '<div style="min-width:0;flex:1;display:flex;align-items:flex-start;gap:8px">'
+      + '<span style="font-size:10px;color:var(--muted);flex-shrink:0;margin-top:2px">' + String(i+1).padStart(2,'0') + '</span>'
+      + '<div style="min-width:0">'
+      + '<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + (item[nameKey]||'').replace(/"/g,'&quot;') + '">' + _esc(item[nameKey]||'—') + '</div>'
+      + (subKey && item[subKey] ? '<div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _esc(item[subKey]) + '</div>' : '')
+      + '</div></div>'
+      + '<div style="text-align:right;flex-shrink:0">'
+      + '<div style="font-family:\'Syne\',sans-serif;font-size:16px;font-weight:800;color:var(--green);line-height:1">' + item[countKey] + '</div>'
+      + (oranKey && item[oranKey]!==undefined ? '<div style="font-size:9px;color:var(--muted)">%' + item[oranKey] + '</div>' : '')
+      + '</div></div>'
+      + '<div style="height:2px;background:var(--surface2);margin-left:22px">'
+      + '<div style="height:2px;background:var(--green);width:' + pct + '%;transition:width .6s ease"></div>'
+      + '</div></div>';
+  }
+  return html + '</div>';
 }
 
 // ===================== İZİN YÖNETİMİ =====================
@@ -2284,13 +2300,9 @@ async function init() {
   renderMonths(data.aylar);
   document.getElementById('footerTime').textContent = new Date().toLocaleString('tr-TR');
 
-  // Genel Analiz dönem filtresi — başlangıçta "year" göster
+  // Genel Analiz dönem filtresi — başlangıçta "year"
   _genelPeriod = 'year';
-  document.querySelectorAll('#view-istatistikler .grf-period-btn[data-period="year"]').forEach(b => b.classList.add('active'));
-  document.querySelectorAll('#view-istatistikler .grf-period-btn:not([data-period="year"])').forEach(b => b.classList.remove('active'));
-  const lbl = document.getElementById('genelPeriodLabel');
-  if (lbl) lbl.textContent = _periodLabel('year');
-  loadIstatistiklerData();
+  setGenelPeriod('year');
 }
 
 init();
