@@ -937,22 +937,23 @@ async function loadIstatistiklerData() {
 // ===================== GRAFİKSEL ANALİZ =====================
 let _grfPeriodUser      = 'year';
 let _grfPeriodCommunity = 'year';
-const _activeCharts     = {};   // canvas id → Chart instance
 
-// ── Dropdown aç/kapat ────────────────────────────────────────────────────────
+// ── Dropdown aç/kapat ─────────────────────────────────────────────────────
 function toggleGrfDropdown(dropId) {
   const drop = document.getElementById(dropId);
   if (!drop) return;
   const isOpen = drop.classList.contains('open');
-  // tüm açık dropdown'ları kapat
   document.querySelectorAll('.grf-period-dropdown.open').forEach(d => d.classList.remove('open'));
   if (!isOpen) drop.classList.add('open');
 }
 
-// Dışarı tıklanınca kapat
+// Dropdown dışına tıklayınca kapat (grf + cmt birlikte)
 document.addEventListener('click', e => {
   if (!e.target.closest('.grf-period-dropdown')) {
     document.querySelectorAll('.grf-period-dropdown.open').forEach(d => d.classList.remove('open'));
+  }
+  if (!e.target.closest('.cmt-wrap')) {
+    document.querySelectorAll('.cmt-menu.open').forEach(m => m.classList.remove('open'));
   }
 });
 
@@ -1090,7 +1091,7 @@ function _buildGrfHTML(d, scope) {
   function chartPanel(key, title, height, content) {
     const cid = pfx + '_' + key;
     const opts = (_CHART_TYPE_OPTIONS[key] || []).map(([t,l]) =>
-      '<div class="cmt-item' + (_chartTypes[cid]===t?' active':'') + '" onclick="_changeChartType(\'' + cid + '\',\'' + t + '\')">' + l + '</div>'
+      '<div class="cmt-item' + (_chartTypes[cid]===t?' active':'') + '" data-type="' + t + '" onclick="_changeChartType(\'' + cid + '\',\'' + t + '\')">' + l + '</div>'
     ).join('');
     return '<div class="chart-panel">'
       + '<div class="chart-panel-header">'
@@ -1150,25 +1151,19 @@ function _toggleCmt(menuId) {
   if (!isOpen) menu.classList.add('open');
 }
 
-document.addEventListener('click', e => {
-  if (!e.target.closest('.cmt-wrap')) {
-    document.querySelectorAll('.cmt-menu.open').forEach(m => m.classList.remove('open'));
-  }
-});
+
 
 function _changeChartType(chartId, newType) {
   _chartTypes[chartId] = newType;
-  // Menü item'larını güncelle
+  // Menü item aktif durumunu güncelle — data-type ile
   const menu = document.getElementById(chartId + '_menu');
   if (menu) {
     menu.querySelectorAll('.cmt-item').forEach(item => {
-      item.classList.toggle('active', item.textContent.trim().startsWith(
-        {'bar':'▊','line':'╱','doughnut':'◎','pie':'◉'}[newType] || '?'
-      ));
+      item.classList.toggle('active', item.dataset.type === newType);
     });
     menu.classList.remove('open');
   }
-  // Grafiği yeniden çiz — _lastGrfData'dan al
+  // Grafiği yeniden çiz
   const scope = chartId.startsWith('u_') ? 'user' : 'community';
   const data  = _lastGrfData[scope];
   if (data) _redrawChart(chartId, data, scope);
