@@ -551,9 +551,15 @@
 
     <div class="stats-row" id="statsRow">
       <div class="stat-card"><div class="label">Toplam Dinlenme</div><div class="value" id="statTotal">—</div><div class="sub">kayıt</div></div>
-      <div class="stat-card"><div class="label">Farklı Şarkı</div><div class="value" id="statTracks">—</div><div class="sub">adet</div></div>
-      <div class="stat-card"><div class="label">Farklı Sanatçı</div><div class="value" id="statArtists">—</div><div class="sub">adet</div></div>
-      <div class="stat-card"><div class="label">Farklı Albüm</div><div class="value" id="statAlbums">—</div><div class="sub">adet</div></div>
+      <div class="stat-card" style="cursor:pointer" onclick="openTumSarkilarModal()">
+        <div class="label">Farklı Şarkı ↗</div><div class="value" id="statTracks">—</div><div class="sub">tıkla → tümünü gör</div>
+      </div>
+      <div class="stat-card" style="cursor:pointer" onclick="openTumSanatcilarModal()">
+        <div class="label">Farklı Sanatçı ↗</div><div class="value" id="statArtists">—</div><div class="sub">tıkla → tümünü gör</div>
+      </div>
+      <div class="stat-card" style="cursor:pointer" onclick="openTumAlbumlerModal()">
+        <div class="label">Farklı Albüm ↗</div><div class="value" id="statAlbums">—</div><div class="sub">tıkla → tümünü gör</div>
+      </div>
       <div class="stat-card"><div class="label">Toplam Süre</div><div class="value" id="statHours">—</div><div class="sub">saat</div></div>
     </div>
 
@@ -809,8 +815,14 @@ function switchView(viewId) {
   document.getElementById('headerSubtitle').textContent = titles[viewId] || '';
 
   if (viewId === 'topluluk')        loadTopluluk();
-  if (viewId === 'topluluk-grafik') { _updateDropdownSubs('community', _grfPeriodCommunity); loadGrfData('community'); }
-  if (viewId === 'grafik-analiz')   { _updateDropdownSubs('user', _grfPeriodUser);           loadGrfData('user');      }
+  if (viewId === 'topluluk-grafik') {
+    _updateDropdownSubs('community', _grfPeriodCommunity);
+    setTimeout(() => loadGrfData('community'), 50);
+  }
+  if (viewId === 'grafik-analiz') {
+    _updateDropdownSubs('user', _grfPeriodUser);
+    setTimeout(() => loadGrfData('user'), 50);
+  }
   if (viewId === 'duzenle')         loadPlaylists();
 
   if (viewId === 'kullanim') {
@@ -1022,18 +1034,19 @@ async function loadGrfData(scope) {
     const res = await fetch(apiUrl);
     const d   = await res.json();
     if (d.error) {
-      container.innerHTML = `<div class="loading" style="color:#ff6b6b">${_esc(d.error)}</div>`;
+      container.innerHTML = '<div class="loading" style="color:#ff6b6b">Hata: ' + (d.error||'bilinmiyor') + '</div>';
       return;
     }
     if (!d.toplam_kayit) {
-      container.innerHTML = `<div class="loading" style="color:var(--muted)">Bu dönemde dinleme verisi bulunamadı.</div>`;
+      container.innerHTML = '<div class="loading" style="color:var(--muted)">Bu dönemde dinleme verisi bulunamadı.</div>';
       return;
     }
     container.innerHTML = _buildGrfHTML(d, scope);
-    // DOM'un tamamen render olması için 2 frame bekle
-    setTimeout(() => _initCharts(d, scope), 80);
+    // DOM'un tamamen render olması için yeterince bekle
+    setTimeout(() => _initCharts(d, scope), 150);
   } catch(e) {
-    container.innerHTML = `<div class="loading" style="color:#ff6b6b">Bağlantı hatası: ${e.message}</div>`;
+    console.error('loadGrfData hatası:', e);
+    container.innerHTML = '<div class="loading" style="color:#ff6b6b">Bağlantı hatası: ' + (e.message||e) + '</div>';
   }
 }
 
@@ -2002,24 +2015,55 @@ function renderMonths(aylar) {
     </tbody></table>`;
 }
 
+async function openTumAlbumlerModal() {
+  document.getElementById('modalTitle').textContent = 'Tüm Albümler';
+  document.getElementById('modalSub').textContent = 'Dinlenme sayısına göre sıralı';
+  document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
+  openModal();
+  try {
+    const res  = await fetch('/api/analiz?period=all');
+    const data = await res.json();
+    const albumler = data.top_albumler || [];
+    const max = albumler[0]?.count || 1;
+    document.getElementById('modalBody').innerHTML = `
+      <div style="margin-bottom:16px;font-size:11px;color:var(--muted)">${data.farkli_album||albumler.length} farklı albüm</div>
+      <div class="modal-track-list">
+        ${albumler.map((a,i) => `
+          <div class="modal-track" style="grid-template-columns:36px 1fr auto;gap:10px;cursor:pointer"
+               data-fn="openAlbumModal" data-name="${(a.album||'').replace(/"/g,'&quot;')}" data-sub="">
+            <span class="mtn">${String(i+1).padStart(2,'0')}</span>
+            <span>
+              <div class="mname">${_esc(a.album||'—')}</div>
+              <div style="font-size:11px;color:var(--muted)">${_esc(a.sanatci||'')}</div>
+              <div class="bar-wrap" style="margin-top:4px"><div class="bar-fill" style="width:${Math.round((a.count||0)/max*100)}%"></div></div>
+            </span>
+            <span class="mcnt">${a.count}</span>
+          </div>`).join('')}
+      </div>`;
+  } catch(e) {
+    document.getElementById('modalBody').innerHTML = '<div class="loading">Hata: ' + e.message + '</div>';
+  }
+}
+
 async function openAlbumModal(albumAdi) {
-  document.getElementById('modalTitle').textContent = albumAdi;
+  document.getElementById('modalTitle').textContent = albumAdi || 'Albüm';
   document.getElementById('modalSub').textContent = 'Albüm detayı';
   document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
   openModal();
   try {
     const res  = await fetch('/api/analiz?period=all');
     const data = await res.json();
-    const albumData = (data.top_albumler||[]).find(a => a.album === albumAdi);
-    if (!albumData) {
-      document.getElementById('modalBody').innerHTML = '<div class="loading">Veri bulunamadı.</div>';
+    const a = (data.top_albumler||[]).find(x => x.album === albumAdi);
+    if (!a) {
+      document.getElementById('modalBody').innerHTML = '<div class="loading" style="color:var(--muted)">Bu albüme ait veri bulunamadı.</div>';
       return;
     }
     document.getElementById('modalBody').innerHTML = `
       <div class="modal-stats">
-        <div class="modal-stat"><div class="val">${albumData.count}</div><div class="lbl">Toplam Dinlenme</div></div>
-        <div class="modal-stat"><div class="val">${albumData.sanatci||'—'}</div><div class="lbl">Sanatçı</div></div>
-        <div class="modal-stat"><div class="val">%${albumData.oran||0}</div><div class="lbl">Dinlenme Oranı</div></div>
+        <div class="modal-stat"><div class="val">${a.count}</div><div class="lbl">Toplam Dinlenme</div></div>
+        <div class="modal-stat"><div class="val">${_esc(a.sanatci||'—')}</div><div class="lbl">Sanatçı</div></div>
+        <div class="modal-stat"><div class="val">%${a.oran||0}</div><div class="lbl">Dinlenme Oranı</div></div>
+        <div class="modal-stat"><div class="val">${a.sure_fmt||'—'}</div><div class="lbl">Toplam Süre</div></div>
       </div>`;
   } catch(e) {
     document.getElementById('modalBody').innerHTML = '<div class="loading">Hata oluştu.</div>';
