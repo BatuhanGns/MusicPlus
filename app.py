@@ -266,10 +266,10 @@ def compute_stats(headers, rows):
 
     idx_sarki   = headers.index("Şarkı Adı")
     idx_sanatci = headers.index("Sanatçı")
-    idx_album   = headers.index("Albüm") if "Albüm" in headers else -1
+    idx_album   = next((i for i,h in enumerate(headers) if h.strip() in ("Albüm","Album","albüm","album")), -1)
     idx_sure    = headers.index("Süre (sn)")
     idx_tarih   = headers.index("Dinlenme Tarihi")
-    idx_iso     = headers.index("_played_at_iso") if "_played_at_iso" in headers else -1
+    idx_iso     = next((i for i,h in enumerate(headers) if h.strip() == "_played_at_iso"), -1)
 
     track_counts  = defaultdict(lambda: {"count": 0, "sanatci": "", "album": "", "sure": 0, "ilk_iso": None})
     artist_counts = defaultdict(lambda: {"count": 0, "sure": 0, "ilk_iso": None})
@@ -425,13 +425,14 @@ def compute_analiz(headers, rows, period="all", scope="user"):
     try:
         idx_sarki   = headers.index("Şarkı Adı")
         idx_sanatci = headers.index("Sanatçı")
-        idx_album   = headers.index("Albüm")
         idx_sure    = headers.index("Süre (sn)")
         idx_tarih   = headers.index("Dinlenme Tarihi")
-        idx_iso     = headers.index("_played_at_iso") if "_played_at_iso" in headers else -1
     except ValueError as e:
-        logger.error(f"Analiz header hatası: {e}")
+        logger.error(f"Analiz header hatası: {e} | headers={headers}")
         return None
+    # Opsiyonel sütunlar
+    idx_album = next((i for i,h in enumerate(headers) if h.strip() in ("Albüm","Album","albüm","album")), -1)
+    idx_iso   = next((i for i,h in enumerate(headers) if h.strip() == "_played_at_iso"), -1)
 
     # Dönem sınırı (UTC)
     now_utc = datetime.now(timezone.utc)
@@ -464,7 +465,7 @@ def compute_analiz(headers, rows, period="all", scope="user"):
             continue
         sarki   = row[idx_sarki].strip()
         sanatci = row[idx_sanatci].strip()
-        album   = row[idx_album].strip() if len(row) > idx_album else ""
+        album   = row[idx_album].strip() if idx_album != -1 and len(row) > idx_album else ""
         tarih   = row[idx_tarih].strip()
         try: sure = int(row[idx_sure])
         except: sure = 0
