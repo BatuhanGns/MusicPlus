@@ -266,10 +266,10 @@ def compute_stats(headers, rows):
 
     idx_sarki   = headers.index("Şarkı Adı")
     idx_sanatci = headers.index("Sanatçı")
-    idx_album   = next((i for i,h in enumerate(headers) if h.strip() in ("Albüm","Album","albüm","album")), -1)
     idx_sure    = headers.index("Süre (sn)")
     idx_tarih   = headers.index("Dinlenme Tarihi")
-    idx_iso     = next((i for i,h in enumerate(headers) if h.strip() == "_played_at_iso"), -1)
+    idx_iso     = headers.index("_played_at_iso") if "_played_at_iso" in headers else -1
+    idx_album   = next((i for i,h in enumerate(headers) if h.strip() in ("Albüm","Album","albüm","album")), -1)
 
     track_counts  = defaultdict(lambda: {"count": 0, "sanatci": "", "album": "", "sure": 0, "ilk_iso": None})
     artist_counts = defaultdict(lambda: {"count": 0, "sure": 0, "ilk_iso": None})
@@ -288,8 +288,8 @@ def compute_stats(headers, rows):
             continue
         sarki   = row[idx_sarki].strip()
         sanatci = row[idx_sanatci].strip()
-        album   = row[idx_album].strip() if idx_album != -1 and len(row) > idx_album else ""
         tarih   = row[idx_tarih].strip()
+        album   = row[idx_album].strip() if idx_album != -1 and len(row) > idx_album else ""
         try: sure = int(row[idx_sure])
         except: sure = 0
 
@@ -404,270 +404,6 @@ def compute_stats(headers, rows):
         "genel_saatler":  [{"saat": f"{h:02d}:00", "count": global_saat_counts.get(h, 0)} for h in range(24)],
         "genel_vakitler": [{"vakit": k, "count": v} for k, v in sorted(global_vakit_counts.items(), key=lambda x: -x[1])],
     }
-
-# ══════════════════════════════════════════════════════════════════════════════
-# YENİ: Dönem bazlı analiz fonksiyonu — /api/analiz?period=week|month|year|all
-# Kullanıcı veya topluluk verisi için, ISO tarih filtrelemesiyle
-# ══════════════════════════════════════════════════════════════════════════════
-
-def compute_analiz(headers, rows, period="all", scope="user"):
-    """
-    period: 'week' | 'month' | 'year' | 'all'
-    - week  → bu haftanın Pazartesi 00:00 UTC'sinden itibaren
-    - month → bu ayın 1. günü 00:00 UTC'sinden itibaren
-    - year  → bu yılın 1 Ocak 00:00 UTC'sinden itibaren (geçen yıla girmez)
-    - all   → filtresiz
-    scope: kullanıcı sayfasında 'user', toplulukta 'community'
-    """
-    if not rows:
-        return None
-
-    try:
-        idx_sarki   = headers.index("Şarkı Adı")
-        idx_sanatci = headers.index("Sanatçı")
-        idx_sure    = headers.index("Süre (sn)")
-        idx_tarih   = headers.index("Dinlenme Tarihi")
-    except ValueError as e:
-        logger.error(f"Analiz header hatası: {e} | headers={headers}")
-        return None
-    # Opsiyonel sütunlar
-    idx_album = next((i for i,h in enumerate(headers) if h.strip() in ("Albüm","Album","albüm","album")), -1)
-    idx_iso   = next((i for i,h in enumerate(headers) if h.strip() == "_played_at_iso"), -1)
-
-    # Dönem sınırı (UTC)
-    now_utc = datetime.now(timezone.utc)
-    if period == "week":
-        # Bu haftanın Pazartesi'si (weekday=0)
-        days_since_mon = now_utc.weekday()  # 0=Mon
-        start_dt = (now_utc - timedelta(days=days_since_mon)).replace(
-            hour=0, minute=0, second=0, microsecond=0)
-    elif period == "month":
-        start_dt = now_utc.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    elif period == "year":
-        start_dt = now_utc.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    else:
-        start_dt = None  # all
-
-    track_counts  = defaultdict(lambda: {"count":0,"sanatci":"","album":"","sure":0,"ilk_iso":None})
-    artist_counts = defaultdict(lambda: {"count":0,"sure":0,"ilk_iso":None,"albumler":set()})
-    album_counts  = defaultdict(lambda: {"count":0,"sure":0,"sanatci":"","ilk_iso":None})
-    gun_sure      = defaultdict(int)
-    gun_kayit     = defaultdict(int)
-    saat_counts   = defaultdict(int)
-    vakit_counts  = defaultdict(int)
-    hafta_gunu    = defaultdict(int)  # 0=Pzt..6=Paz
-    toplam_sure   = 0
-    toplam_kayit  = 0
-    bugun_date    = now_utc.date()
-
-    for row in rows:
-        if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_tarih):
-            continue
-        sarki   = row[idx_sarki].strip()
-        sanatci = row[idx_sanatci].strip()
-        album   = row[idx_album].strip() if idx_album != -1 and len(row) > idx_album else ""
-        tarih   = row[idx_tarih].strip()
-        try: sure = int(row[idx_sure])
-        except: sure = 0
-        iso = row[idx_iso].strip() if idx_iso != -1 and len(row) > idx_iso else ""
-
-        # ISO parse + dönem filtresi
-        row_dt = None
-        if iso and iso != "—":
-            try:
-                row_dt = datetime.strptime(iso[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
-            except:
-                try:
-                    row_dt = datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M").replace(tzinfo=timezone.utc)
-                except: pass
-
-        # Dönem filtresi
-        if start_dt:
-            if row_dt is None:
-                # ISO yoksa tarih sütunundan dene
-                try:
-                    g, ay, yil = tarih.split(".")
-                    row_date = datetime(int(yil), int(ay), int(g), tzinfo=timezone.utc)
-                    if row_date < start_dt:
-                        continue
-                except: continue
-            else:
-                if row_dt < start_dt:
-                    continue
-
-        toplam_kayit += 1
-        toplam_sure  += sure
-
-        if row_dt:
-            saat_counts[row_dt.hour] += 1
-            vakit_counts[get_vakit(row_dt.hour)] += 1
-            hafta_gunu[row_dt.weekday()] += 1  # 0=Pzt
-            gun_key = row_dt.strftime("%d.%m.%Y")
-            gun_sure[gun_key]  += sure
-            gun_kayit[gun_key] += 1
-        elif tarih:
-            gun_sure[tarih]  += sure
-            gun_kayit[tarih] += 1
-
-        if sarki:
-            track_counts[sarki]["count"]  += 1
-            track_counts[sarki]["sure"]   += sure
-            track_counts[sarki]["sanatci"] = sanatci
-            track_counts[sarki]["album"]   = album
-            if iso and (track_counts[sarki]["ilk_iso"] is None or iso < track_counts[sarki]["ilk_iso"]):
-                track_counts[sarki]["ilk_iso"] = iso
-
-        if sanatci:
-            artist_counts[sanatci]["count"] += 1
-            artist_counts[sanatci]["sure"]  += sure
-            if album:
-                artist_counts[sanatci]["albumler"].add(album)
-            if iso and (artist_counts[sanatci]["ilk_iso"] is None or iso < artist_counts[sanatci]["ilk_iso"]):
-                artist_counts[sanatci]["ilk_iso"] = iso
-
-        if album:
-            album_counts[album]["count"]  += 1
-            album_counts[album]["sure"]   += sure
-            album_counts[album]["sanatci"] = sanatci
-            if iso and (album_counts[album]["ilk_iso"] is None or iso < album_counts[album]["ilk_iso"]):
-                album_counts[album]["ilk_iso"] = iso
-
-    if toplam_kayit == 0:
-        return {"toplam_kayit": 0, "mesaj": "Bu dönemde veri yok"}
-
-    def calc_days(iso_str):
-        if not iso_str: return None
-        try:
-            dt = datetime.strptime(iso_str[:10], "%Y-%m-%d").date()
-            return max(0, (bugun_date - dt).days)
-        except: return None
-
-    # Top listeler
-    top_sarkilar = sorted(
-        [{"sarki": k, "sanatci": v["sanatci"], "album": v["album"],
-          "count": v["count"], "sure_fmt": fmt_sure(v["sure"]),
-          "kac_gundur": calc_days(v["ilk_iso"])}
-         for k, v in track_counts.items()],
-        key=lambda x: -x["count"]
-    )[:10]
-
-    top_sanatcilar = sorted(
-        [{"sanatci": k, "count": v["count"], "sure_fmt": fmt_sure(v["sure"]),
-          "album_sayisi": len(v["albumler"]), "kac_gundur": calc_days(v["ilk_iso"])}
-         for k, v in artist_counts.items()],
-        key=lambda x: -x["count"]
-    )[:10]
-
-    top_albumler = sorted(
-        [{"album": k, "sanatci": v["sanatci"], "count": v["count"],
-          "sure_fmt": fmt_sure(v["sure"]), "kac_gundur": calc_days(v["ilk_iso"])}
-         for k, v in album_counts.items()],
-        key=lambda x: -x["count"]
-    )[:10]
-
-    # Günlük trend — tarihe göre sıralı
-    gunluk_trend = []
-    for tarih_key in sorted(gun_sure.keys()):
-        try:
-            g, ay, yil = tarih_key.split(".")
-            ts = f"{yil}-{ay}-{g}"
-        except:
-            ts = tarih_key
-        gunluk_trend.append({
-            "tarih": tarih_key,
-            "tarih_iso": ts,
-            "sure_sn": gun_sure[tarih_key],
-            "kayit": gun_kayit.get(tarih_key, 0)
-        })
-
-    # Saat dağılımı
-    saatler = [{"saat": f"{h:02d}:00", "count": saat_counts.get(h, 0)} for h in range(24)]
-
-    # Vakit dağılımı
-    vakit_sirali = sorted(vakit_counts.items(), key=lambda x: -x[1])
-    vakitler = [{"vakit": k, "count": v} for k, v in vakit_sirali]
-
-    # Haftanın günleri (0=Pzt → 6=Paz)
-    haftanin_gunleri = [
-        {"gun": TR_GUNLER[i], "gun_idx": i, "count": hafta_gunu.get(i, 0)}
-        for i in range(7)
-    ]
-
-    # Sanatçı dinlenme oranı (toplam içindeki %)
-    for s in top_sanatcilar:
-        s["oran"] = round(s["count"] / toplam_kayit * 100, 1) if toplam_kayit else 0
-
-    # Şarkı dinlenme oranı
-    for s in top_sarkilar:
-        s["oran"] = round(s["count"] / toplam_kayit * 100, 1) if toplam_kayit else 0
-
-    # Albüm dinlenme oranı
-    for a in top_albumler:
-        a["oran"] = round(a["count"] / toplam_kayit * 100, 1) if toplam_kayit else 0
-
-    return {
-        "period": period,
-        "toplam_kayit":   toplam_kayit,
-        "farkli_sarki":   len(track_counts),
-        "farkli_sanatci": len(artist_counts),
-        "farkli_album":   len(album_counts),
-        "toplam_sure_sn": toplam_sure,
-        "top_sarkilar":   top_sarkilar,
-        "top_sanatcilar": top_sanatcilar,
-        "top_albumler":   top_albumler,
-        "gunluk_trend":   gunluk_trend,
-        "saatler":        saatler,
-        "vakitler":       vakitler,
-        "haftanin_gunleri": haftanin_gunleri,
-    }
-
-
-@app.route("/api/analiz")
-def api_analiz():
-    """Dönem bazlı analiz — kişisel veri"""
-    try:
-        uid = get_current_user_id()
-        if not uid:
-            return jsonify({"error": "Giriş yapılmamış"}), 401
-        period = request.args.get("period", "all")
-        if period not in ("week", "month", "year", "all"):
-            period = "all"
-        headers, rows = get_cached_data(uid)
-        if not rows:
-            load_user_data(uid)
-            headers, rows = get_cached_data(uid)
-        result = compute_analiz(headers, rows, period=period, scope="user")
-        if not result:
-            return jsonify({"error": "Veri yok"})
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"❌ Analiz API hatası: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/topluluk-analiz")
-def api_topluluk_analiz():
-    """Dönem bazlı analiz — topluluk verisi"""
-    try:
-        uid = get_current_user_id()
-        if not uid:
-            return jsonify({"error": "Giriş yapılmamış"}), 401
-        period = request.args.get("period", "all")
-        if period not in ("week", "month", "year", "all"):
-            period = "all"
-        permitted = sheets.get_all_permitted_users()
-        if not permitted:
-            return jsonify({"error": "Henüz kimse izin vermemiş"})
-        headers, rows = sheets.get_combined_data(permitted)
-        result = compute_analiz(headers, rows, period=period, scope="community")
-        if not result:
-            return jsonify({"error": "Veri yok"})
-        result["katilimci_sayisi"] = len(permitted)
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"❌ Topluluk analiz hatası: {e}")
-        return jsonify({"error": str(e)}), 500
-
 
 @app.route("/api/dashboard")
 def api_dashboard():
@@ -867,6 +603,141 @@ def api_sanatci_detay(sanatci_adi):
     except Exception as e:
         logger.error(f"❌ Sanatçı detay hatası: {e}")
         return jsonify({"error": str(e)}), 500
+
+# ── Görsel endpoint'leri ─────────────────────────────────────────────────────
+_gorsel_cache = {}
+
+def _spotify_search_image(q, item_type="artist"):
+    cache_key = f"{item_type}:{q}"
+    if cache_key in _gorsel_cache:
+        return _gorsel_cache[cache_key]
+    try:
+        uid = next(iter(_user_cache), None)
+        if not uid: return None
+        token = _user_cache[uid].get("access_token")
+        if not token: return None
+        params = {"q": q, "type": item_type, "limit": 1, "market": "TR"}
+        resp = requests.get(
+            "https://api.spotify.com/v1/search",
+            headers={"Authorization": f"Bearer {token}"},
+            params=params, timeout=4
+        )
+        if resp.status_code != 200:
+            _gorsel_cache[cache_key] = None
+            return None
+        data = resp.json()
+        img_url = None
+        if item_type == "artist":
+            items = data.get("artists", {}).get("items", [])
+            if items and items[0].get("images"):
+                img_url = items[0]["images"][-1]["url"]
+        elif item_type == "track":
+            items = data.get("tracks", {}).get("items", [])
+            if items and items[0].get("album", {}).get("images"):
+                img_url = items[0]["album"]["images"][-1]["url"]
+        elif item_type == "album":
+            items = data.get("albums", {}).get("items", [])
+            if items and items[0].get("images"):
+                img_url = items[0]["images"][-1]["url"]
+        _gorsel_cache[cache_key] = img_url
+        return img_url
+    except Exception as e:
+        logger.error(f"Görsel arama hatası: {e}")
+        return None
+
+
+@app.route("/api/sanatci-gorsel/<sanatci>")
+def api_sanatci_gorsel(sanatci):
+    uid = get_current_user_id()
+    if not uid: return jsonify({"error": "Giriş yok"}), 401
+    img = _spotify_search_image(sanatci, "artist")
+    return jsonify({"image_url": img})
+
+
+@app.route("/api/sarki-gorsel/<sarki>")
+def api_sarki_gorsel(sarki):
+    uid = get_current_user_id()
+    if not uid: return jsonify({"error": "Giriş yok"}), 401
+    sanatci = request.args.get("sanatci", "")
+    q = f"{sarki} {sanatci}".strip()
+    img = _spotify_search_image(q, "track")
+    return jsonify({"image_url": img})
+
+
+@app.route("/api/album-gorsel/<album>")
+def api_album_gorsel(album):
+    uid = get_current_user_id()
+    if not uid: return jsonify({"error": "Giriş yok"}), 401
+    sanatci = request.args.get("sanatci", "")
+    q = f"{album} {sanatci}".strip()
+    img = _spotify_search_image(q, "album")
+    return jsonify({"image_url": img})
+
+
+@app.route("/api/album/<album_adi>")
+def api_album(album_adi):
+    try:
+        uid = get_current_user_id()
+        if not uid: return jsonify({"error": "Giriş yok"}), 401
+        headers, rows = get_cached_data(uid)
+        if not rows:
+            load_user_data(uid)
+            headers, rows = get_cached_data(uid)
+        if not rows: return jsonify({"error": "Veri yok"})
+
+        idx_sarki   = headers.index("Şarkı Adı")
+        idx_sanatci = headers.index("Sanatçı")
+        idx_album   = next((i for i,h in enumerate(headers) if h.strip() in ("Albüm","Album","albüm","album")), -1)
+        idx_sure    = headers.index("Süre (sn)")
+
+        sarki_counts = defaultdict(lambda: {"count":0,"sanatci":"","sure":0})
+        toplam_count = 0; toplam_sure = 0; sanatci_ad = ""
+
+        for row in rows:
+            alb = row[idx_album].strip() if idx_album != -1 and len(row) > idx_album else ""
+            if alb.lower() != album_adi.lower(): continue
+            sarki   = row[idx_sarki].strip()  if len(row) > idx_sarki   else ""
+            sanatci = row[idx_sanatci].strip() if len(row) > idx_sanatci else ""
+            try: sure = int(row[idx_sure])
+            except: sure = 0
+            sarki_counts[sarki]["count"]  += 1
+            sarki_counts[sarki]["sanatci"] = sanatci
+            sarki_counts[sarki]["sure"]   += sure
+            toplam_count += 1; toplam_sure += sure
+            if not sanatci_ad: sanatci_ad = sanatci
+
+        top_sarkilar = sorted(
+            [{"sarki":k,"sanatci":v["sanatci"],"count":v["count"]} for k,v in sarki_counts.items()],
+            key=lambda x:-x["count"]
+        )[:10]
+        return jsonify({"album":album_adi,"sanatci":sanatci_ad,"toplam_count":toplam_count,
+                        "toplam_sure":fmt_sure(toplam_sure),"top_sarkilar":top_sarkilar})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/tum-albumler")
+def api_tum_albumler():
+    try:
+        uid = get_current_user_id()
+        if not uid: return jsonify({"error": "Giriş yok"}), 401
+        headers, rows = get_cached_data(uid)
+        if not rows:
+            load_user_data(uid); headers, rows = get_cached_data(uid)
+        if not rows: return jsonify({"albumler":[],"toplam":0})
+        idx_album   = next((i for i,h in enumerate(headers) if h.strip() in ("Albüm","Album","albüm","album")), -1)
+        idx_sanatci = headers.index("Sanatçı")
+        if idx_album == -1: return jsonify({"albumler":[],"toplam":0})
+        counts = defaultdict(lambda:{"count":0,"sanatci":""})
+        for row in rows:
+            alb = row[idx_album].strip() if len(row)>idx_album else ""
+            san = row[idx_sanatci].strip() if len(row)>idx_sanatci else ""
+            if alb: counts[alb]["count"]+=1; counts[alb]["sanatci"]=san
+        albumler = sorted([{"album":k,"sanatci":v["sanatci"],"count":v["count"]} for k,v in counts.items()],key=lambda x:-x["count"])
+        return jsonify({"albumler":albumler,"toplam":len(albumler)})
+    except Exception as e:
+        return jsonify({"error":str(e)}),500
+
 
 @app.route('/api/tum-sanatcilar')
 def api_tum_sanatcilar():
