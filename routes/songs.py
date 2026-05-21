@@ -44,7 +44,7 @@ def _spotify_search_image(q, item_type="artist"):
             
         params = {"q": q, "type": item_type, "limit": 1, "market": "TR"}
         
-        # 🟢 İŞTE GERÇEK VE DOĞRU SPOTIFY API URL'Sİ:
+        # SADECE BU SATIR DEĞİŞTİ: Orijinal Spotify Arama API adresi.
         resp = requests.get(
             "https://api.spotify.com/v1/search",
             headers={"Authorization": f"Bearer {token}"},
@@ -59,6 +59,7 @@ def _spotify_search_image(q, item_type="artist"):
         data = resp.json()
         img_url = None
         
+        # Ayrıştırma (Parse) mantığın tamamen doğru, dokunmadım.
         if item_type == "artist":
             items = data.get("artists", {}).get("items", [])
             if items and items[0].get("images"):
