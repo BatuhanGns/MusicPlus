@@ -27,6 +27,38 @@
   /* MENÜ BUTONU VE YAN MENÜ */
   .hamburger-btn {background:var(--surface); border:1px solid var(--border); color:var(--text); width:34px; height:34px; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:border-color .2s; line-height:1;}
   .hamburger-btn:hover {border-color:var(--green);}
+
+  /* ARALIK SEÇİCİ */
+  .aralik-wrap {position:relative; display:inline-block;}
+  .aralik-btn {background:var(--surface); border:1px solid var(--border); color:var(--text); height:34px; padding:0 12px; font-family:'DM Mono',monospace; font-size:11px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:border-color .2s; white-space:nowrap; letter-spacing:.5px;}
+  .aralik-btn:hover, .aralik-btn.open {border-color:var(--green); color:var(--green);}
+  .aralik-btn .aralik-arrow {font-size:9px; transition:transform .2s;}
+  .aralik-btn.open .aralik-arrow {transform:rotate(180deg);}
+  .aralik-dropdown {position:absolute; top:calc(100% + 4px); right:0; background:var(--surface); border:1px solid var(--border); z-index:500; min-width:150px; display:none; flex-direction:column; box-shadow:0 8px 24px rgba(0,0,0,.5);}
+  .aralik-dropdown.open {display:flex;}
+  .aralik-option {padding:12px 16px; font-family:'DM Mono',monospace; font-size:12px; cursor:pointer; color:var(--muted); transition:all .15s; border-left:2px solid transparent;}
+  .aralik-option:hover {background:var(--surface2); color:var(--text); border-left-color:var(--border);}
+  .aralik-option.active {color:var(--green); border-left-color:var(--green); background:var(--green-dim);}
+
+  /* AI LİMİT KARTI */
+  .ai-limit-card {background:var(--surface); border:1px solid var(--border); padding:32px 28px; margin-bottom:16px;}
+  .ai-limit-top {display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; flex-wrap:wrap; gap:12px;}
+  .ai-limit-title {font-family:'Syne',sans-serif; font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-bottom:8px;}
+  .ai-limit-val {font-family:'Syne',sans-serif; font-size:48px; font-weight:800; color:var(--green); line-height:1;}
+  .ai-limit-sub {font-size:11px; color:var(--muted); margin-top:4px;}
+  .ai-limit-reset {text-align:right;}
+  .ai-limit-reset-label {font-size:10px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px;}
+  .ai-limit-reset-val {font-family:'Syne',sans-serif; font-size:22px; font-weight:700; color:var(--text);}
+  .ai-bar-track {height:8px; background:var(--surface2); border:1px solid var(--border); margin-bottom:12px; overflow:hidden;}
+  .ai-bar-fill {height:100%; background:var(--green); transition:width .8s ease;}
+  .ai-bar-labels {display:flex; justify-content:space-between; font-size:10px; color:var(--muted); letter-spacing:1px;}
+  .ai-detail-row {display:flex; gap:1px; background:var(--border); margin-top:24px;}
+  .ai-detail-cell {flex:1; background:var(--surface2); padding:16px; text-align:center;}
+  .ai-detail-cell .adc-label {font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:6px;}
+  .ai-detail-cell .adc-val {font-family:'Syne',sans-serif; font-size:20px; font-weight:800; color:var(--text);}
+  .ai-detail-cell .adc-val.green {color:var(--green);}
+  .ai-detail-cell .adc-val.warn {color:#f59e0b;}
+  .ai-detail-cell .adc-val.danger {color:#ef4444;}
   
   .side-menu {position:fixed; top:0; right:-320px; width:300px; height:100vh; background:var(--surface); border-left:1px solid var(--border); transition:right 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index:200; padding:32px 24px; box-shadow:-10px 0 30px rgba(0,0,0,0.5);}
   .side-menu.open {right:0;}
@@ -97,11 +129,10 @@
   .loading{color:var(--muted);font-size:13px;padding:24px 0;}
 
   /* RANK ITEM GÖRSEL */
-  .rank-thumb{width:40px;height:40px;min-width:40px;max-width:40px;flex-shrink:0;object-fit:cover;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:16px;overflow:hidden;position:relative;}
-  .rank-thumb img{width:40px;height:40px;min-width:40px;max-width:40px;object-fit:cover;display:block;position:absolute;top:0;left:0;}
-  .rank-thumb-placeholder{width:40px;height:40px;min-width:40px;max-width:40px;flex-shrink:0;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);overflow:hidden;position:relative;}
-  .rank-thumb-placeholder img{width:40px;height:40px;object-fit:cover;display:block;position:absolute;top:0;left:0;}
-  .rank-item{display:grid;grid-template-columns:36px 40px 1fr auto;align-items:center;gap:12px;background:var(--surface);padding:10px 16px;transition:background .15s,border-left-color .15s;border-left:2px solid transparent;cursor:pointer;overflow:hidden;}
+  .rank-thumb{width:40px;height:40px;min-width:40px;object-fit:cover;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:16px;overflow:hidden;}
+  .rank-thumb img{width:40px;height:40px;object-fit:cover;display:block;}
+  .rank-thumb-placeholder{width:40px;height:40px;min-width:40px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);}
+  .rank-item{display:grid;grid-template-columns:36px 40px 1fr auto;align-items:center;gap:12px;background:var(--surface);padding:10px 16px;transition:background .15s,border-left-color .15s;border-left:2px solid transparent;cursor:pointer;}
   .rank-item:hover{background:var(--surface2);border-left-color:var(--green);}
 
   /* MODAL VE GRAFİKLER */
@@ -445,6 +476,19 @@
     </div>
     <div style="display:flex;align-items:center;gap:12px">
       <div class="sync-info" id="syncInfo"><span class="dot"></span> Yükleniyor...</div>
+      <!-- ARALIK SEÇİCİ -->
+      <div class="aralik-wrap" id="aralilkWrap">
+        <button class="aralik-btn" id="aralilkBtn" onclick="toggleAralikMenu(event)">
+          <span id="aralilkLabel">Tüm Zamanlar</span>
+          <span class="aralik-arrow">▼</span>
+        </button>
+        <div class="aralik-dropdown" id="aralilkDropdown">
+          <div class="aralik-option" data-val="1hafta"  onclick="setAralik('1hafta','1 Hafta',this)">1 Hafta</div>
+          <div class="aralik-option" data-val="1ay"     onclick="setAralik('1ay','1 Ay',this)">1 Ay</div>
+          <div class="aralik-option" data-val="1yil"    onclick="setAralik('1yil','1 Yıl',this)">1 Yıl</div>
+          <div class="aralik-option active" data-val="tumzamanlar" onclick="setAralik('tumzamanlar','Tüm Zamanlar',this)">Tüm Zamanlar</div>
+        </div>
+      </div>
       <button onclick="downloadPNG()" id="dlBtn" title="Görüntüyü İndir" class="hamburger-btn">↓</button>
       <button onclick="toggleMenu()" class="hamburger-btn">☰</button>
     </div>
@@ -544,46 +588,49 @@
     </div>
   </div>
 
-  <!-- KULLANIM VE LİMİTLER EKRANI (GÜNCELLENDİ) -->
+  <!-- KULLANIM VE LİMİTLER EKRANI — Sadece AI Limiti -->
   <div id="view-kullanim" class="view-section">
-    <div class="section-title">Sunucu (Render) Durumu</div>
-    <div class="stats-row" id="serverStatsRow">
-      <div class="stat-card">
-        <div class="label">CPU Kullanımı</div>
-        <div class="value" id="sysCpu">—</div>
-        <div class="bar-wrap" style="margin-top:10px; background:var(--surface2)"><div class="bar-fill" id="sysCpuBar" style="width:0%"></div></div>
+    <div class="section-title">AI Kullanım Limiti</div>
+    <div class="ai-limit-card">
+      <div class="ai-limit-top">
+        <div>
+          <div class="ai-limit-title">Kalan İstek Hakkı</div>
+          <div class="ai-limit-val" id="aiRemaining">—</div>
+          <div class="ai-limit-sub">Toplam 3.000 limit · Tüm kullanıcılar ortak</div>
+        </div>
+        <div class="ai-limit-reset">
+          <div class="ai-limit-reset-label">Limite dolmasına</div>
+          <div class="ai-limit-reset-val" id="aiResetCountdown">—</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">saat kaldı (sıfırlama)</div>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="label">RAM Kullanımı</div>
-        <div class="value" id="sysRam">—</div>
-        <div class="sub" id="sysRamDetail">— MB / — MB</div>
-        <div class="bar-wrap" style="margin-top:10px; background:var(--surface2)"><div class="bar-fill" id="sysRamBar" style="width:0%"></div></div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Ağ Trafiği (G/Ç)</div>
-        <div class="value" id="sysNet" style="font-size:16px">—</div>
-        <div class="sub">Sunucu veri trafiği</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Uptime (Çalışma)</div>
-        <div class="value" id="sysUptime" style="font-size:18px">—</div>
-        <div class="sub">Son yeniden başlatmadan beri</div>
-      </div>
-    </div>
 
-    <!-- AI LIMITLERI -->
-    <div class="section-title" style="margin-top:32px">AI Hizmetleri (Gemini API)</div>
-    <div class="stats-row" id="aiStatsRow">
-      <div class="stat-card">
-        <div class="label">Kalan İstek Hakkı</div>
-        <div class="value" id="aiRemaining">—</div>
-        <div class="sub">Toplam 3.000 limit üzerinden (tüm uygulama)</div>
-        <div class="bar-wrap" style="margin-top:10px; background:var(--surface2)"><div class="bar-fill" id="aiRemainingBar" style="width:0%"></div></div>
+      <div class="ai-bar-track">
+        <div class="ai-bar-fill" id="aiRemainingBar" style="width:0%"></div>
       </div>
-      <div class="stat-card" style="cursor:pointer" onclick="openLimitsModal()">
-        <div class="label">Kullanıcı Bazlı Detay</div>
-        <div class="value" style="font-size:22px" id="aiUsedTotal">—</div>
-        <div class="sub">Toplam kullanılan istek · detay için tıkla</div>
+      <div class="ai-bar-labels">
+        <span>0</span>
+        <span id="aiBarUsed">0 kullanıldı</span>
+        <span>3.000</span>
+      </div>
+
+      <div class="ai-detail-row">
+        <div class="ai-detail-cell">
+          <div class="adc-label">Kullanılan</div>
+          <div class="adc-val" id="aiUsedTotal">—</div>
+        </div>
+        <div class="ai-detail-cell">
+          <div class="adc-label">Kalan</div>
+          <div class="adc-val green" id="aiRemainingDetail">—</div>
+        </div>
+        <div class="ai-detail-cell">
+          <div class="adc-label">Limit</div>
+          <div class="adc-val" style="color:var(--muted)">3.000</div>
+        </div>
+        <div class="ai-detail-cell" style="cursor:pointer" onclick="openLimitsModal()">
+          <div class="adc-label">Kullanıcı Detayı</div>
+          <div class="adc-val" style="font-size:14px;color:var(--muted)">↗ Tıkla</div>
+        </div>
       </div>
     </div>
 
@@ -615,21 +662,6 @@
             <div id="limitsModalBar" style="background:var(--green);height:6px;width:0%;transition:width .6s;"></div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- UPTIMEROBOT DURUMU -->
-    <div class="section-title" style="margin-top:32px">UptimeRobot (Erişilebilirlik) Durumu</div>
-    <div class="stats-row" id="uptimeStatsRow">
-      <div class="stat-card">
-        <div class="label">Sistem Durumu</div>
-        <div class="value" id="urStatus">—</div>
-        <div class="sub">UptimeRobot API anlık verisi</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Tüm Zamanlar Uptime</div>
-        <div class="value" id="urRatio">—</div>
-        <div class="sub">Kesintisiz çalışma oranı</div>
       </div>
     </div>
   </div>
@@ -697,8 +729,43 @@ function toggleMenu() {
   if(overlay) overlay.classList.toggle('open');
 }
 
+// ===================== ARALIK SEÇİCİ =====================
+let _currentAralik = 'tumzamanlar';
+
+function toggleAralikMenu(e) {
+  e.stopPropagation();
+  const btn      = document.getElementById('aralilkBtn');
+  const dropdown = document.getElementById('aralilkDropdown');
+  btn.classList.toggle('open');
+  dropdown.classList.toggle('open');
+}
+
+function setAralik(val, label, el) {
+  _currentAralik = val;
+  document.getElementById('aralilkLabel').textContent = label;
+  document.getElementById('aralilkBtn').classList.remove('open');
+  document.getElementById('aralilkDropdown').classList.remove('open');
+  document.querySelectorAll('.aralik-option').forEach(o => o.classList.remove('active'));
+  el.classList.add('active');
+
+  // Aralik değişince sadece istatistikler ve topluluk sayfaları için yeniden yükle
+  const activeView = document.querySelector('.view-section.active');
+  if (!activeView) return;
+  const vid = activeView.id.replace('view-', '');
+  if (vid === 'istatistikler') reloadStats();
+  if (vid === 'topluluk') loadTopluluk(_currentAralik);
+}
+
+// Dışarı tıklanınca dropdown kapansın
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#aralilkWrap')) {
+    document.getElementById('aralilkBtn')?.classList.remove('open');
+    document.getElementById('aralilkDropdown')?.classList.remove('open');
+  }
+});
+
 // ===================== EKRAN GEÇİŞ FONKSİYONLARI =====================
-let sysStatsInterval = null;
+let _aiStatsInterval = null;
 
 function switchView(viewId) {
   document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
@@ -716,61 +783,65 @@ function switchView(viewId) {
   };
   document.getElementById('headerSubtitle').textContent = titles[viewId] || '';
 
-  if (viewId === 'topluluk') loadTopluluk();
-  if (viewId === 'duzenle')  loadPlaylists();
+  // Aralik dropdown'unu sadece istatistikler ve topluluk sayfalarında göster
+  const showAralik = (viewId === 'istatistikler' || viewId === 'topluluk');
+  const aralilkWrap = document.getElementById('aralilkWrap');
+  if (aralilkWrap) aralilkWrap.style.display = showAralik ? 'inline-block' : 'none';
 
+  if (viewId === 'topluluk') loadTopluluk(_currentAralik);
+  if (viewId === 'duzenle')  loadPlaylists();
   if (viewId === 'kullanim') {
-    loadSystemStats();
-    if (!sysStatsInterval) sysStatsInterval = setInterval(loadSystemStats, 5000);
+    loadAiStats();
+    if (!_aiStatsInterval) _aiStatsInterval = setInterval(loadAiStats, 30000);
   } else {
-    if (sysStatsInterval) { clearInterval(sysStatsInterval); sysStatsInterval = null; }
+    if (_aiStatsInterval) { clearInterval(_aiStatsInterval); _aiStatsInterval = null; }
   }
 }
 
-// ===================== SİSTEM METRİKLERİ FONKSİYONLARI (GÜNCELLENDİ) =====================
-async function loadSystemStats() {
+// ===================== AI LİMİT FONKSİYONLARI =====================
+function _calcResetCountdown() {
+  // Her gün 00:00 UTC'de sıfırlanıyor
+  const now     = new Date();
+  const utcNow  = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(),
+                           now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds());
+  const tomorrow = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0);
+  const diffMs  = tomorrow - utcNow;
+  const diffH   = Math.floor(diffMs / 3600000);
+  const diffM   = Math.floor((diffMs % 3600000) / 60000);
+  return `${diffH} saat ${diffM} dakika`;
+}
+
+async function loadAiStats() {
   try {
-    const res = await fetch('/api/system-stats');
-    if(!res.ok) return;
+    const res  = await fetch('/api/system-stats');
+    if (!res.ok) return;
     const data = await res.json();
-    if(data.status === 'ok') {
-      // 1) Sunucu Durumu
-      document.getElementById('sysCpu').textContent = data.cpu_percent + '%';
-      document.getElementById('sysCpuBar').style.width = data.cpu_percent + '%';
-      
-      document.getElementById('sysRam').textContent = data.ram_percent + '%';
-      document.getElementById('sysRamDetail').textContent = data.ram_used_mb + ' MB / ' + data.ram_total_mb + ' MB';
-      document.getElementById('sysRamBar').style.width = data.ram_percent + '%';
-      
-      document.getElementById('sysNet').textContent = data.net_sent_mb + ' MB 🔼 / ' + data.net_recv_mb + ' MB 🔽';
-      document.getElementById('sysUptime').textContent = data.uptime;
+    if (data.status !== 'ok') return;
 
-      // 2) AI Limitleri
-      if (data.ai_remaining !== undefined) {
-        document.getElementById('aiRemaining').textContent = data.ai_remaining.toLocaleString('tr-TR');
-        const used = (data.ai_total || 3000) - data.ai_remaining;
-        const usedEl = document.getElementById('aiUsedTotal');
-        if (usedEl) usedEl.textContent = used.toLocaleString('tr-TR');
-        const pct = Math.max(0, Math.min(100, (data.ai_remaining / data.ai_total) * 100));
-        const bar = document.getElementById('aiRemainingBar');
-        bar.style.width = pct + '%';
-        if (pct < 10) bar.style.background = '#ff4444'; // %10'dan az kalırsa kırmızı
-        else bar.style.background = 'var(--green)';
-      }
+    const total     = data.ai_total     || 3000;
+    const remaining = data.ai_remaining !== undefined ? data.ai_remaining : total;
+    const used      = total - remaining;
+    const pct       = Math.max(0, Math.min(100, (remaining / total) * 100));
 
-      // 3) UptimeRobot Durumu
-      if (data.uptimerobot) {
-        const urStatusEl = document.getElementById('urStatus');
-        urStatusEl.textContent = data.uptimerobot.status;
-        
-        // Renklendirme
-        if(data.uptimerobot.status.includes('UP')) urStatusEl.style.color = 'var(--green)';
-        else if(data.uptimerobot.status.includes('DOWN')) urStatusEl.style.color = '#ff4444';
-        else urStatusEl.style.color = 'var(--text)';
+    document.getElementById('aiRemaining').textContent       = remaining.toLocaleString('tr-TR');
+    document.getElementById('aiRemainingDetail').textContent = remaining.toLocaleString('tr-TR');
+    document.getElementById('aiUsedTotal').textContent       = used.toLocaleString('tr-TR');
+    document.getElementById('aiBarUsed').textContent         = used.toLocaleString('tr-TR') + ' kullanıldı';
+    document.getElementById('aiResetCountdown').textContent  = _calcResetCountdown();
 
-        const ratio = data.uptimerobot.uptime_ratio;
-        document.getElementById('urRatio').textContent = ratio !== '—' ? '%' + ratio : '—';
-      }
+    const bar = document.getElementById('aiRemainingBar');
+    bar.style.width = pct + '%';
+    // Renk: %20'nin altında turuncu, %10'un altında kırmızı
+    const detailVal = document.getElementById('aiRemainingDetail');
+    if (pct < 10) {
+      bar.style.background = '#ef4444';
+      detailVal.className = 'adc-val danger';
+    } else if (pct < 20) {
+      bar.style.background = '#f59e0b';
+      detailVal.className = 'adc-val warn';
+    } else {
+      bar.style.background = 'var(--green)';
+      detailVal.className = 'adc-val green';
     }
   } catch(e) {}
 }
@@ -811,14 +882,21 @@ async function toggleIzin() {
 
 // ===================== TOPLULUK İSTATİSTİKLERİ =====================
 let _toplulukLoaded = false;
+let _toplulukAralik = null;
 
-async function loadTopluluk() {
+async function loadTopluluk(aralik) {
+  const a = aralik || _currentAralik || 'tumzamanlar';
+  // Aralik değişmişse cache'i sıfırla
+  if (a !== _toplulukAralik) {
+    _toplulukLoaded = false;
+    _toplulukAralik = a;
+  }
   if (_toplulukLoaded) return;
   const content = document.getElementById('toplulukContent');
   content.innerHTML = '<div class="loading">Topluluk verileri yükleniyor...</div>';
 
   try {
-    const res  = await fetch('/api/istatistikler');
+    const res  = await fetch('/api/istatistikler?aralik=' + a);
     const data = await res.json();
 
     if (data.error === 'Henüz kimse izin vermemiş') {
@@ -1357,9 +1435,32 @@ async function openSanatciModal(sanatci) {
   `;
 }
 
-async function fetchData() {
-  const res = await fetch('/api/dashboard');
+async function fetchData(aralik) {
+  const param = aralik || _currentAralik || 'tumzamanlar';
+  const res = await fetch('/api/dashboard?aralik=' + param);
   return res.ok ? res.json() : null;
+}
+
+async function reloadStats() {
+  // Listeleri "Yükleniyor..." yap
+  ['topTracks','topArtists','topAlbums'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<div class="loading">Yükleniyor...</div>';
+  });
+  const data = await fetchData(_currentAralik);
+  if (!data) return;
+  renderStats(data);
+  renderWeek(data.hafta);
+  renderRankList('topTracks',  data.top_sarkilar,   'sarki',   'sanatci', 'count', 'kac_gundur', 'openSarkiModal');
+  renderRankList('topArtists', data.top_sanatcilar, 'sanatci', null,      'count', 'kac_gundur', 'openSanatciModal');
+  if (data.top_albumler) {
+    renderRankList('topAlbums', data.top_albumler, 'album', 'sanatci', 'count', 'kac_gundur', 'openAlbumModal');
+  }
+  if (data.genel_saatler && data.genel_vakitler) {
+    document.getElementById('globalHourChartContainer').innerHTML = renderHourChart(data.genel_saatler);
+    document.getElementById('globalVakitContainer').innerHTML = renderVakitler(data.genel_vakitler);
+  }
+  renderMonths(data.aylar);
 }
 
 function renderStats(d) {
@@ -1393,16 +1494,13 @@ async function _fetchSpotifyImg(type, name, sub) {
   if (_imgCache[cacheKey] !== undefined) return _imgCache[cacheKey];
   _imgCache[cacheKey] = null; // önce null set et (paralel istekleri engeller)
   try {
-    // FIX: Query param olarak gönder — path'e gömmek yerine
-    // Bu sayede / ve özel karakterler sorun çıkarmaz
     let url = '';
-    const params = new URLSearchParams({ q: name, sanatci: sub || '' });
     if (type === 'artist') {
-      url = '/api/sanatci-gorsel?' + new URLSearchParams({ q: name });
+      url = '/api/sanatci-gorsel/' + encodeURIComponent(name);
     } else if (type === 'track') {
-      url = '/api/sarki-gorsel?' + params;
+      url = '/api/sarki-gorsel/' + encodeURIComponent(name) + '?sanatci=' + encodeURIComponent(sub||'');
     } else if (type === 'album') {
-      url = '/api/album-gorsel?' + params;
+      url = '/api/album-gorsel/' + encodeURIComponent(name) + '?sanatci=' + encodeURIComponent(sub||'');
     }
     if (!url) return null;
     const res = await fetch(url);
@@ -1712,7 +1810,11 @@ async function createPlaylist(type, btn) {
 
 // ===================== BAŞLATMA =====================
 async function init() {
-  const data = await fetchData();
+  // Başlangıçta aralik dropdown görünür (istatistikler sayfası aktif)
+  const aralilkWrap = document.getElementById('aralilkWrap');
+  if (aralilkWrap) aralilkWrap.style.display = 'inline-block';
+
+  const data = await fetchData('tumzamanlar');
   if (!data) return;
   renderStats(data);
   renderWeek(data.hafta);
