@@ -1492,15 +1492,16 @@ const _imgCache = {};
 async function _fetchSpotifyImg(type, name, sub) {
   const cacheKey = type + ':' + name;
   if (_imgCache[cacheKey] !== undefined) return _imgCache[cacheKey];
-  _imgCache[cacheKey] = null; // önce null set et (paralel istekleri engeller)
+  _imgCache[cacheKey] = null;
   try {
     let url = '';
+    // FIX: query param kullan — path'e gömmek Türkçe/özel karakterleri bozuyor
     if (type === 'artist') {
-      url = '/api/sanatci-gorsel/' + encodeURIComponent(name);
+      url = '/api/sanatci-gorsel?' + new URLSearchParams({ q: name });
     } else if (type === 'track') {
-      url = '/api/sarki-gorsel/' + encodeURIComponent(name) + '?sanatci=' + encodeURIComponent(sub||'');
+      url = '/api/sarki-gorsel?'  + new URLSearchParams({ q: name, sanatci: sub || '' });
     } else if (type === 'album') {
-      url = '/api/album-gorsel/' + encodeURIComponent(name) + '?sanatci=' + encodeURIComponent(sub||'');
+      url = '/api/album-gorsel?'  + new URLSearchParams({ q: name, sanatci: sub || '' });
     }
     if (!url) return null;
     const res = await fetch(url);
