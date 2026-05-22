@@ -285,3 +285,69 @@ def api_ai_limits():
         "remaining": max(0, config.AI_MAX_REQUESTS - grand_total),
         "users": list(user_totals.values()),
     })
+
+
+@bp.route("/api/ai/recommend-details", methods=["POST"])
+def api_ai_recommend_details():
+    """
+    AI'in önerdiği şarkı listesi için Spotify'dan kapak + metadata çeker.
+    Body: {"tracks": [{"track": "...", "artist": "..."}, ...]}
+    Response: {"tracks": [{"track":..., "artist":..., "cover_url":..., "spotify_url":...}, ...]}
+    """
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giriş yapılmamış"}), 401
+
+    body = request.get_json(silent=True) or {}
+    tracks = body.get("tracks", [])
+    if not tracks:
+        return jsonify({"tracks": []})
+
+    import requests as _req
+
+    results = []
+    try:
+        token = spotify._get_access_token()
+    except Exception:
+        token = None
+
+    for item in tracks[:10]:
+        track_name  = (item.get("track") or "").strip()
+        artist_name = (item.get("artist") or "").strip()
+        if not track_name:
+            continue
+
+        result = {
+            "track":       track_name,
+            "artist":      artist_name,
+            "cover_url":   None,
+            "spotify_url": None,
+            "track_id":    None,
+        }
+
+        if token:
+            try:
+                q = f"{track_name} {artist_name}".strip()
+                resp = _req.get(
+                    "https://api.spotify.com/v1/search",
+                    headers={"Authorization": f"Bearer {token}"},
+                    params={"q": q, "type": "track", "limit": 1},
+                    timeout=4,
+                )
+                if resp.status_code == 200:
+                    items = resp.json().get("tracks", {}).get("items", [])
+                    if items:
+                        t = items[0]
+                        images = t.get("album", {}).get("images", [])
+                        result["cover_url"]   = images[0]["url"] if images else None
+                        result["spotify_url"] = t.get("external_urls", {}).get("spotify")
+                        result["track_id"]    = t.get("id")
+                        # API'den gelen gerçek adları kullan
+                        result["track"]  = t.get("name", track_name)
+                        result["artist"] = ", ".join(a["name"] for a in t.get("artists", [])) or artist_name
+            except Exception as e:
+                logger.warning(f"Öneri detay hatası '{track_name}': {e}")
+
+        results.append(result)
+
+    return jsonify({"tracks": results})
