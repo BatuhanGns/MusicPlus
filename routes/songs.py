@@ -31,52 +31,81 @@ _gorsel_cache = {}
 
 
 def _spotify_search_image(q, item_type="artist"):
+    """
+    Spotify Search API kullanarak görsel URL döndürür.
+
+    DÜZELTMELER:
+    1. market parametresi kaldırıldı (Kasım 2024 deprecated → 400 hatası).
+    2. Token artık get_current_user_id() ile gelen session'dan alınıyor;
+       başka kullanıcının token'ı kullanılma riski ortadan kalktı.
+    3. images[0] kullanılıyor (en büyük görsel); [-1] en küçüğü veriyordu.
+    4. Görsel route'larında <path:> converter eksikliği düzeltildi (aşağıda).
+    """
     cache_key = f"{item_type}:{q}"
     if cache_key in _gorsel_cache:
         return _gorsel_cache[cache_key]
     try:
-        uid = next(iter(config._user_cache), None)
-        if not uid:
-            return None
-        token = config._user_cache[uid].get("access_token")
+        # Token'ı doğrudan session'daki aktif kullanıcıdan al
+        token = None
+        if has_request_context_safe():
+            token = _get_token_from_session()
+        if not token:
+            # Fallback: SpotifyClient üzerinden taze token al
+            token = spotify._get_access_token()
         if not token:
             return None
-            
-        params = {"q": q, "type": item_type, "limit": 1, "market": "TR"}
-        
-        # SADECE BU SATIR DEĞİŞTİ: Orijinal Spotify Arama API adresi.
+
+        # FIX: market parametresi kaldırıldı (Kasım 2024 deprecated)
+        params = {"q": q, "type": item_type, "limit": 1}
+
         resp = requests.get(
             "https://api.spotify.com/v1/search",
             headers={"Authorization": f"Bearer {token}"},
             params=params,
             timeout=4,
         )
-        
+
         if resp.status_code != 200:
             _gorsel_cache[cache_key] = None
             return None
-            
+
         data = resp.json()
         img_url = None
-        
-        # Ayrıştırma (Parse) mantığın tamamen doğru, dokunmadım.
+
         if item_type == "artist":
             items = data.get("artists", {}).get("items", [])
             if items and items[0].get("images"):
-                img_url = items[0]["images"][-1]["url"]
+                # FIX: [0] → en büyük görsel ([-1] en küçüğü veriyordu)
+                img_url = items[0]["images"][0]["url"]
         elif item_type == "track":
             items = data.get("tracks", {}).get("items", [])
             if items and items[0].get("album", {}).get("images"):
-                img_url = items[0]["album"]["images"][-1]["url"]
+                img_url = items[0]["album"]["images"][0]["url"]
         elif item_type == "album":
             items = data.get("albums", {}).get("items", [])
             if items and items[0].get("images"):
-                img_url = items[0]["images"][-1]["url"]
-                
+                img_url = items[0]["images"][0]["url"]
+
         _gorsel_cache[cache_key] = img_url
         return img_url
     except Exception as e:
         logger.error(f"Görsel arama hatası: {e}")
+        return None
+
+
+def has_request_context_safe():
+    try:
+        from flask import has_request_context
+        return has_request_context()
+    except Exception:
+        return False
+
+
+def _get_token_from_session():
+    try:
+        from flask import session
+        return session.get("access_token")
+    except Exception:
         return None
 
 
@@ -231,7 +260,7 @@ def api_sanatci_detay(sanatci_adi):
 
 # ── Albüm Detay ──────────────────────────────────────────────────────────────
 
-@bp.route("/api/album/<album_adi>")
+@bp.route("/api/album/<path:album_adi>")
 def api_album(album_adi):
     try:
         uid = get_current_user_id()
@@ -401,7 +430,7 @@ def api_tum_albumler():
 
 # ── Aylık Detay ──────────────────────────────────────────────────────────────
 
-@bp.route("/api/ay/<ay_label>")
+@bp.route("/api/ay/<path:ay_label>")
 def api_ay_detay(ay_label):
     try:
         uid = get_current_user_id()
@@ -485,8 +514,9 @@ def api_ay_detay(ay_label):
 
 
 # ── Görsel Endpoint'leri ─────────────────────────────────────────────────────
+# FIX: <path:> converter eklendi — sanatçı/şarkı/albüm adlarında / karakteri olabilir
 
-@bp.route("/api/sanatci-gorsel/<sanatci>")
+@bp.route("/api/sanatci-gorsel/<path:sanatci>")
 def api_sanatci_gorsel(sanatci):
     uid = get_current_user_id()
     if not uid:
@@ -495,7 +525,7 @@ def api_sanatci_gorsel(sanatci):
     return jsonify({"image_url": img})
 
 
-@bp.route("/api/sarki-gorsel/<sarki>")
+@bp.route("/api/sarki-gorsel/<path:sarki>")
 def api_sarki_gorsel(sarki):
     uid = get_current_user_id()
     if not uid:
@@ -506,7 +536,7 @@ def api_sarki_gorsel(sarki):
     return jsonify({"image_url": img})
 
 
-@bp.route("/api/album-gorsel/<album>")
+@bp.route("/api/album-gorsel/<path:album>")
 def api_album_gorsel(album):
     uid = get_current_user_id()
     if not uid:
