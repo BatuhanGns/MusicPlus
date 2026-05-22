@@ -7,7 +7,7 @@ Yapı:
   config.py          → Ortam değişkenleri ve sabitler
   extensions.py      → Client instance'ları ve shared state
   utils/helpers.py   → Pure fonksiyonlar (istatistik, formatlama)
-  routes/            → Endpoint blueprint'leri (auth, stats, songs, playlists, ai, system, topluluk)
+  routes/            → Endpoint blueprint'leri
   clients/           → Spotify, Sheets, Gemini client modülleri
   templates/         → HTML şablonları
 """
@@ -31,29 +31,38 @@ def create_app():
     app.secret_key = config.SECRET_KEY
     app.config["PERMANENT_SESSION_LIFETIME"] = config.PERMANENT_SESSION_LIFETIME
 
-    # Tüm blueprint'leri kaydet
     register_blueprints(app)
 
+    # FIX: Scheduler'ı sadece __main__'de değil, her ortamda başlat
+    # (Gunicorn/Render gibi production ortamlarında __main__ bloku çalışmaz)
+    _start_scheduler()
+
     return app
+
+
+def _start_scheduler():
+    """APScheduler'ı başlatır. Çift başlamayı önlemek için kontrol eder."""
+    try:
+        scheduler = BackgroundScheduler()
+        # Her 30 dakikada bir tüm kullanıcıları senkronize et
+        scheduler.add_job(scheduled_sync_all, "cron", minute="0,30", id="spotify_sync")
+        # Her gün 00:00 UTC'de günlük AI limiti sıfırla + aylık arşive yaz
+        scheduler.add_job(
+            lambda: sheets.reset_daily_limits(),
+            "cron",
+            hour=0,
+            minute=0,
+            id="daily_limit_reset",
+            timezone="UTC",
+        )
+        scheduler.start()
+        logger.info("⏰ Scheduler başlatıldı (her 30 dakika sync + 00:00 UTC limit sıfırlama)")
+    except Exception as e:
+        logger.error(f"❌ Scheduler başlatma hatası: {e}")
 
 
 app = create_app()
 
 if __name__ == "__main__":
-    scheduler = BackgroundScheduler()
-    # Her 30 dakikada bir tüm kullanıcıları senkronize et
-    scheduler.add_job(scheduled_sync_all, "cron", minute="0,30", id="spotify_sync")
-    # Her gün 00:00 UTC'de günlük AI limit sıfırla + aylık arşive yaz
-    scheduler.add_job(
-        lambda: sheets.reset_daily_limits(),
-        "cron",
-        hour=0,
-        minute=0,
-        id="daily_limit_reset",
-        timezone="UTC",
-    )
-    scheduler.start()
-    logger.info("⏰ Scheduler başlatıldı (her 30 dakika sync + 00:00 UTC limit sıfırlama)")
-
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
