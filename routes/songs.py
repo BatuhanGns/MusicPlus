@@ -33,25 +33,14 @@ _gorsel_cache = {}
 def _spotify_search_image(q, item_type="artist"):
     """
     Spotify Search API kullanarak görsel URL döndürür.
-
-    DÜZELTMELER:
-    1. market parametresi kaldırıldı (Kasım 2024 deprecated → 400 hatası).
-    2. Token artık get_current_user_id() ile gelen session'dan alınıyor;
-       başka kullanıcının token'ı kullanılma riski ortadan kalktı.
-    3. images[0] kullanılıyor (en büyük görsel); [-1] en küçüğü veriyordu.
-    4. Görsel route'larında <path:> converter eksikliği düzeltildi (aşağıda).
+    SpotifyClient._ get_access_token() ile her zaman taze token alır.
+    market parametresi Kasim 2024'te deprecated oldugundan kullanilmiyor.
     """
     cache_key = f"{item_type}:{q}"
     if cache_key in _gorsel_cache:
         return _gorsel_cache[cache_key]
     try:
-        # Token'ı doğrudan session'daki aktif kullanıcıdan al
-        token = None
-        if has_request_context_safe():
-            token = _get_token_from_session()
-        if not token:
-            # Fallback: SpotifyClient üzerinden taze token al
-            token = spotify._get_access_token()
+        token = spotify._get_access_token()
         if not token:
             return None
 
@@ -90,22 +79,6 @@ def _spotify_search_image(q, item_type="artist"):
         return img_url
     except Exception as e:
         logger.error(f"Görsel arama hatası: {e}")
-        return None
-
-
-def has_request_context_safe():
-    try:
-        from flask import has_request_context
-        return has_request_context()
-    except Exception:
-        return False
-
-
-def _get_token_from_session():
-    try:
-        from flask import session
-        return session.get("access_token")
-    except Exception:
         return None
 
 
