@@ -4,7 +4,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Model öncelik sırası — ilk başarısız olursa diğerine geçilir
 MODELS = ["gemma-4-31b-it", "gemma-4-26b-a4b-it"]
 
 SYSTEM_PROMPT = """Sen Music+ uygulamasının yapay zeka müzik asistanısın. Kullanıcının Spotify dinleme geçmişini ve alışkanlıklarını analiz ederek yardımcı olursun.
@@ -34,6 +33,13 @@ KOMUT FORMATLARI (bir işlem yapman gerektiğinde YANITININ SONUNA ekle):
 5. Playlist karıştırmak:
 {"action":"shuffle_playlist","playlist_id":"PLAYLIST_ID"}
 
+6. Şarkı önerisi (görsel kartlar ile gösterilecek):
+Kullanıcı müzik önerisi, öneri, öneri yap, şarkı öner gibi şeyler istediğinde MUTLAKA bu formatı kullan:
+{"action":"recommend_tracks","tracks":[{"track":"Şarkı Adı","artist":"Sanatçı Adı"},{"track":"Şarkı Adı 2","artist":"Sanatçı Adı 2"}]}
+- tracks dizisinde en az 5, en fazla 10 şarkı olsun
+- Öneri metnini yaz, ardından bu JSON'u YANITININ EN SONUNA ekle
+- "Sana şu şarkıları öneririm:" gibi bir liste YAZMA, sadece açıklama yaz — kartlar otomatik gösterilecek
+
 KURALLAR:
 - Türkçe konuş, samimi ve yardımsever ol
 - Yanıtların kısa ve öz olsun, gereksiz uzatma
@@ -41,7 +47,7 @@ KURALLAR:
 - JSON komutunu yanıtın en sonuna yaz, başka yerde yazma
 - Kullanıcının dinleme geçmişine dayalı kişiselleştirilmiş öneriler sun
 - Tam detaylı analiz yapman istendiğinde ay bazlı trendleri, sanatçı profilini ve dinleme kalıplarını kapsamlı şekilde açıkla
-- Playlist düzenleme veya şarkı ekleme işlemlerinde MUTLAKA sağlanan playlist listesindeki gerçek ID'yi kullan. Playlist adını asla playlist_id olarak kullanma. ID her zaman "ID: XXXX" formatında sağlanır.
+- Playlist düzenleme veya şarkı ekleme işlemlerinde MUTLAKA sağlanan playlist listesindeki gerçek ID'yi kullan
 """
 
 
@@ -58,8 +64,8 @@ class GeminiClient:
     def build_spotify_context(now_playing: dict | None, recent_tracks: list | None) -> str:
         lines = []
         if now_playing and now_playing.get("playing"):
-            durum = "çalıyor" if now_playing.get("is_playing") else "duraklatıldı"
-            lines.append(f"Şu an {durum}: {now_playing['track_name']} — {now_playing['artist_name']} ({now_playing.get('album_name','')})")
+            durum = "calıyor" if now_playing.get("is_playing") else "duraklatıldı"
+            lines.append(f"Su an {durum}: {now_playing['track_name']} — {now_playing['artist_name']} ({now_playing.get('album_name','')})")
         if recent_tracks:
             lines.append("Son dinlenenler (en yeni → eski):")
             for t in recent_tracks[:8]:
@@ -67,29 +73,19 @@ class GeminiClient:
         return "\n".join(lines)
 
     def stream_chat(self, messages: list, spotify_context: str = ""):
-        """
-        Generator: her chunk için SSE-uyumlu JSON satırı yield eder.
-
-        Chunk tipleri:
-          {"type":"thinking", "text":"..."}   — düşünme süreci (collapsible)
-          {"type":"text",     "text":"..."}   — asıl yanıt (stream)
-          {"type":"done",  "model":"..."}     — tamamlandı
-          {"type":"error",    "text":"..."}   — hata
-        """
         try:
             from google import genai
             from google.genai import types
         except ImportError:
-            yield json.dumps({"type": "error", "text": "google-genai paketi eksik. Lütfen sunucuya yükleyin: pip install google-genai"})
+            yield json.dumps({"type": "error", "text": "google-genai paketi eksik."})
             return
 
         if not self.api_key:
-            yield json.dumps({"type": "error", "text": "GEMINI_API_KEY ortam değişkeni ayarlanmamış."})
+            yield json.dumps({"type": "error", "text": "GEMINI_API_KEY ayarlanmamis."})
             return
 
         client = genai.Client(api_key=self.api_key)
 
-        # Mesajları Gemini formatına çevir
         gemini_contents = []
         for msg in messages:
             role = "user" if msg["role"] == "user" else "model"
@@ -102,14 +98,12 @@ class GeminiClient:
         last_error = None
         for model in MODELS:
             try:
-                logger.info(f"🤖 Gemini isteği: {model}, {len(messages)} mesaj")
-
+                logger.info(f"Gemini istegi: {model}, {len(messages)} mesaj")
                 config = types.GenerateContentConfig(
                     system_instruction=system_prompt,
                     thinking_config=types.ThinkingConfig(thinking_level="HIGH"),
                     temperature=0.9,
                 )
-
                 for chunk in client.models.generate_content_stream(
                     model=model,
                     contents=gemini_contents,
@@ -134,12 +128,11 @@ class GeminiClient:
                 return
 
             except Exception as e:
-                logger.warning(f"⚠️ Model {model} başarısız: {e}")
+                logger.warning(f"Model {model} basarisiz: {e}")
                 last_error = str(e)
-                # Bir sonraki modele geç
                 continue
 
         yield json.dumps(
-            {"type": "error", "text": f"Tüm modeller başarısız oldu. Son hata: {last_error}"},
+            {"type": "error", "text": f"Tum modeller basarisiz oldu. Son hata: {last_error}"},
             ensure_ascii=False,
         )
