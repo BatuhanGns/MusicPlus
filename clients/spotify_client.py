@@ -170,7 +170,6 @@ class SpotifyClient:
         token = self._get_access_token()
         headers = kwargs.pop("headers", {})
         headers["Authorization"] = f"Bearer {token}"
-        # Spotify JSON body isteklerinde Content-Type zorunlu
         if "json" in kwargs:
             headers["Content-Type"] = "application/json"
 
@@ -208,7 +207,6 @@ class SpotifyClient:
         if not data or data.get("currently_playing_type") != "track":
             return {"playing": False}
 
-        # Player response'da alan adi "item" dir
         item = data.get("item") or data.get("track")
         if not item:
             return {"playing": False}
@@ -280,12 +278,8 @@ class SpotifyClient:
 
     def _get_playlist_tracks(self, playlist_id):
         """
-        Spotify Subat 2026 degisiklikleri:
-          - Endpoint: GET /playlists/{id}/tracks  ->  GET /playlists/{id}/items
-          - Her ogrenin icindeki alan adi: "track"  ->  "item"
-            (Geriye donuk uyum icin ikisi birden denenir)
-          - Sadece kullanicinin sahip oldugu veya ortak calistigi
-            playlist'ler erisime acik; digerlerinde 403 doner.
+        Şubat 2026: GET /playlists/{id}/tracks  →  GET /playlists/{id}/items
+        Alan adı: "track"  →  "item" (geriye dönük uyum için ikisi de denenir)
         """
         tracks = []
         url    = f"/playlists/{playlist_id}/items"
@@ -295,7 +289,6 @@ class SpotifyClient:
             for entry in data.get("items", []):
                 if not entry:
                     continue
-                # 2026: alan adi "item" oldu; eski "track" de denenir
                 track = entry.get("item") or entry.get("track")
                 if not track:
                     continue
@@ -314,8 +307,12 @@ class SpotifyClient:
     # ------------------------------------------------------------------ #
 
     def _search_track(self, query):
-        """Sarki adina gore Spotify track ID dondurur."""
+        """
+        Şarkı adına göre Spotify track ID döndürür.
+        FIX: market parametresi kaldırıldı (Kasım 2024 deprecated).
+        """
         try:
+            # market parametresi Kasım 2024'te deprecated oldu → kaldırıldı
             data  = self._req("GET", "/search",
                               params={"q": query, "type": "track", "limit": 1})
             items = data.get("tracks", {}).get("items", [])
@@ -326,8 +323,7 @@ class SpotifyClient:
 
     def create_playlist_from_track_names(self, name, track_names, description=""):
         """
-        Subat 2026: POST /users/{id}/playlists  KALDIRILDI
-                    POST /me/playlists  kullan
+        Şubat 2026: POST /users/{id}/playlists KALDIRILDI → POST /me/playlists
         """
         pl = self._req("POST", "/me/playlists", json={
             "name":        name,
@@ -342,7 +338,6 @@ class SpotifyClient:
             if tid:
                 uris.append(f"spotify:track:{tid}")
 
-        # POST /playlists/{id}/items  body: {"uris": [...]}
         for i in range(0, len(uris), 100):
             self._req("POST", f"/playlists/{playlist_id}/items", json={
                 "uris": uris[i:i + 100]
@@ -353,16 +348,9 @@ class SpotifyClient:
 
     def shuffle_playlist(self, playlist_id):
         """
-        Playlist'i karistirir.
-
-        Adimlar:
-          1. GET /playlists/{id}/items  ile tum track ID'leri al
-          2. ID listesini bellekte karistir
-          3. PUT /playlists/{id}/items  ile ilk 100'u replace et
-             (bu islem playlist'in tum icerigini sifirlar)
-          4. POST /playlists/{id}/items ile kalan sarkilari ekle
-
-        DELETE kullanilmaz; 2026 API ile tam uyumlu.
+        Playlist'i karıştırır.
+        PUT /playlists/{id}/items ile ilk 100 replace, POST ile kalanları ekle.
+        DELETE kullanılmaz; 2026 API ile tam uyumlu.
         """
         import random
 
@@ -379,12 +367,10 @@ class SpotifyClient:
 
         logger.info(f"{len(track_uris)} sarki karistiriliyor...")
 
-        # PUT ile ilk 100 -> playlist icerigini tamamen replace eder
         self._req("PUT", f"/playlists/{playlist_id}/items", json={
             "uris": track_uris[:100]
         })
 
-        # Kalan sarkilari POST ile ekle
         for i in range(100, len(track_uris), 100):
             self._req("POST", f"/playlists/{playlist_id}/items", json={
                 "uris": track_uris[i:i + 100]
@@ -394,9 +380,8 @@ class SpotifyClient:
 
     def _remove_tracks_from_playlist(self, playlist_id, track_ids):
         """
-        Subat 2026: DELETE /playlists/{id}/tracks  KALDIRILDI
-                    DELETE /playlists/{id}/items   kullan
-                    Body: {"items": [{"uri": "spotify:track:..."}, ...]}
+        Şubat 2026: DELETE /playlists/{id}/tracks KALDIRILDI → /playlists/{id}/items
+        Body: {"items": [{"uri": "spotify:track:..."}, ...]}
         """
         if not track_ids:
             return 0
@@ -414,10 +399,8 @@ class SpotifyClient:
 
     def _get_liked_track_ids(self, track_ids):
         """
-        Subat 2026: GET /me/tracks/contains  KALDIRILDI
-                    GET /me/library/contains  kullan
-                    Parametre: uris  virgülle ayrılmış QUERY PARAM
-                    (JSON body değil!)
+        Şubat 2026: GET /me/tracks/contains KALDIRILDI → GET /me/library/contains
+        Parametre: uris (virgülle ayrılmış query param)
         """
         liked = set()
         for i in range(0, len(track_ids), 50):
@@ -436,9 +419,8 @@ class SpotifyClient:
 
     def like_all_tracks_in_playlist(self, playlist_id):
         """
-        Subat 2026: PUT /me/tracks   KALDIRILDI
-                    PUT /me/library  kullan
-                    uris = virgülle ayrılmış QUERY PARAM (JSON body değil!)
+        Şubat 2026: PUT /me/tracks KALDIRILDI → PUT /me/library
+        uris = virgülle ayrılmış query param
         """
         tracks    = self._get_playlist_tracks(playlist_id)
         track_ids = [t["id"] for t in tracks if t.get("id")]
@@ -450,9 +432,8 @@ class SpotifyClient:
 
     def unlike_all_tracks_in_playlist(self, playlist_id):
         """
-        Subat 2026: DELETE /me/tracks   KALDIRILDI
-                    DELETE /me/library  kullan
-                    uris = virgülle ayrılmış QUERY PARAM (JSON body değil!)
+        Şubat 2026: DELETE /me/tracks KALDIRILDI → DELETE /me/library
+        uris = virgülle ayrılmış query param
         """
         tracks    = self._get_playlist_tracks(playlist_id)
         track_ids = [t["id"] for t in tracks if t.get("id")]
@@ -481,9 +462,8 @@ class SpotifyClient:
 
     def follow_all_artists_in_playlist(self, playlist_id):
         """
-        Subat 2026: PUT /me/following   KALDIRILDI
-                    PUT /me/library     kullan
-                    uris = virgülle ayrılmış QUERY PARAM (JSON body değil!)
+        Şubat 2026: PUT /me/following KALDIRILDI → PUT /me/library
+        uris = virgülle ayrılmış query param
         """
         tracks     = self._get_playlist_tracks(playlist_id)
         artist_ids = list({
@@ -500,9 +480,8 @@ class SpotifyClient:
 
     def unfollow_all_artists_in_playlist(self, playlist_id):
         """
-        Subat 2026: DELETE /me/following   KALDIRILDI
-                    DELETE /me/library     kullan
-                    uris = virgülle ayrılmış QUERY PARAM (JSON body değil!)
+        Şubat 2026: DELETE /me/following KALDIRILDI → DELETE /me/library
+        uris = virgülle ayrılmış query param
         """
         tracks     = self._get_playlist_tracks(playlist_id)
         artist_ids = list({
