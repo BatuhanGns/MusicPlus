@@ -1,12 +1,13 @@
 """
 Kullanıcı istatistik API'leri.
-- GET  /api/dashboard        → Kişisel dashboard verisi
-- GET  /api/now-playing      → Şu an çalan şarkı
-- GET  /api/playlists        → Kullanıcı playlist'leri
+- GET  /api/dashboard?aralik=1hafta|1ay|1yil|tumzamanlar  -> Kişisel dashboard verisi
+- GET  /api/now-playing      -> Şu an çalan şarkı
+- GET  /api/playlists        -> Kullanıcı playlist'leri
 """
 
 import logging
-from flask import Blueprint, jsonify
+from datetime import datetime, timezone, timedelta
+from flask import Blueprint, jsonify, request
 
 import config
 from extensions import get_current_user_id, get_cached_data, load_user_data, spotify
@@ -16,23 +17,67 @@ logger = logging.getLogger(__name__)
 bp = Blueprint("stats", __name__)
 
 
+def _filter_rows_by_aralik(headers, rows, aralik):
+    """
+    Satırları seçilen zaman aralığına göre filtreler.
+    aralik: '1hafta' | '1ay' | '1yil' | 'tumzamanlar'
+    Filtreleme _played_at_iso sütununa göre yapılır.
+    """
+    if aralik == "tumzamanlar" or not aralik:
+        return rows
+
+    try:
+        idx_iso = headers.index("_played_at_iso")
+    except ValueError:
+        return rows  # Sütun yoksa filtresiz dön
+
+    now = datetime.now(timezone.utc)
+    if aralik == "1hafta":
+        since = now - timedelta(weeks=1)
+    elif aralik == "1ay":
+        since = now - timedelta(days=30)
+    elif aralik == "1yil":
+        since = now - timedelta(days=365)
+    else:
+        return rows
+
+    since_str = since.strftime("%Y-%m-%dT%H:%M")
+
+    filtered = []
+    for row in rows:
+        if len(row) <= idx_iso:
+            continue
+        iso = row[idx_iso].strip()
+        if iso and iso != "—" and iso[:16] >= since_str:
+            filtered.append(row)
+
+    return filtered
+
+
 @bp.route("/api/dashboard")
 def api_dashboard():
     try:
         uid = get_current_user_id()
         if not uid:
             return jsonify({"error": "Giriş yapılmamış"}), 401
+
         headers, rows = get_cached_data(uid)
         if not rows:
             load_user_data(uid)
             headers, rows = get_cached_data(uid)
-        stats = compute_stats(headers, rows)
+
+        aralik = request.args.get("aralik", "tumzamanlar")
+        filtered_rows = _filter_rows_by_aralik(headers, rows, aralik)
+
+        stats = compute_stats(headers, filtered_rows)
         if not stats:
             return jsonify({"error": "Veri yok"})
+
         stats["son_sync"] = config._last_sync
+        stats["aralik"] = aralik
         return jsonify(stats)
     except Exception as e:
-        logger.error(f"❌ Dashboard API hatası: {e}")
+        logger.error(f"Dashboard API hatasi: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -42,7 +87,7 @@ def api_now_playing():
         data = spotify.get_now_playing()
         return jsonify(data)
     except Exception as e:
-        logger.error(f"❌ Now playing hatası: {e}")
+        logger.error(f"Now playing hatasi: {e}")
         return jsonify({"playing": False}), 200
 
 
@@ -52,5 +97,5 @@ def api_playlists():
         playlists = spotify.get_playlists()
         return jsonify({"playlists": playlists})
     except Exception as e:
-        logger.error(f"❌ Playlist hatası: {e}")
+        logger.error(f"Playlist hatasi: {e}")
         return jsonify({"error": str(e)}), 500
