@@ -97,10 +97,11 @@
   .loading{color:var(--muted);font-size:13px;padding:24px 0;}
 
   /* RANK ITEM GÖRSEL */
-  .rank-thumb{width:40px;height:40px;min-width:40px;object-fit:cover;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:16px;overflow:hidden;}
-  .rank-thumb img{width:40px;height:40px;object-fit:cover;display:block;}
-  .rank-thumb-placeholder{width:40px;height:40px;min-width:40px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);}
-  .rank-item{display:grid;grid-template-columns:36px 40px 1fr auto;align-items:center;gap:12px;background:var(--surface);padding:10px 16px;transition:background .15s,border-left-color .15s;border-left:2px solid transparent;cursor:pointer;}
+  .rank-thumb{width:40px;height:40px;min-width:40px;max-width:40px;flex-shrink:0;object-fit:cover;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:16px;overflow:hidden;position:relative;}
+  .rank-thumb img{width:40px;height:40px;min-width:40px;max-width:40px;object-fit:cover;display:block;position:absolute;top:0;left:0;}
+  .rank-thumb-placeholder{width:40px;height:40px;min-width:40px;max-width:40px;flex-shrink:0;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);overflow:hidden;position:relative;}
+  .rank-thumb-placeholder img{width:40px;height:40px;object-fit:cover;display:block;position:absolute;top:0;left:0;}
+  .rank-item{display:grid;grid-template-columns:36px 40px 1fr auto;align-items:center;gap:12px;background:var(--surface);padding:10px 16px;transition:background .15s,border-left-color .15s;border-left:2px solid transparent;cursor:pointer;overflow:hidden;}
   .rank-item:hover{background:var(--surface2);border-left-color:var(--green);}
 
   /* MODAL VE GRAFİKLER */
@@ -1392,13 +1393,16 @@ async function _fetchSpotifyImg(type, name, sub) {
   if (_imgCache[cacheKey] !== undefined) return _imgCache[cacheKey];
   _imgCache[cacheKey] = null; // önce null set et (paralel istekleri engeller)
   try {
+    // FIX: Query param olarak gönder — path'e gömmek yerine
+    // Bu sayede / ve özel karakterler sorun çıkarmaz
     let url = '';
+    const params = new URLSearchParams({ q: name, sanatci: sub || '' });
     if (type === 'artist') {
-      url = '/api/sanatci-gorsel/' + encodeURIComponent(name);
+      url = '/api/sanatci-gorsel?' + new URLSearchParams({ q: name });
     } else if (type === 'track') {
-      url = '/api/sarki-gorsel/' + encodeURIComponent(name) + '?sanatci=' + encodeURIComponent(sub||'');
+      url = '/api/sarki-gorsel?' + params;
     } else if (type === 'album') {
-      url = '/api/album-gorsel/' + encodeURIComponent(name) + '?sanatci=' + encodeURIComponent(sub||'');
+      url = '/api/album-gorsel?' + params;
     }
     if (!url) return null;
     const res = await fetch(url);
