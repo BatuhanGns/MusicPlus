@@ -458,6 +458,85 @@
     color: var(--muted); margin: 6px 0;
   }
 
+  /* ── Şarkı Öneri Kartları ─────────────────────────────────────────────── */
+  .ai-recommend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .ai-rec-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color .2s, transform .15s;
+    position: relative;
+  }
+  .ai-rec-card:hover { border-color: var(--green); transform: translateY(-2px); }
+  .ai-rec-card:active { transform: translateY(0); }
+  .ai-rec-cover {
+    width: 100%; aspect-ratio: 1;
+    background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px; overflow: hidden; position: relative;
+  }
+  .ai-rec-cover img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+  }
+  .ai-rec-cover .ai-rec-play {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,.55);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity .2s;
+    font-size: 28px;
+  }
+  .ai-rec-card:hover .ai-rec-play { opacity: 1; }
+  .ai-rec-info {
+    padding: 8px 10px 10px;
+  }
+  .ai-rec-track {
+    font-size: 12px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    color: var(--text); line-height: 1.3;
+  }
+  .ai-rec-artist {
+    font-size: 10px; color: var(--muted); margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ai-rec-loading {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: var(--muted); margin-top: 10px;
+    padding: 10px 0;
+  }
+  .ai-rec-loading .rec-spinner {
+    width: 14px; height: 14px; border: 2px solid var(--border);
+    border-top-color: var(--green); border-radius: 50%;
+    animation: spin .7s linear infinite; flex-shrink: 0;
+  }
+  .ai-rec-actions {
+    display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;
+  }
+  .ai-rec-action-btn {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: 7px 14px;
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    cursor: pointer; transition: all .15s; letter-spacing: .5px;
+  }
+  .ai-rec-action-btn:hover { border-color: var(--green); color: var(--green); }
+  .ai-rec-action-btn.primary {
+    background: var(--green); color: #000;
+    border-color: var(--green); font-weight: 700;
+  }
+  .ai-rec-action-btn.primary:hover { background: #1ed760; }
+
+  @media (max-width: 480px) {
+    .ai-recommend-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+  }
+  /* ────────────────────────────────────────────────────────────────────── */
+
   @media (max-width: 480px) {
     .ai-panel { width: 100vw; height: 70vh; right: 0; }
     .ai-fab { padding: 10px 16px; font-size: 12px; }
@@ -2198,7 +2277,14 @@ async function sendAIMessage(hiddenText) {
               ? responseText.replace(/\{[\s\S]*?"action"[\s\S]*?\}[\s]*$/, '').trim()
               : responseText;
             bubble.innerHTML = _renderMarkdown(cleanText || responseText);
-            if (action) _appendActionCard(msgDiv, action);
+            if (action) {
+              if (action.action === 'recommend_tracks') {
+                // Güzel kart grid'i render et
+                _renderRecommendCards(msgDiv, action);
+              } else {
+                _appendActionCard(msgDiv, action);
+              }
+            }
           }
 
         } else if (chunk.type === 'error') {
@@ -2227,12 +2313,84 @@ function _parseAction(text) {
   if (!match) return null;
   try {
     const action = JSON.parse(match[0]);
-    const validActions = ['search_track', 'create_playlist', 'add_to_playlist', 'edit_playlist', 'shuffle_playlist'];
+    const validActions = ['search_track', 'create_playlist', 'add_to_playlist', 'edit_playlist', 'shuffle_playlist', 'recommend_tracks'];
     if (!validActions.includes(action.action)) return null;
     return action;
   } catch {
     return null;
   }
+}
+
+// ── Şarkı Öneri Kartları ──────────────────────────────────────────────────
+async function _renderRecommendCards(parent, action) {
+  const tracks = action.tracks || [];
+  if (!tracks.length) return;
+
+  // Loading göster
+  const loadingEl = document.createElement('div');
+  loadingEl.className = 'ai-rec-loading';
+  loadingEl.innerHTML = '<div class="rec-spinner"></div> Spotify\'dan kapaklar yükleniyor...';
+  parent.appendChild(loadingEl);
+
+  let enriched = tracks;
+  try {
+    const res = await fetch('/api/ai/recommend-details', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tracks }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      enriched = data.tracks || tracks;
+    }
+  } catch(e) {}
+
+  loadingEl.remove();
+
+  // Kart grid'i oluştur
+  const grid = document.createElement('div');
+  grid.className = 'ai-recommend-grid';
+
+  enriched.forEach(t => {
+    const card = document.createElement('div');
+    card.className = 'ai-rec-card';
+    const spotifyHref = t.spotify_url ? `href="${t.spotify_url}" target="_blank"` : '';
+    card.innerHTML = `
+      <a ${spotifyHref} style="text-decoration:none;display:block;">
+        <div class="ai-rec-cover">
+          ${t.cover_url
+            ? `<img src="${t.cover_url}" alt="" loading="lazy" onerror="this.style.display='none'">`
+            : '🎵'}
+          <div class="ai-rec-play">▶</div>
+        </div>
+        <div class="ai-rec-info">
+          <div class="ai-rec-track">${t.track || '—'}</div>
+          <div class="ai-rec-artist">${t.artist || '—'}</div>
+        </div>
+      </a>`;
+    grid.appendChild(card);
+  });
+
+  parent.appendChild(grid);
+
+  // Alt butonlar: Playlist oluştur
+  const actions = document.createElement('div');
+  actions.className = 'ai-rec-actions';
+
+  const trackNames = enriched.map(t => `${t.track} - ${t.artist}`);
+  const plBtn = document.createElement('button');
+  plBtn.className = 'ai-rec-action-btn primary';
+  plBtn.textContent = '＋ Playlist Oluştur';
+  plBtn.onclick = () => {
+    const plAction = { action: 'create_playlist', name: 'AI Önerileri', tracks: trackNames };
+    _appendActionCard(parent, plAction);
+    plBtn.disabled = true;
+    plBtn.textContent = '✓ Eklendi';
+  };
+  actions.appendChild(plBtn);
+
+  parent.appendChild(actions);
+  _scrollBottom();
 }
 
 function _appendActionCard(parent, action) {
