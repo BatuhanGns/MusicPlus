@@ -514,34 +514,45 @@ def api_ay_detay(ay_label):
 
 
 # ── Görsel Endpoint'leri ─────────────────────────────────────────────────────
-# FIX: <path:> converter eklendi — sanatçı/şarkı/albüm adlarında / karakteri olabilir
+# FIX: Path param yerine query param kullanılıyor.
+# Eski: /api/sanatci-gorsel/Soner%20Sarıkabadayı  (encode sorunları)
+# Yeni: /api/sanatci-gorsel?q=Soner+Sarıkabadayı  (güvenli, tüm karakterler çalışır)
 
-@bp.route("/api/sanatci-gorsel/<path:sanatci>")
-def api_sanatci_gorsel(sanatci):
+@bp.route("/api/sanatci-gorsel")
+def api_sanatci_gorsel():
     uid = get_current_user_id()
     if not uid:
         return jsonify({"error": "Giriş yok"}), 401
+    sanatci = request.args.get("q", "").strip()
+    if not sanatci:
+        return jsonify({"image_url": None})
     img = _spotify_search_image(sanatci, "artist")
     return jsonify({"image_url": img})
 
 
-@bp.route("/api/sarki-gorsel/<path:sarki>")
-def api_sarki_gorsel(sarki):
+@bp.route("/api/sarki-gorsel")
+def api_sarki_gorsel():
     uid = get_current_user_id()
     if not uid:
         return jsonify({"error": "Giriş yok"}), 401
-    sanatci = request.args.get("sanatci", "")
+    sarki   = request.args.get("q", "").strip()
+    sanatci = request.args.get("sanatci", "").strip()
     q = f"{sarki} {sanatci}".strip()
+    if not q:
+        return jsonify({"image_url": None})
     img = _spotify_search_image(q, "track")
     return jsonify({"image_url": img})
 
 
-@bp.route("/api/album-gorsel/<path:album>")
-def api_album_gorsel(album):
+@bp.route("/api/album-gorsel")
+def api_album_gorsel():
     uid = get_current_user_id()
     if not uid:
         return jsonify({"error": "Giriş yok"}), 401
-    sanatci = request.args.get("sanatci", "")
+    album   = request.args.get("q", "").strip()
+    sanatci = request.args.get("sanatci", "").strip()
     q = f"{album} {sanatci}".strip()
+    if not q:
+        return jsonify({"image_url": None})
     img = _spotify_search_image(q, "album")
     return jsonify({"image_url": img})
