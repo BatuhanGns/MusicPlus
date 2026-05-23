@@ -505,6 +505,21 @@
   .pet-card .pc-lv{font-size:8px;color:var(--muted);margin-top:1px;}
   .pet-card .pc-active-badge{position:absolute;top:3px;right:3px;width:8px;height:8px;background:var(--green);border-radius:50%;}
   .pet-card .pc-sel-badge{position:absolute;top:3px;left:3px;font-size:10px;}
+  .pet-card .pc-count{position:absolute;top:3px;right:3px;background:var(--green);color:#000;font-size:9px;font-weight:800;padding:1px 5px;border-radius:8px;line-height:1.4;}
+  /* Pet action modal */
+  .pet-action-modal{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99997;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .pet-action-modal.show{opacity:1;pointer-events:all;}
+  .pet-action-box{background:var(--surface);border:1px solid var(--border);padding:24px;min-width:220px;max-width:300px;text-align:center;}
+  .pet-action-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;margin-bottom:4px;}
+  .pet-action-sub{font-size:10px;color:var(--muted);margin-bottom:16px;}
+  .pet-action-btns{display:flex;flex-direction:column;gap:8px;}
+  .pet-action-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;letter-spacing:.5px;}
+  .pet-action-btn:hover{border-color:var(--green);color:var(--green);}
+  .pet-action-btn.danger:hover{border-color:#ef4444;color:#ef4444;}
+  .pet-action-btn.cancel{color:var(--muted);}
+  /* Auto fusion btn */
+  .auto-fusion-btn{background:transparent;border:1px solid #f59e0b55;color:#f59e0b;padding:8px 16px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .2s;letter-spacing:.5px;margin-left:8px;}
+  .auto-fusion-btn:hover{border-color:#f59e0b;background:#f59e0b11;}
 
   /* Açılış animasyonu */
   .opening-overlay{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99998;display:flex;align-items:center;justify-content:center;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .3s;}
@@ -911,12 +926,13 @@
         <div class="fusion-slot" data-fslot="2" onclick="fusionSlotClick(2)">❓</div>
       </div>
       <button class="fusion-btn" id="fusionBtn" onclick="doFusion()" disabled>⚗️ Fusion Dene</button>
+      <button class="auto-fusion-btn" id="autoFusionBtn" onclick="doAutoFusion()">🔄 Otomatik Fusion</button>
       <div id="fusionResult" style="margin-top:10px;font-size:12px;display:none"></div>
     </div>
 
     <!-- Envanter -->
     <div class="section-title">Envanterim <span style="font-size:10px;color:var(--muted);font-weight:400" id="invCount"></span></div>
-    <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Tıkla → tak/çıkar veya fusion'a seç</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Tıkla → <b>Tak</b>, <b>Fusion'a Ekle</b> veya <b>Çıkar</b></div>
     <div class="pet-inv-grid" id="petInventory">
       <div class="loading">Yükleniyor...</div>
     </div>
@@ -924,6 +940,15 @@
   </div>
 
   <!-- AÇILIŞ OVERLAY -->
+  <!-- Pet Action Modal -->
+  <div class="pet-action-modal" id="petActionModal" onclick="closePetModal(event)">
+    <div class="pet-action-box" id="petActionBox">
+      <div class="pet-action-title" id="pamTitle">—</div>
+      <div class="pet-action-sub" id="pamSub">—</div>
+      <div class="pet-action-btns" id="pamBtns"></div>
+    </div>
+  </div>
+
   <div class="opening-overlay" id="openingOverlay">
     <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text);margin-bottom:16px" id="openingTitle">Yumurtalar açılıyor...</div>
     <div class="opening-results" id="openingResults"></div>
@@ -3224,48 +3249,151 @@ function _renderActiveSlots(inventory) {
   }
 }
 
+function _groupInventory(inventory) {
+  // Aktif petler ayrı, pasif petler (rarity+egg_type+coin_mult+xp_mult) bazlı stack
+  const TIER = {Cosmic:6,Mysterious:5,Legendary:4,Epic:3,Rare:2,Common:1};
+  const active  = inventory.filter(p => p.active)
+                           .sort((a,b)=>(TIER[b.rarity]||0)-(TIER[a.rarity]||0));
+  const passive = inventory.filter(p => !p.active);
+
+  // Stack: key = rarity|egg_type|coin_mult|xp_mult
+  const stacks = {};
+  for (const p of passive) {
+    const k = p.rarity+'|'+p.egg_type+'|'+p.coin_mult+'|'+p.xp_mult;
+    if (!stacks[k]) stacks[k] = {pet: p, ids: []};
+    stacks[k].ids.push(p.id);
+  }
+  const stackArr = Object.values(stacks)
+    .sort((a,b)=>(TIER[b.pet.rarity]||0)-(TIER[a.pet.rarity]||0));
+
+  return {active, stackArr};
+}
+
 function _renderInventory(inventory) {
   const grid = document.getElementById('petInventory');
   if (!grid) return;
   if (!inventory.length) {
-    grid.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Henuz pet yok. Yumurta ac!</div>';
+    grid.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Henüz pet yok. Yumurta aç!</div>';
     return;
   }
-  grid.innerHTML = inventory.map(p => {
-    const col      = RARITY_COLORS[p.rarity] || '#fff';
-    const icon     = RARITY_ICONS[p.rarity]  || '?';
-    const lv       = (p.level_info||{}).level || 0;
-    const isActive = p.active;
-    const isFusion = _fusionPetIds.includes(p.id);
-    const borderCol = isFusion ? '#f59e0b' : (isActive ? 'var(--green)' : col + '44');
-    return '<div class="pet-card ' + (isActive?'active-pet':'') + '"' +
-      ' style="border-color:' + borderCol + '"' +
-      ' onclick="petCardClick(\'' + p.id + '\')">' +
-      (isActive ? '<div class="pc-active-badge" title="Aktif"></div>' : '') +
-      (isFusion ? '<div class="pc-sel-badge">\u2697\ufe0f</div>' : '') +
-      '<span class="pc-icon">' + icon + '</span>' +
-      '<div class="pc-rarity" style="color:' + col + '">' + p.rarity + '</div>' +
-      '<div class="pc-type">' + (EGG_ICONS[p.egg_type]||'') + ' ' + p.egg_type + '</div>' +
-      '<div class="pc-mult">\ud83e\ude99' + p.coin_mult + 'x \u2b50' + p.xp_mult + 'x</div>' +
-      '<div class="pc-lv">Lv.' + lv + '</div>' +
-      '</div>';
-  }).join('');
+  const {active, stackArr} = _groupInventory(inventory);
+  let html = '';
+
+  // Aktif petler
+  for (const p of active) {
+    const col = RARITY_COLORS[p.rarity]||'#fff';
+    const lv  = (p.level_info||{}).level||0;
+    html += `<div class="pet-card active-pet" style="border-color:${col}" onclick="petCardClick('${p.id}','active')">
+      <div class="pc-active-badge"></div>
+      <span class="pc-icon">${RARITY_ICONS[p.rarity]||'?'}</span>
+      <div class="pc-rarity" style="color:${col}">${p.rarity}</div>
+      <div class="pc-type">${EGG_ICONS[p.egg_type]||''} ${p.egg_type}</div>
+      <div class="pc-mult">🪙${p.coin_mult}x ⭐${p.xp_mult}x</div>
+      <div class="pc-lv">Lv.${lv}</div>
+    </div>`;
+  }
+
+  // Stack'lı pasif petler
+  for (const {pet: p, ids} of stackArr) {
+    const col     = RARITY_COLORS[p.rarity]||'#fff';
+    const isFusion = ids.some(id => _fusionPetIds.includes(id));
+    const border  = isFusion ? '#f59e0b' : col+'44';
+    const countBadge = ids.length > 1 ? `<div class="pc-count">${ids.length}x</div>` : '';
+    const selBadge   = isFusion ? `<div class="pc-sel-badge">⚗️</div>` : '';
+    html += `<div class="pet-card" style="border-color:${border}" onclick="petCardClick('${ids[0]}','passive','${p.rarity}|${p.egg_type}|${p.coin_mult}|${p.xp_mult}')">
+      ${countBadge}${selBadge}
+      <span class="pc-icon">${RARITY_ICONS[p.rarity]||'?'}</span>
+      <div class="pc-rarity" style="color:${col}">${p.rarity}</div>
+      <div class="pc-type">${EGG_ICONS[p.egg_type]||''} ${p.egg_type}</div>
+      <div class="pc-mult">🪙${p.coin_mult}x ⭐${p.xp_mult}x</div>
+      ${ids.length > 1 ? `<div class="pc-lv" style="color:${col};font-weight:700">${ids.length} adet</div>` : ''}
+    </div>`;
+  }
+
+  grid.innerHTML = html;
 }
 
-function petCardClick(petId) {
+// ── Pet Action Modal ─────────────────────────────────────────────────────────
+let _pamPetId  = null;
+let _pamMode   = null; // 'active' | 'passive'
+let _pamStackKey = null;
+
+function petCardClick(petId, mode, stackKey) {
   const inv = (_petState||{}).inventory || [];
   const pet = inv.find(p => p.id === petId);
   if (!pet) return;
-  if (!_fusionPetIds.includes(petId) && _fusionPetIds.includes(null) && !pet.active) {
-    const emptyIdx = _fusionPetIds.indexOf(null);
-    _fusionPetIds[emptyIdx] = petId;
-    _renderFusionSlots();
-    _renderInventory(inv);
-    _checkFusionReady();
-    return;
+  _pamPetId    = petId;
+  _pamMode     = mode;
+  _pamStackKey = stackKey || null;
+
+  const col  = RARITY_COLORS[pet.rarity]||'#fff';
+  const icon = RARITY_ICONS[pet.rarity]||'?';
+  // Stack count
+  let stackIds = [petId];
+  if (stackKey) {
+    const {stackArr} = _groupInventory(inv.filter(p=>!p.active));
+    const found = stackArr.find(s => {
+      const k = s.pet.rarity+'|'+s.pet.egg_type+'|'+s.pet.coin_mult+'|'+s.pet.xp_mult;
+      return k === stackKey;
+    });
+    if (found) stackIds = found.ids;
   }
-  if (pet.active) { unequipPet(petId); }
-  else { equipPet(petId); }
+
+  document.getElementById('pamTitle').innerHTML =
+    `<span style="color:${col}">${icon} ${pet.rarity}</span> ${EGG_ICONS[pet.egg_type]||''} ${pet.egg_type}`;
+  document.getElementById('pamSub').textContent =
+    `🪙${pet.coin_mult}x  ⭐${pet.xp_mult}x` + (stackIds.length > 1 ? `  ·  ${stackIds.length} adet` : '');
+
+  const btns = document.getElementById('pamBtns');
+  btns.innerHTML = '';
+
+  if (mode === 'active') {
+    // Aktif pet: sadece çıkar
+    _addPamBtn(btns, '⬇️ Aktiften Çıkar', () => { closePetModal(); unequipPet(petId); }, 'danger');
+  } else {
+    // Pasif pet
+    const activeCount = inv.filter(p=>p.active).length;
+    if (activeCount < 5) {
+      _addPamBtn(btns, '✅ Tak (Aktif Et)', () => { closePetModal(); equipPet(petId); });
+    }
+    // Fusion'a ekle — 3 slot kontrolü
+    const alreadyInFusion = stackIds.some(id => _fusionPetIds.includes(id));
+    const emptySlots = _fusionPetIds.filter(id => id === null).length;
+    if (!alreadyInFusion && emptySlots > 0) {
+      _addPamBtn(btns, '⚗️ Fusion\'a Ekle', () => {
+        const idx = _fusionPetIds.indexOf(null);
+        _fusionPetIds[idx] = petId;
+        closePetModal();
+        _renderFusionSlots();
+        _renderInventory((_petState||{}).inventory||[]);
+        _checkFusionReady();
+      });
+    } else if (alreadyInFusion) {
+      _addPamBtn(btns, '❌ Fusion\'dan Çıkar', () => {
+        _fusionPetIds = _fusionPetIds.map(id => stackIds.includes(id) ? null : id);
+        closePetModal();
+        _renderFusionSlots();
+        _renderInventory((_petState||{}).inventory||[]);
+        _checkFusionReady();
+      }, 'danger');
+    }
+  }
+  _addPamBtn(btns, 'Vazgeç', () => closePetModal(), 'cancel');
+
+  document.getElementById('petActionModal').classList.add('show');
+}
+
+function _addPamBtn(container, label, fn, cls) {
+  const b = document.createElement('button');
+  b.className = 'pet-action-btn' + (cls ? ' '+cls : '');
+  b.textContent = label;
+  b.onclick = fn;
+  container.appendChild(b);
+}
+
+function closePetModal(e) {
+  if (e && e.target !== document.getElementById('petActionModal')) return;
+  document.getElementById('petActionModal').classList.remove('show');
 }
 
 async function equipPet(petId) {
@@ -3311,8 +3439,8 @@ async function openEggs(eggType, count) {
   const overlay = document.getElementById('openingOverlay');
   const results = document.getElementById('openingResults');
   const title   = document.getElementById('openingTitle');
-  results.innerHTML = '<div style="color:var(--muted);font-size:13px">Aciliyor...</div>';
-  title.textContent = realCount + 'x ' + eggType + ' yumurta aciliyor...';
+  results.innerHTML = '<div style="color:var(--muted);font-size:13px">Açılıyor...</div>';
+  title.textContent = realCount + 'x ' + eggType + ' yumurta açılıyor...';
   overlay.classList.add('show');
   try {
     const res = await fetch('/api/pets/open', {
@@ -3321,18 +3449,19 @@ async function openEggs(eggType, count) {
     });
     const d = await res.json();
     if (d.error) { overlay.classList.remove('show'); alert(d.error); return; }
-    title.textContent = d.opened.length + ' pet kazandin! ('+d.coins_spent+' coin harcandi)';
-    const tierOrder = {Cosmic:6, Mysterious:5, Legendary:4, Epic:3, Rare:2, Common:1};
+    title.textContent = d.opened.length + ' pet kazandın! (' + d.coins_spent + ' coin harcandı)';
+    const tierOrder = {Cosmic:6,Mysterious:5,Legendary:4,Epic:3,Rare:2,Common:1};
     const sorted = [...d.opened].sort((a,b)=>(tierOrder[b.rarity]||0)-(tierOrder[a.rarity]||0));
     results.innerHTML = sorted.map(function(p,i){
-      const col = RARITY_COLORS[p.rarity] || '#fff';
-      return '<div class="open-result-card" style="border-color:'+col+';animation-delay:'+Math.min(i,30)*0.04+'s">' +
-        '<span class="or-icon">'+(RARITY_ICONS[p.rarity]||'?')+'</span>' +
-        '<div class="or-rarity" style="color:'+col+'">'+p.rarity+'</div>' +
-        '<div class="or-type">'+(EGG_ICONS[p.egg_type]||'')+' '+p.egg_type+'</div>' +
+      const col = RARITY_COLORS[p.rarity]||'#fff';
+      return '<div class="open-result-card" style="border-color:'+col+';animation-delay:'+Math.min(i,30)*0.04+'s">'+
+        '<span class="or-icon">'+(RARITY_ICONS[p.rarity]||'?')+'</span>'+
+        '<div class="or-rarity" style="color:'+col+'">'+p.rarity+'</div>'+
+        '<div class="or-type">'+(EGG_ICONS[p.egg_type]||'')+' '+p.egg_type+'</div>'+
         '<div class="or-mult" style="color:var(--green)">Coin:'+p.coin_mult+'x XP:'+p.xp_mult+'x</div></div>';
     }).join('');
     if (_petState) _petState.coins = d.coins;
+    document.getElementById('petCoinVal').textContent = d.coins.toLocaleString('tr-TR');
   } catch(err) {
     overlay.classList.remove('show');
     alert('Hata: ' + err.message);
@@ -3341,7 +3470,7 @@ async function openEggs(eggType, count) {
 
 function openEggCustom(eggType, inputId) {
   const val = parseInt(document.getElementById(inputId).value);
-  if (!val || val < 1) { alert('Gecerli bir sayi gir'); return; }
+  if (!val || val < 1) { alert('Geçerli bir sayı gir'); return; }
   openEggs(eggType, val);
 }
 
@@ -3368,12 +3497,12 @@ function _renderFusionSlots() {
     if (pid) {
       const pet = inv.find(p => p.id === pid);
       const col = pet ? (RARITY_COLORS[pet.rarity]||'#fff') : '#fff';
-      slot.innerHTML = '<span style="font-size:24px">'+(pet?RARITY_ICONS[pet.rarity]:'?')+'</span>' +
-        '<button class="fs-remove" onclick="fusionSlotClick('+i+')">\u2715</button>';
+      slot.innerHTML = '<span style="font-size:24px">'+(pet?RARITY_ICONS[pet.rarity]:'?')+'</span>'+
+        '<button class="fs-remove" onclick="fusionSlotClick('+i+')">✕</button>';
       slot.classList.add('filled');
       slot.style.borderColor = col;
     } else {
-      slot.innerHTML = '\u2753';
+      slot.innerHTML = '❓';
       slot.classList.remove('filled');
       slot.style.borderColor = '';
     }
@@ -3388,7 +3517,7 @@ function _checkFusionReady() {
 
 async function doFusion() {
   if (_fusionPetIds.some(id => id === null)) return;
-  if (!confirm('Fusion dene! %20 sans — basarisiz olursa 3 pet de gider. Emin misin?')) return;
+  if (!confirm('Fusion dene! %20 şans — başarısız olursa 3 pet de gider. Emin misin?')) return;
   try {
     const res = await fetch('/api/pets/fusion', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -3398,19 +3527,49 @@ async function doFusion() {
     const resultEl = document.getElementById('fusionResult');
     resultEl.style.display = 'block';
     if (d.success && d.result_pet) {
-      const col = RARITY_COLORS[d.result_pet.rarity] || '#fff';
-      resultEl.innerHTML = '<span style="color:var(--green)">Basarili! ' + (d.message||'') + '</span>' +
-        '<div style="margin-top:6px">' +
-        '<span style="font-size:20px">'+(RARITY_ICONS[d.result_pet.rarity]||'?')+'</span> ' +
-        '<span style="color:'+col+';font-weight:700">'+d.result_pet.rarity+'</span> ' +
-        '<span style="color:var(--muted);font-size:10px">'+( EGG_ICONS[d.result_pet.egg_type]||'')+' '+d.result_pet.egg_type+'</span> ' +
+      const col = RARITY_COLORS[d.result_pet.rarity]||'#fff';
+      resultEl.innerHTML = '<span style="color:var(--green)">Başarılı! '+( d.message||'')+'</span>'+
+        '<div style="margin-top:6px">'+
+        '<span style="font-size:20px">'+(RARITY_ICONS[d.result_pet.rarity]||'?')+'</span> '+
+        '<span style="color:'+col+';font-weight:700">'+d.result_pet.rarity+'</span> '+
+        '<span style="color:var(--muted);font-size:10px">'+(EGG_ICONS[d.result_pet.egg_type]||'')+' '+d.result_pet.egg_type+'</span> '+
         '<span style="color:var(--green);font-size:10px">Coin:'+d.result_pet.coin_mult+'x XP:'+d.result_pet.xp_mult+'x</span></div>';
     } else {
-      resultEl.innerHTML = '<span style="color:#ef4444">' + (d.message||d.error||'Basarisiz!') + '</span>';
+      resultEl.innerHTML = '<span style="color:#ef4444">'+(d.message||d.error||'Başarısız!')+'</span>';
     }
     _fusionPetIds = [null, null, null];
     await loadPets();
   } catch(e) { alert('Hata: ' + e.message); }
+}
+
+async function doAutoFusion() {
+  const btn = document.getElementById('autoFusionBtn');
+  if (btn) btn.disabled = true;
+  try {
+    const inv = (_petState||{}).inventory || [];
+    const FROM_FUSION = {normal:true, golden:true}; // diamond desteklenmez
+    const eligible = inv.filter(p => !p.active && FROM_FUSION[p.egg_type]);
+    if (eligible.length < 3) {
+      alert('Otomatik fusion için en az 3 adet passive, non-diamond pet gerekli!');
+      if (btn) btn.disabled = false;
+      return;
+    }
+    if (!confirm(`${eligible.length} adet uygun pet bulundu. Otomatik fusion denensin mi? (3'er gruplar halinde, başarısız gruplar kaybolur)`)) {
+      if (btn) btn.disabled = false;
+      return;
+    }
+    const res = await fetch('/api/pets/auto-fusion', {
+      method:'POST', headers:{'Content-Type':'application/json'}
+    });
+    const d = await res.json();
+    if (d.error) { alert('Hata: ' + d.error); if (btn) btn.disabled = false; return; }
+    const msg = `✅ Tamamlandı!\n${d.attempts} fusion denendi\n${d.successes} başarılı (${d.new_pets.length} yeni pet)\nEnvanterde ${d.remaining} pet kaldı`;
+    alert(msg);
+    await loadPets();
+  } catch(e) {
+    alert('Hata: ' + e.message);
+  }
+  if (btn) btn.disabled = false;
 }
 </script>
 
