@@ -84,23 +84,28 @@ def _pet_summary(data: dict) -> str:
 
 def _default_pet_data() -> dict:
     return {
-        "coins":     0,
-        "inventory": [],  # [{id, rarity, egg_type, coin_mult, xp_mult, xp, active, slot}]
+        "coins":       0,
+        "spent_coins": 0,   # toplam harcanan coin — taze hesaplamadan dusurulur
+        "inventory":   [],  # [{id, rarity, egg_type, coin_mult, xp_mult, xp, active, slot}]
     }
 
 # ── Coin Hesaplama ───────────────────────────────────────────────────────────
 
 def _recalc_coins(uid: str, current_data: dict) -> int:
-    """Tüm zamanlar verilerinden coin hesaplar (pet bonus dahil)."""
+    """compute_stats() ciktisinden coin hesaplar, harcanan coini duser."""
+    from utils.helpers import compute_stats
+    from utils.pets import compute_coins_from_stats
     headers, rows = get_cached_data(uid)
     if not rows:
         load_user_data(uid)
         headers, rows = get_cached_data(uid)
-
+    _stats      = compute_stats(headers, rows) or {}
     active_pets = [p for p in current_data.get("inventory", []) if p.get("active")]
     bonuses     = calc_active_bonuses(active_pets)
-    coins       = compute_coins(headers, rows, bonuses["coin_multiplier"])
-    return coins
+    base        = compute_coins_from_stats(_stats)
+    gross       = int(base * bonuses["coin_multiplier"])
+    spent       = current_data.get("spent_coins", 0)
+    return max(0, gross - spent)
 
 
 # ── Endpoint'ler ─────────────────────────────────────────────────────────────
@@ -206,7 +211,8 @@ def api_pets_open():
             pet["lv_bonus"]   = 1.0
             data["inventory"].append(pet)
 
-        data["coins"] = result["new_coins"]
+        data["spent_coins"] = data.get("spent_coins", 0) + result["coins_spent"]
+        data["coins"]       = max(0, data["coins"] - result["coins_spent"])
         _save_pet_data(uid, get_current_user_name(), data)
 
         return jsonify({
@@ -273,6 +279,73 @@ def api_pets_fusion():
         logger.error(f"Pets fusion hatası: {e}")
         return jsonify({"error": str(e)}), 500
 
+
+
+
+@bp.route("/api/pets/auto-fusion", methods=["POST"])
+def api_pets_auto_fusion():
+    """
+    Destekleyen (non-diamond, non-active) petleri otomatik fusion yapar.
+    Her turde rastgele 3 eslesen pet secilir, fusion denenir.
+    Basarili fusion sonucu yeni pet eklenir, eskiler silinir.
+    Donüs: {attempts, successes, new_pets, remaining}
+    """
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giris yapilmamis"}), 401
+    try:
+        from extensions import get_current_user_name
+        from utils.pets import attempt_fusion, FUSION_ROUTES
+        data      = _load_pet_data(uid)
+        inventory = data.get("inventory", [])
+
+        # Aktif olmayanlar ve diamond olmayanlari al
+        candidates = [p for p in inventory if not p.get("active") and p.get("egg_type") in FUSION_ROUTES]
+
+        # (rarity, egg_type) gruplarina gore grupla
+        from collections import defaultdict
+        groups = defaultdict(list)
+        for p in candidates:
+            groups[(p["rarity"], p["egg_type"])].append(p)
+
+        attempts   = 0
+        successes  = 0
+        new_pets   = []
+        removed_ids = set()
+
+        for key, pets in groups.items():
+            # Her gruptan 3'er 3'er al
+            while len(pets) >= 3:
+                trio   = pets[:3]
+                pets   = pets[3:]
+                result = attempt_fusion(trio, trio[0]["egg_type"])
+                attempts += 1
+                for p in trio:
+                    removed_ids.add(p["id"])
+                if result["success"]:
+                    successes += 1
+                    np = result["result_pet"]
+                    np["id"]         = str(uuid.uuid4())
+                    np["active"]     = False
+                    np["slot"]       = None
+                    np["xp"]         = 0
+                    np["level_info"] = calc_pet_level(0)
+                    np["lv_bonus"]   = 1.0
+                    new_pets.append(np)
+
+        # Envantere uygula
+        data["inventory"] = [p for p in inventory if p["id"] not in removed_ids] + new_pets
+        _save_pet_data(uid, get_current_user_name(), data)
+
+        return jsonify({
+            "attempts":  attempts,
+            "successes": successes,
+            "new_pets":  new_pets,
+            "remaining": len(data["inventory"]),
+        })
+    except Exception as e:
+        logger.error(f"Auto-fusion hatasi: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @bp.route("/api/pets/equip", methods=["POST"])
 def api_pets_equip():
