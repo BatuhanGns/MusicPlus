@@ -84,27 +84,16 @@ def _pet_summary(data: dict) -> str:
 
 def _default_pet_data() -> dict:
     return {
-        "coins":               0,
-        "spent_coins":         0,    # toplam harcanan coin
-        "base_snapshot":       0,    # pet takildigindaki base coin degeri
-        "snapshot_multiplier": 1.0,  # pet takildigindaki carpan
-        "inventory":           [],
+        "coins":     0,   # sync'te biriken coin bakiyesi
+        "xp":        0,   # sync'te biriken xp bakiyesi
+        "inventory": [],
     }
 
 # ── Coin Hesaplama ───────────────────────────────────────────────────────────
 
 def _recalc_coins(uid: str, current_data: dict) -> int:
-    """compute_stats() ciktisinden coin hesaplar, harcanan coini duser."""
-    from utils.helpers import compute_stats
-    from utils.pets import compute_coins_from_stats
-    headers, rows = get_cached_data(uid)
-    if not rows:
-        load_user_data(uid)
-        headers, rows = get_cached_data(uid)
-    _stats = compute_stats(headers, rows) or {}
-    base   = compute_coins_from_stats(_stats)
-    spent  = current_data.get("spent_coins", 0)
-    return max(0, base - spent)
+    """Artik dogrudan bakiyeyi dondurur — coin sync'te birikir."""
+    return int(current_data.get("coins", 0))
 
 
 def _update_snapshot(uid: str, data: dict):
@@ -175,30 +164,11 @@ def api_pets_state():
         return jsonify({"error": "Giriş yapılmamış"}), 401
     try:
         data = _load_pet_data(uid)
-
-        # Coin hesapla — spent_coins dahil _recalc_coins kullan
+        # Coin ve XP dogrudan bakiyeden okunur — sync aninda birikir
         inventory   = data.get('inventory', [])
         active_pets = [p for p in inventory if p.get('active')]
         bonuses     = calc_active_bonuses(active_pets)
-
-        from utils.helpers import compute_stats
-        from utils.pets import compute_coins_from_stats
-        headers, rows = get_cached_data(uid)
-        if not rows:
-            load_user_data(uid)
-            headers, rows = get_cached_data(uid)
-        _stats     = compute_stats(headers, rows) or {}
-        base_coins = compute_coins_from_stats(_stats)
-        spent      = data.get('spent_coins', 0)
-
-        # Carpan SADECE snapshot'tan sonraki yeni kazanima uygulanir.
-        # coins = (snapshot'a kadar kazanilan) + (snapshot'tan sonra kazanilan * carpan) - harcanan
-        snapshot      = data.get('base_snapshot', 0)
-        snap_mult     = data.get('snapshot_multiplier', 1.0)
-        new_since_snap = max(0, base_coins - snapshot)
-        coins = max(0, int(snapshot * snap_mult) + int(new_since_snap * bonuses['coin_multiplier']) - spent)
-        data['coins'] = coins
-
+        coins = int(data.get('coins', 0))
         # Pet level bilgilerini tazele
         for p in inventory:
             p["level_info"] = calc_pet_level(p.get("xp", 0))
@@ -236,7 +206,7 @@ def api_pets_open():
             return jsonify({"error": "Geçersiz adet"}), 400
 
         data          = _load_pet_data(uid)
-        data["coins"] = _recalc_coins(uid, data)
+        # Bakiye dogrudan data["coins"]'dan gelir
 
         result = open_eggs(egg_type, count, data["coins"])
 
@@ -253,8 +223,8 @@ def api_pets_open():
             pet["lv_bonus"]   = 1.0
             data["inventory"].append(pet)
 
-        data["spent_coins"] = data.get("spent_coins", 0) + result["coins_spent"]
-        data["coins"]       = max(0, data["coins"] - result["coins_spent"])
+        # coin harcama
+        data["coins"] = max(0, int(data.get("coins", 0)) - result["coins_spent"])
         _save_pet_data(uid, get_current_user_name(), data)
 
         return jsonify({
