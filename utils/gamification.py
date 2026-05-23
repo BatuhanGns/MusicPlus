@@ -8,10 +8,11 @@ XP Sistemi:
   +50 XP / farklı albüm
 
 Seviye Eşikleri:
-  Seviye 1→2 için baz 100 XP
-  0-100 arası: her seviye için +5 XP eklenir
-  101-1000 arası: her seviye için +10 XP eklenir
-  1000'den sonra XP birikmaya devam eder ama seviye sabit kalır
+  Seviye 1→2 için baz 1000 XP
+  0-100 arası: her seviye için +50 XP eklenir
+  101-500 arası: her seviye için +100 XP eklenir
+  501-1000 arası: her seviye için +250 XP eklenir
+  1000'den sonra XP birikmeye devam eder ama seviye sabit kalır
 
 Mastery (Yıllık, en çok dinlenen şarkı/sanatçı/albüm için):
   Acemi   > 1.000 dinlenme
@@ -34,13 +35,16 @@ def xp_for_level(level: int) -> int:
     if level <= 0:
         return 0
     total = 0
-    base  = 100  # Seviye 1→2 için gereken XP
+    base  = 1000  # Seviye 1→2 için gereken Baz XP
     for lv in range(1, level + 1):
         if lv <= 100:
-            total += base + (lv - 1) * 5
+            total += base + (lv - 1) * 50
+        elif lv <= 500:
+            # 101-500 arası: ilk 100 seviyenin artışı (99*50) + yeni seviyenin artışı
+            total += base + (99 * 50) + (lv - 100) * 100
         else:
-            # 101. seviyeden itibaren her seviye +10 artar
-            total += base + 99 * 5 + (lv - 100) * 10
+            # 501-1000 arası: 100'e kadar olan (99*50) + 500'e kadar olan (400*100) + yeni artış
+            total += base + (99 * 50) + (400 * 100) + (lv - 500) * 250
     return total
 
 MAX_LEVEL = 1000
@@ -193,7 +197,7 @@ def compute_gamification(headers, rows) -> dict:
         return _empty()
 
     # ── Toplama ─────────────────────────────────────────────
-    toplam_sure_sn = 0
+    toplam_sure_sn  = 0
     unique_tracks   = set()
     unique_artists  = set()
     unique_albums   = set()
