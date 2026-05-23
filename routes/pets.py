@@ -111,27 +111,42 @@ def api_pets_state():
     if not uid:
         return jsonify({"error": "Giriş yapılmamış"}), 401
     try:
-        data        = _load_pet_data(uid)
-        data["coins"] = _recalc_coins(uid, data)
+        data = _load_pet_data(uid)
+
+        # Coin hesapla — her zaman tüm zamanlar verisi üzerinden
+        headers, rows = get_cached_data(uid)
+        if not rows:
+            load_user_data(uid)
+            headers, rows = get_cached_data(uid)
 
         inventory   = data.get("inventory", [])
         active_pets = [p for p in inventory if p.get("active")]
         bonuses     = calc_active_bonuses(active_pets)
+
+        # Coin hesapla (pet bonus OLMADAN baz, pet bonus ile görüntüle)
+        from utils.pets import compute_coins
+        base_coins = compute_coins(headers, rows, 1.0)
+        # Pet coin çarpanı ekle
+        coins = int(base_coins * bonuses["coin_multiplier"])
+        data["coins"] = coins
 
         # Pet level bilgilerini tazele
         for p in inventory:
             p["level_info"] = calc_pet_level(p.get("xp", 0))
             p["lv_bonus"]   = level_bonus(p["level_info"]["level"])
 
+        logger.info(f"Pets state: uid={uid} coins={coins} pets={len(inventory)} active={len(active_pets)}")
+
         return jsonify({
-            "coins":            data["coins"],
-            "inventory":        inventory,
-            "active_bonuses":   bonuses,
-            "egg_costs":        EGG_COST,
-            "max_active":       5,
+            "coins":          coins,
+            "base_coins":     base_coins,
+            "inventory":      inventory,
+            "active_bonuses": bonuses,
+            "egg_costs":      EGG_COST,
+            "max_active":     5,
         })
     except Exception as e:
-        logger.error(f"Pets state hatası: {e}")
+        logger.error(f"Pets state hatası: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
