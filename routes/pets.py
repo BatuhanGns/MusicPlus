@@ -99,13 +99,10 @@ def _recalc_coins(uid: str, current_data: dict) -> int:
     if not rows:
         load_user_data(uid)
         headers, rows = get_cached_data(uid)
-    _stats      = compute_stats(headers, rows) or {}
-    active_pets = [p for p in current_data.get("inventory", []) if p.get("active")]
-    bonuses     = calc_active_bonuses(active_pets)
-    base        = compute_coins_from_stats(_stats)
-    gross       = int(base * bonuses["coin_multiplier"])
-    spent       = current_data.get("spent_coins", 0)
-    return max(0, gross - spent)
+    _stats = compute_stats(headers, rows) or {}
+    base   = compute_coins_from_stats(_stats)
+    spent  = current_data.get("spent_coins", 0)
+    return max(0, base - spent)
 
 
 # ── Endpoint'ler ─────────────────────────────────────────────────────────────
@@ -153,9 +150,10 @@ def api_pets_state():
             headers, rows = get_cached_data(uid)
         _stats     = compute_stats(headers, rows) or {}
         base_coins = compute_coins_from_stats(_stats)
-        gross_coins = int(base_coins * bonuses['coin_multiplier'])
-        spent       = data.get('spent_coins', 0)
-        coins       = max(0, gross_coins - spent)
+        # Carpan MEVCUT coini artirmaz — sadece bundan sonraki kazanimlari etkiler.
+        # Coin = ham kazanim - harcanan. Carpan bilgi amacli dondurulur.
+        spent  = data.get('spent_coins', 0)
+        coins  = max(0, base_coins - spent)
         data['coins'] = coins
 
         # Pet level bilgilerini tazele
