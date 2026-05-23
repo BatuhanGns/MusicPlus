@@ -12,6 +12,7 @@ from flask import Blueprint, jsonify, request
 import config
 from extensions import get_current_user_id, get_cached_data, load_user_data, spotify
 from utils.helpers import compute_stats
+from utils.gamification import compute_gamification
 
 logger = logging.getLogger(__name__)
 bp = Blueprint("stats", __name__)
@@ -98,4 +99,27 @@ def api_playlists():
         return jsonify({"playlists": playlists})
     except Exception as e:
         logger.error(f"Playlist hatasi: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/gamification")
+def api_gamification():
+    """
+    Kullanıcının XP / Seviye / Seri / Mastery durumunu döner.
+    Gamification her zaman TÜM zamanlar verisi üzerinden hesaplanır.
+    """
+    try:
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+
+        headers, rows = get_cached_data(uid)
+        if not rows:
+            load_user_data(uid)
+            headers, rows = get_cached_data(uid)
+
+        result = compute_gamification(headers, rows)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Gamification API hatasi: {e}")
         return jsonify({"error": str(e)}), 500
