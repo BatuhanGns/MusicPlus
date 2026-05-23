@@ -105,6 +105,28 @@ def _recalc_coins(uid: str, current_data: dict) -> int:
 
 # ── Endpoint'ler ─────────────────────────────────────────────────────────────
 
+@bp.route("/api/pets/debug")
+def api_pets_debug():
+    """Geçici debug endpoint — sorun tespiti için."""
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giriş yok"}), 401
+    try:
+        headers, rows = get_cached_data(uid)
+        if not rows:
+            load_user_data(uid)
+            headers, rows = get_cached_data(uid)
+        return jsonify({
+            "uid":          uid,
+            "headers":      headers,
+            "row_count":    len(rows),
+            "sample_row":   rows[0] if rows else [],
+            "sheets_ok":    sheets.sh is not None,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @bp.route("/api/pets/state")
 def api_pets_state():
     uid = get_current_user_id()
