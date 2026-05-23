@@ -218,8 +218,11 @@ def calc_active_bonuses(active_pets: list) -> dict:
     """
     En fazla MAX_ACTIVE_PETS peti değerlendirir.
     Tüm çarpanlar toplanır (çarpılmaz).
-    Seviye bonusu her pet için ayrıca uygulanır.
+    Pet yoksa 1.0x baz çarpan döner (sıfır değil!).
     """
+    if not active_pets:
+        return {"coin_multiplier": 1.0, "xp_multiplier": 1.0}
+
     total_coin = 0.0
     total_xp   = 0.0
     for pet in active_pets[:MAX_ACTIVE_PETS]:
@@ -227,8 +230,8 @@ def calc_active_bonuses(active_pets: list) -> dict:
         total_coin += pet["coin_mult"] * lv_bonus
         total_xp   += pet["xp_mult"]  * lv_bonus
     return {
-        "coin_multiplier": round(total_coin, 3),
-        "xp_multiplier":   round(total_xp,   3),
+        "coin_multiplier": round(max(total_coin, 1.0), 3),
+        "xp_multiplier":   round(max(total_xp,   1.0), 3),
     }
 
 
