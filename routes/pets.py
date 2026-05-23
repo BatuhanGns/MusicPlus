@@ -140,8 +140,11 @@ def api_pets_state():
     try:
         data = _load_pet_data(uid)
 
-        # Coin hesapla — /api/dashboard ile ayni compute_stats verisinden,
-        # Sheets'i tekrar taramaya gerek yok.
+        # Coin hesapla — spent_coins dahil _recalc_coins kullan
+        inventory   = data.get('inventory', [])
+        active_pets = [p for p in inventory if p.get('active')]
+        bonuses     = calc_active_bonuses(active_pets)
+
         from utils.helpers import compute_stats
         from utils.pets import compute_coins_from_stats
         headers, rows = get_cached_data(uid)
@@ -150,11 +153,9 @@ def api_pets_state():
             headers, rows = get_cached_data(uid)
         _stats     = compute_stats(headers, rows) or {}
         base_coins = compute_coins_from_stats(_stats)
-
-        inventory   = data.get('inventory', [])
-        active_pets = [p for p in inventory if p.get('active')]
-        bonuses     = calc_active_bonuses(active_pets)
-        coins = int(base_coins * bonuses['coin_multiplier'])
+        gross_coins = int(base_coins * bonuses['coin_multiplier'])
+        spent       = data.get('spent_coins', 0)
+        coins       = max(0, gross_coins - spent)
         data['coins'] = coins
 
         # Pet level bilgilerini tazele
