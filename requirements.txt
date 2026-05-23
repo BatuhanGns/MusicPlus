@@ -1,4 +1,5 @@
 flask
+gunicorn
 apscheduler
 gspread
 google-auth
