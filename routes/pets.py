@@ -135,22 +135,23 @@ def api_pets_state():
     try:
         data = _load_pet_data(uid)
 
-        # Coin hesapla — her zaman tüm zamanlar verisi üzerinden
-        headers, rows = get_cached_data(uid)
-        if not rows:
-            load_user_data(uid)
+        # Coin hesapla — once Sheets cache'ten, yoksa canli hesapla
+        cache = sheets.get_gamification_cache(uid)
+        if cache:
+            base_coins = cache['coins']
+        else:
             headers, rows = get_cached_data(uid)
+            if not rows:
+                load_user_data(uid)
+                headers, rows = get_cached_data(uid)
+            from utils.pets import compute_coins
+            base_coins = compute_coins(headers, rows, 1.0)
 
-        inventory   = data.get("inventory", [])
-        active_pets = [p for p in inventory if p.get("active")]
+        inventory   = data.get('inventory', [])
+        active_pets = [p for p in inventory if p.get('active')]
         bonuses     = calc_active_bonuses(active_pets)
-
-        # Coin hesapla (pet bonus OLMADAN baz, pet bonus ile görüntüle)
-        from utils.pets import compute_coins
-        base_coins = compute_coins(headers, rows, 1.0)
-        # Pet coin çarpanı ekle
-        coins = int(base_coins * bonuses["coin_multiplier"])
-        data["coins"] = coins
+        coins = int(base_coins * bonuses['coin_multiplier'])
+        data['coins'] = coins
 
         # Pet level bilgilerini tazele
         for p in inventory:

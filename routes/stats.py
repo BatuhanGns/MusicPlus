@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 from flask import Blueprint, jsonify, request
 
 import config
-from extensions import get_current_user_id, get_cached_data, load_user_data, spotify
+from extensions import get_current_user_id, get_cached_data, load_user_data, spotify, sheets
 from utils.helpers import compute_stats
 from utils.gamification import compute_gamification
 
@@ -113,12 +113,26 @@ def api_gamification():
         if not uid:
             return jsonify({"error": "Giriş yapılmamış"}), 401
 
-        headers, rows = get_cached_data(uid)
-        if not rows:
-            load_user_data(uid)
+        # XP once Sheets cache'ten, yoksa canli hesapla
+        cache = sheets.get_gamification_cache(uid)
+        if cache:
             headers, rows = get_cached_data(uid)
+            if not rows:
+                load_user_data(uid)
+                headers, rows = get_cached_data(uid)
+            # Streak ve mastery icin tam hesap yapilmali, sadece xp cache'ten al
+            result = compute_gamification(headers, rows)
+            result['xp']   = cache['xp']
+            from utils.gamification import calc_level
+            result['level'] = calc_level(cache['xp'])
+            result['xp_breakdown'] = result.get('xp_breakdown', {})
+        else:
+            headers, rows = get_cached_data(uid)
+            if not rows:
+                load_user_data(uid)
+                headers, rows = get_cached_data(uid)
+            result = compute_gamification(headers, rows)
 
-        result = compute_gamification(headers, rows)
         return jsonify(result)
     except Exception as e:
         logger.error(f"Gamification API hatasi: {e}")
