@@ -458,6 +458,77 @@
     color: var(--muted); margin: 6px 0;
   }
 
+  /* ── PET SİSTEMİ ───────────────────────────────────────────────────────── */
+  .pet-coin-bar{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);padding:14px 18px;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+  .pet-coin-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:#f59e0b;display:flex;align-items:center;gap:8px;}
+  .pet-coin-bonus{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  .egg-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+  .egg-card{background:var(--surface);border:1px solid var(--border);padding:16px 12px;text-align:center;position:relative;}
+  .egg-icon{font-size:40px;margin-bottom:6px;display:block;transition:transform .2s;}
+  .egg-card:hover .egg-icon{transform:scale(1.1) rotate(-5deg);}
+  .egg-name{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;margin-bottom:4px;}
+  .egg-cost{font-size:10px;color:#f59e0b;margin-bottom:10px;}
+  .egg-btns{display:flex;flex-direction:column;gap:4px;}
+  .egg-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 8px;font-size:10px;font-family:'DM Mono',monospace;cursor:pointer;transition:all .15s;letter-spacing:.5px;}
+  .egg-btn:hover{border-color:var(--green);color:var(--green);}
+  .egg-btn.primary{background:var(--green);color:#000;border-color:var(--green);font-weight:700;}
+  .egg-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .egg-custom-row{display:flex;gap:4px;margin-top:4px;}
+  .egg-custom-input{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 6px;font-size:10px;font-family:'DM Mono',monospace;min-width:0;}
+
+  /* Aktif slotlar */
+  .active-slots{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:16px;}
+  .slot-cell{background:var(--surface);border:2px dashed var(--border);padding:10px 6px;text-align:center;min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;transition:border-color .2s;}
+  .slot-cell.filled{border-style:solid;}
+  .slot-cell .slot-icon{font-size:22px;margin-bottom:4px;}
+  .slot-cell .slot-name{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;}
+  .slot-cell .slot-remove{position:absolute;top:3px;right:4px;background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;padding:0;line-height:1;}
+  .slot-cell .slot-remove:hover{color:#ef4444;}
+  .slot-lv{font-size:8px;font-weight:700;margin-top:2px;}
+
+  /* Bonus bar */
+  .bonus-bar{background:var(--surface);border:1px solid var(--border);padding:12px 16px;display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;align-items:center;}
+  .bonus-chip{font-size:11px;background:var(--surface2);padding:6px 10px;border:1px solid var(--border);}
+  .bonus-chip span{color:var(--green);font-weight:700;font-family:'Syne',sans-serif;}
+
+  /* Envanter */
+  .pet-inv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-bottom:16px;}
+  .pet-card{background:var(--surface);border:2px solid var(--border);padding:10px 8px;text-align:center;cursor:pointer;transition:all .2s;position:relative;}
+  .pet-card.selected{border-color:var(--green);}
+  .pet-card.active-pet{border-style:solid;}
+  .pet-card:hover{background:var(--surface2);}
+  .pet-card .pc-icon{font-size:26px;display:block;margin-bottom:4px;}
+  .pet-card .pc-rarity{font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px;}
+  .pet-card .pc-type{font-size:8px;color:var(--muted);}
+  .pet-card .pc-mult{font-size:8px;color:var(--green);margin-top:2px;}
+  .pet-card .pc-lv{font-size:8px;color:var(--muted);margin-top:1px;}
+  .pet-card .pc-active-badge{position:absolute;top:3px;right:3px;width:8px;height:8px;background:var(--green);border-radius:50%;}
+  .pet-card .pc-sel-badge{position:absolute;top:3px;left:3px;font-size:10px;}
+
+  /* Açılış animasyonu */
+  .opening-overlay{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99998;display:flex;align-items:center;justify-content:center;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .3s;}
+  .opening-overlay.show{opacity:1;pointer-events:all;}
+  .opening-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;max-width:700px;width:90%;max-height:70vh;overflow-y:auto;padding:8px;}
+  .open-result-card{background:var(--surface);border:2px solid;padding:14px 10px;text-align:center;animation:popIn .3s ease backwards;}
+  @keyframes popIn{from{transform:scale(0.5);opacity:0;}to{transform:scale(1);opacity:1;}}
+  .open-result-card .or-icon{font-size:32px;margin-bottom:6px;display:block;}
+  .open-result-card .or-rarity{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+  .open-result-card .or-type{font-size:9px;color:var(--muted);margin-top:2px;}
+  .open-result-card .or-mult{font-size:9px;margin-top:4px;}
+  .open-close-btn{margin-top:20px;background:var(--green);color:#000;border:none;padding:12px 36px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:1px;}
+
+  /* Fusion panel */
+  .fusion-panel{background:var(--surface);border:1px solid var(--border);padding:16px;margin-bottom:12px;}
+  .fusion-slots{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap;}
+  .fusion-slot{width:72px;height:72px;background:var(--surface2);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:24px;position:relative;cursor:pointer;}
+  .fusion-slot.filled{border-style:solid;}
+  .fusion-slot .fs-remove{position:absolute;top:-6px;right:-6px;background:#ef4444;border:none;color:#fff;width:16px;height:16px;border-radius:50%;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;}
+  .fusion-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;transition:all .2s;letter-spacing:.5px;}
+  .fusion-btn:hover:not(:disabled){border-color:#f59e0b;color:#f59e0b;}
+  .fusion-btn:disabled{opacity:.4;cursor:not-allowed;}
+  /* ──────────────────────────────────────────────────────────────────────── */
+
   /* ── GAMİFİCATİON ───────────────────────────────────────────────────────── */
   .gami-grid { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--border); margin-bottom:16px; }
   .gami-cell { background:var(--surface); padding:20px 18px; }
@@ -605,6 +676,7 @@
   <a class="menu-item active" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler">İstatistiklerim</a>
   <a class="menu-item" onclick="switchView('topluluk');toggleMenu()" id="nav-topluluk">İstatistikleriniz</a>
   <a class="menu-item" onclick="switchView('duzenle');toggleMenu()" id="nav-duzenle">Çalma Listeleri</a>
+  <a class="menu-item" onclick="switchView('hayvanlar');toggleMenu()" id="nav-hayvanlar">Hayvanlarım 🥚</a>
   <a class="menu-item" onclick="switchView('kullanim');toggleMenu()" id="nav-kullanim">Kullanım ve Limitler</a>
   <a class="menu-item" onclick="switchView('profil');toggleMenu()" id="nav-profil">Profilin</a>
 </div>
@@ -727,6 +799,135 @@
     <div id="playlistGrid" style="display:grid;grid-template-columns:1fr;gap:12px">
       <!-- Playlist kartları buraya yüklenecek -->
     </div>
+  </div>
+
+  <!-- HAYVANLARIM SAYFASI -->
+  <div id="view-hayvanlar" class="view-section">
+
+    <!-- Coin bar -->
+    <div class="pet-coin-bar">
+      <div>
+        <div style="font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Coinlerim</div>
+        <div class="pet-coin-val">🪙 <span id="petCoinVal">—</span></div>
+        <div class="pet-coin-bonus" id="petCoinBonus">Coin çarpanı yükleniyor...</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">XP Çarpanı</div>
+        <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--green)" id="petXpBonus">—x</div>
+      </div>
+    </div>
+
+    <!-- Aktif Petler (5 slot) -->
+    <div class="section-title">Aktif Petler <span style="font-size:10px;color:var(--muted);font-weight:400">(max 5 — çarpanlar toplanır)</span></div>
+    <div class="active-slots" id="activeSlots">
+      <div class="slot-cell" data-slot="0"><span style="font-size:22px;color:var(--border)">+</span></div>
+      <div class="slot-cell" data-slot="1"><span style="font-size:22px;color:var(--border)">+</span></div>
+      <div class="slot-cell" data-slot="2"><span style="font-size:22px;color:var(--border)">+</span></div>
+      <div class="slot-cell" data-slot="3"><span style="font-size:22px;color:var(--border)">+</span></div>
+      <div class="slot-cell" data-slot="4"><span style="font-size:22px;color:var(--border)">+</span></div>
+    </div>
+
+    <!-- Bonus özeti -->
+    <div class="bonus-bar" id="bonusBar">
+      <div class="bonus-chip">🪙 Coin <span id="bonusCoin">1.00</span>x</div>
+      <div class="bonus-chip">⭐ XP <span id="bonusXp">1.00</span>x</div>
+      <div style="font-size:10px;color:var(--muted);margin-left:auto">5 aktif pet çarpanı toplanır</div>
+    </div>
+
+    <!-- Yumurtalar -->
+    <div class="section-title">Yumurtalar</div>
+    <div class="egg-row">
+
+      <!-- Normal Yumurta -->
+      <div class="egg-card">
+        <span class="egg-icon">🥚</span>
+        <div class="egg-name">Normal</div>
+        <div class="egg-cost">5 🪙 / adet</div>
+        <div class="egg-btns">
+          <button class="egg-btn primary" onclick="openEggs('normal',1)">1x Aç</button>
+          <button class="egg-btn" onclick="openEggs('normal',10)">10x</button>
+          <button class="egg-btn" onclick="openEggs('normal',100)">100x</button>
+          <button class="egg-btn" onclick="openEggs('normal','all')">ALL</button>
+          <div class="egg-custom-row">
+            <input class="egg-custom-input" type="number" min="1" placeholder="?" id="customNormal">
+            <button class="egg-btn" onclick="openEggCustom('normal','customNormal')">AÇ</button>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:9px;color:var(--muted);text-align:left;line-height:1.6">
+          Common 60% · Rare 25%<br>Epic 10% · Legendary 4%<br>Mysterious 1%
+        </div>
+      </div>
+
+      <!-- Altın Yumurta -->
+      <div class="egg-card" style="border-color:#f59e0b44">
+        <span class="egg-icon">🌟</span>
+        <div class="egg-name" style="color:#f59e0b">Altın</div>
+        <div class="egg-cost">25 🪙 / adet</div>
+        <div class="egg-btns">
+          <button class="egg-btn primary" style="background:#f59e0b;border-color:#f59e0b" onclick="openEggs('golden',1)">1x Aç</button>
+          <button class="egg-btn" onclick="openEggs('golden',10)">10x</button>
+          <button class="egg-btn" onclick="openEggs('golden',100)">100x</button>
+          <button class="egg-btn" onclick="openEggs('golden','all')">ALL</button>
+          <div class="egg-custom-row">
+            <input class="egg-custom-input" type="number" min="1" placeholder="?" id="customGolden">
+            <button class="egg-btn" onclick="openEggCustom('golden','customGolden')">AÇ</button>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:9px;color:var(--muted);text-align:left;line-height:1.6">
+          Common 60% · Rare 25%<br>Epic 10% · Legendary 4%<br>Mysterious 1% · 1.5x çarpan
+        </div>
+      </div>
+
+      <!-- Elmas Yumurta -->
+      <div class="egg-card" style="border-color:#06b6d444">
+        <span class="egg-icon">💎</span>
+        <div class="egg-name" style="color:#06b6d4">Elmas</div>
+        <div class="egg-cost">100 🪙 / adet</div>
+        <div class="egg-btns">
+          <button class="egg-btn primary" style="background:#06b6d4;border-color:#06b6d4" onclick="openEggs('diamond',1)">1x Aç</button>
+          <button class="egg-btn" onclick="openEggs('diamond',10)">10x</button>
+          <button class="egg-btn" onclick="openEggs('diamond',100)">100x</button>
+          <button class="egg-btn" onclick="openEggs('diamond','all')">ALL</button>
+          <div class="egg-custom-row">
+            <input class="egg-custom-input" type="number" min="1" placeholder="?" id="customDiamond">
+            <button class="egg-btn" onclick="openEggCustom('diamond','customDiamond')">AÇ</button>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:9px;color:var(--muted);text-align:left;line-height:1.6">
+          Common 60% · Rare 25%<br>Epic 10% · Legendary 4%<br>Mysterious 0.9% · <span style="color:#06b6d4">Cosmic 0.1%</span><br>3x çarpan
+        </div>
+      </div>
+    </div>
+
+    <!-- Fusion -->
+    <div class="section-title">Fusion <span style="font-size:10px;color:var(--muted);font-weight:400">(%20 şans — 3 aynı pet gerekli)</span></div>
+    <div class="fusion-panel">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+        Normal → Altın (1.5x çarpan) · Altın → Elmas (2x çarpan) · Başarısız olursa 3 pet de gider!
+      </div>
+      <div class="fusion-slots" id="fusionSlots">
+        <div class="fusion-slot" data-fslot="0" onclick="fusionSlotClick(0)">❓</div>
+        <div class="fusion-slot" data-fslot="1" onclick="fusionSlotClick(1)">❓</div>
+        <div class="fusion-slot" data-fslot="2" onclick="fusionSlotClick(2)">❓</div>
+      </div>
+      <button class="fusion-btn" id="fusionBtn" onclick="doFusion()" disabled>⚗️ Fusion Dene</button>
+      <div id="fusionResult" style="margin-top:10px;font-size:12px;display:none"></div>
+    </div>
+
+    <!-- Envanter -->
+    <div class="section-title">Envanterim <span style="font-size:10px;color:var(--muted);font-weight:400" id="invCount"></span></div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Tıkla → tak/çıkar veya fusion'a seç</div>
+    <div class="pet-inv-grid" id="petInventory">
+      <div class="loading">Yükleniyor...</div>
+    </div>
+
+  </div>
+
+  <!-- AÇILIŞ OVERLAY -->
+  <div class="opening-overlay" id="openingOverlay">
+    <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text);margin-bottom:16px" id="openingTitle">Yumurtalar açılıyor...</div>
+    <div class="opening-results" id="openingResults"></div>
+    <button class="open-close-btn" onclick="closeOpeningOverlay()">Envanteri Güncelle ✓</button>
   </div>
 
   <!-- KULLANIM VE LİMİTLER EKRANI — Sadece AI Limiti -->
@@ -992,6 +1193,7 @@ function switchView(viewId) {
     'istatistikler': 'Kişisel Spotify Verilerin',
     'topluluk':      'Topluluk İstatistikleri',
     'duzenle':       'Çalma Listesi Yönetimi',
+    'hayvanlar':     'Hayvanlarım 🥚',
     'kullanim':      'Kullanım ve Limitler',
     'profil':        'Profilin'
   };
@@ -1002,8 +1204,9 @@ function switchView(viewId) {
   const aralilkWrap = document.getElementById('aralilkWrap');
   if (aralilkWrap) aralilkWrap.style.display = showAralik ? 'inline-block' : 'none';
 
-  if (viewId === 'topluluk') loadTopluluk(_currentAralik);
-  if (viewId === 'duzenle')  loadPlaylists();
+  if (viewId === 'topluluk')  loadTopluluk(_currentAralik);
+  if (viewId === 'duzenle')   loadPlaylists();
+  if (viewId === 'hayvanlar') loadPets();
 
   if (viewId === 'kullanim') {
     loadAiStats();
@@ -2896,7 +3099,269 @@ setTimeout(async () => {
       _prevLevel = (data.level || {}).level ?? 0;
     }
   } catch(e) {}
-}, 3000);
+, 3000);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ===================== PET SİSTEMİ =====================
+
+const RARITY_COLORS = {
+  Common:     '#9ca3af',
+  Rare:       '#3b82f6',
+  Epic:       '#8b5cf6',
+  Legendary:  '#f59e0b',
+  Mysterious: '#ec4899',
+  Cosmic:     '#06b6d4',
+};
+const RARITY_ICONS = {
+  Common:'⬜', Rare:'🔷', Epic:'💜', Legendary:'🌟', Mysterious:'🌸', Cosmic:'🌌'
+};
+const EGG_ICONS = { normal:'🥚', golden:'🌟', diamond:'💎' };
+
+let _petState      = null;
+let _fusionPetIds  = [null, null, null];
+let _selectedPetId = null;
+
+async function loadPets() {
+  try {
+    const res = await fetch('/api/pets/state');
+    if (!res.ok) return;
+    _petState = await res.json();
+    _renderPets(_petState);
+  } catch(e) { console.error('loadPets:', e); }
+}
+
+function _renderPets(s) {
+  if (!s) return;
+  document.getElementById('petCoinVal').textContent  = (s.coins || 0).toLocaleString('tr-TR');
+  const cb = s.active_bonuses || {};
+  document.getElementById('petCoinBonus').textContent = 'Coin carpani: ' + (cb.coin_multiplier||1).toFixed(2) + 'x';
+  document.getElementById('petXpBonus').textContent   = (cb.xp_multiplier||1).toFixed(2) + 'x';
+  document.getElementById('bonusCoin').textContent    = (cb.coin_multiplier||1).toFixed(2);
+  document.getElementById('bonusXp').textContent      = (cb.xp_multiplier||1).toFixed(2);
+  _renderActiveSlots(s.inventory || []);
+  _renderInventory(s.inventory || []);
+  const invEl = document.getElementById('invCount');
+  if (invEl) invEl.textContent = '(' + (s.inventory||[]).length + ' pet)';
+  _fusionPetIds = [null, null, null];
+  _renderFusionSlots();
+  const fb = document.getElementById('fusionBtn');
+  if (fb) fb.disabled = true;
+  const fr = document.getElementById('fusionResult');
+  if (fr) fr.style.display = 'none';
+}
+
+function _renderActiveSlots(inventory) {
+  const activePets = inventory.filter(p => p.active).sort((a,b)=>(a.slot||0)-(b.slot||0));
+  for (let i = 0; i < 5; i++) {
+    const cell = document.querySelector('.slot-cell[data-slot="' + i + '"]');
+    if (!cell) continue;
+    const pet = activePets.find(p => p.slot === i) || activePets[i];
+    if (pet) {
+      const lv  = (pet.level_info||{}).level || 0;
+      const col = RARITY_COLORS[pet.rarity] || '#fff';
+      cell.innerHTML = '<button class="slot-remove" onclick="unequipPet(\'' + pet.id + '\',event)">\u2715</button>' +
+        '<div class="slot-icon">' + (RARITY_ICONS[pet.rarity]||'?') + '</div>' +
+        '<div class="slot-name" style="color:' + col + ';font-size:8px;font-weight:700">' + pet.rarity + '</div>' +
+        '<div class="slot-name">' + (EGG_ICONS[pet.egg_type]||'') + ' ' + pet.egg_type + '</div>' +
+        '<div class="slot-lv" style="color:var(--green)">Lv.' + lv + '</div>';
+      cell.classList.add('filled');
+      cell.style.borderColor = col;
+    } else {
+      cell.innerHTML = '<span style="font-size:22px;color:var(--border)">+</span>';
+      cell.classList.remove('filled');
+      cell.style.borderColor = '';
+    }
+  }
+}
+
+function _renderInventory(inventory) {
+  const grid = document.getElementById('petInventory');
+  if (!grid) return;
+  if (!inventory.length) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Henuz pet yok. Yumurta ac!</div>';
+    return;
+  }
+  grid.innerHTML = inventory.map(p => {
+    const col      = RARITY_COLORS[p.rarity] || '#fff';
+    const icon     = RARITY_ICONS[p.rarity]  || '?';
+    const lv       = (p.level_info||{}).level || 0;
+    const isActive = p.active;
+    const isFusion = _fusionPetIds.includes(p.id);
+    const borderCol = isFusion ? '#f59e0b' : (isActive ? 'var(--green)' : col + '44');
+    return '<div class="pet-card ' + (isActive?'active-pet':'') + '"' +
+      ' style="border-color:' + borderCol + '"' +
+      ' onclick="petCardClick(\'' + p.id + '\')">' +
+      (isActive ? '<div class="pc-active-badge" title="Aktif"></div>' : '') +
+      (isFusion ? '<div class="pc-sel-badge">\u2697\ufe0f</div>' : '') +
+      '<span class="pc-icon">' + icon + '</span>' +
+      '<div class="pc-rarity" style="color:' + col + '">' + p.rarity + '</div>' +
+      '<div class="pc-type">' + (EGG_ICONS[p.egg_type]||'') + ' ' + p.egg_type + '</div>' +
+      '<div class="pc-mult">\ud83e\ude99' + p.coin_mult + 'x \u2b50' + p.xp_mult + 'x</div>' +
+      '<div class="pc-lv">Lv.' + lv + '</div>' +
+      '</div>';
+  }).join('');
+}
+
+function petCardClick(petId) {
+  const inv = (_petState||{}).inventory || [];
+  const pet = inv.find(p => p.id === petId);
+  if (!pet) return;
+  if (!_fusionPetIds.includes(petId) && _fusionPetIds.includes(null) && !pet.active) {
+    const emptyIdx = _fusionPetIds.indexOf(null);
+    _fusionPetIds[emptyIdx] = petId;
+    _renderFusionSlots();
+    _renderInventory(inv);
+    _checkFusionReady();
+    return;
+  }
+  if (pet.active) { unequipPet(petId); }
+  else { equipPet(petId); }
+}
+
+async function equipPet(petId) {
+  const inv = (_petState||{}).inventory || [];
+  const activeCount = inv.filter(p=>p.active).length;
+  if (activeCount >= 5) { alert('Maksimum 5 aktif pet!'); return; }
+  try {
+    const res = await fetch('/api/pets/equip', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pet_id: petId, slot: activeCount})
+    });
+    const d = await res.json();
+    if (d.error) { alert(d.error); return; }
+    await loadPets();
+  } catch(e) {}
+}
+
+async function unequipPet(petId, e) {
+  if (e) e.stopPropagation();
+  try {
+    const res = await fetch('/api/pets/unequip', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pet_id: petId})
+    });
+    const d = await res.json();
+    if (d.error) { alert(d.error); return; }
+    await loadPets();
+  } catch(e) {}
+}
+
+async function openEggs(eggType, count) {
+  const coins   = (_petState||{}).coins || 0;
+  const costMap = {normal:5, golden:25, diamond:100};
+  const cost    = costMap[eggType] || 5;
+  let realCount = count;
+  if (count === 'all') {
+    realCount = Math.floor(coins / cost);
+    if (realCount === 0) { alert('Yetersiz coin!'); return; }
+  } else if (typeof count === 'number' && coins < cost * count) {
+    realCount = Math.floor(coins / cost);
+    if (realCount === 0) { alert('Yetersiz coin!'); return; }
+  }
+  const overlay = document.getElementById('openingOverlay');
+  const results = document.getElementById('openingResults');
+  const title   = document.getElementById('openingTitle');
+  results.innerHTML = '<div style="color:var(--muted);font-size:13px">Aciliyor...</div>';
+  title.textContent = realCount + 'x ' + eggType + ' yumurta aciliyor...';
+  overlay.classList.add('show');
+  try {
+    const res = await fetch('/api/pets/open', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({egg_type: eggType, count: realCount})
+    });
+    const d = await res.json();
+    if (d.error) { overlay.classList.remove('show'); alert(d.error); return; }
+    title.textContent = d.opened.length + ' pet kazandin! ('+d.coins_spent+' coin harcandi)';
+    const tierOrder = {Cosmic:6, Mysterious:5, Legendary:4, Epic:3, Rare:2, Common:1};
+    const sorted = [...d.opened].sort((a,b)=>(tierOrder[b.rarity]||0)-(tierOrder[a.rarity]||0));
+    results.innerHTML = sorted.map(function(p,i){
+      const col = RARITY_COLORS[p.rarity] || '#fff';
+      return '<div class="open-result-card" style="border-color:'+col+';animation-delay:'+Math.min(i,30)*0.04+'s">' +
+        '<span class="or-icon">'+(RARITY_ICONS[p.rarity]||'?')+'</span>' +
+        '<div class="or-rarity" style="color:'+col+'">'+p.rarity+'</div>' +
+        '<div class="or-type">'+(EGG_ICONS[p.egg_type]||'')+' '+p.egg_type+'</div>' +
+        '<div class="or-mult" style="color:var(--green)">Coin:'+p.coin_mult+'x XP:'+p.xp_mult+'x</div></div>';
+    }).join('');
+    if (_petState) _petState.coins = d.coins;
+  } catch(err) {
+    overlay.classList.remove('show');
+    alert('Hata: ' + err.message);
+  }
+}
+
+function openEggCustom(eggType, inputId) {
+  const val = parseInt(document.getElementById(inputId).value);
+  if (!val || val < 1) { alert('Gecerli bir sayi gir'); return; }
+  openEggs(eggType, val);
+}
+
+function closeOpeningOverlay() {
+  document.getElementById('openingOverlay').classList.remove('show');
+  loadPets();
+}
+
+function fusionSlotClick(slotIdx) {
+  if (_fusionPetIds[slotIdx]) {
+    _fusionPetIds[slotIdx] = null;
+    _renderFusionSlots();
+    _renderInventory((_petState||{}).inventory||[]);
+    _checkFusionReady();
+  }
+}
+
+function _renderFusionSlots() {
+  const inv = (_petState||{}).inventory || [];
+  for (let i = 0; i < 3; i++) {
+    const slot = document.querySelector('.fusion-slot[data-fslot="' + i + '"]');
+    if (!slot) continue;
+    const pid = _fusionPetIds[i];
+    if (pid) {
+      const pet = inv.find(p => p.id === pid);
+      const col = pet ? (RARITY_COLORS[pet.rarity]||'#fff') : '#fff';
+      slot.innerHTML = '<span style="font-size:24px">'+(pet?RARITY_ICONS[pet.rarity]:'?')+'</span>' +
+        '<button class="fs-remove" onclick="fusionSlotClick('+i+')">\u2715</button>';
+      slot.classList.add('filled');
+      slot.style.borderColor = col;
+    } else {
+      slot.innerHTML = '\u2753';
+      slot.classList.remove('filled');
+      slot.style.borderColor = '';
+    }
+  }
+}
+
+function _checkFusionReady() {
+  const ready = _fusionPetIds.every(id => id !== null);
+  const btn = document.getElementById('fusionBtn');
+  if (btn) btn.disabled = !ready;
+}
+
+async function doFusion() {
+  if (_fusionPetIds.some(id => id === null)) return;
+  if (!confirm('Fusion dene! %20 sans — basarisiz olursa 3 pet de gider. Emin misin?')) return;
+  try {
+    const res = await fetch('/api/pets/fusion', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pet_ids: _fusionPetIds})
+    });
+    const d = await res.json();
+    const resultEl = document.getElementById('fusionResult');
+    resultEl.style.display = 'block';
+    if (d.success && d.result_pet) {
+      const col = RARITY_COLORS[d.result_pet.rarity] || '#fff';
+      resultEl.innerHTML = '<span style="color:var(--green)">Basarili! ' + (d.message||'') + '</span>' +
+        '<div style="margin-top:6px">' +
+        '<span style="font-size:20px">'+(RARITY_ICONS[d.result_pet.rarity]||'?')+'</span> ' +
+        '<span style="color:'+col+';font-weight:700">'+d.result_pet.rarity+'</span> ' +
+        '<span style="color:var(--muted);font-size:10px">'+( EGG_ICONS[d.result_pet.egg_type]||'')+' '+d.result_pet.egg_type+'</span> ' +
+        '<span style="color:var(--green);font-size:10px">Coin:'+d.result_pet.coin_mult+'x XP:'+d.result_pet.xp_mult+'x</span></div>';
+    } else {
+      resultEl.innerHTML = '<span style="color:#ef4444">' + (d.message||d.error||'Basarisiz!') + '</span>';
+    }
+    _fusionPetIds = [null, null, null];
+    await loadPets();
+  } catch(e) { alert('Hata: ' + e.message); }
+}
 </script>
 
 </body>
