@@ -78,7 +78,7 @@ PET_LEVEL_XP_PER_MINUTE = 1  # Kullanıcı ile aynı oran, coin kazandıkça art
 
 # ── Yardımcı Fonksiyonlar ────────────────────────────────────────────────────
 
-def get_multipliers(rarity: str, egg_type: str) -> tuple[float, float]:
+def get_multipliers(rarity: str, egg_type: str):
     """Nadirlik + yumurta tipine göre coin ve XP çarpanlarını döndürür."""
     base_coin, base_xp = BASE_MULTIPLIERS.get(rarity, (1.0, 1.0))
     tier_factor = TIER_MULT.get(egg_type, 1.0)

@@ -96,7 +96,7 @@ MASTERY_TIERS = [
     (1000,  "Acemi",    "#22c55e", "🌱"),
 ]
 
-def get_mastery(count: int) -> dict | None:
+def get_mastery(count: int) ->
     for threshold, name, color, icon in MASTERY_TIERS:
         if count >= threshold:
             return {"name": name, "color": color, "icon": icon, "threshold": threshold}
