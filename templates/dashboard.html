@@ -3122,23 +3122,51 @@ let _fusionPetIds  = [null, null, null];
 let _selectedPetId = null;
 
 async function loadPets() {
-  // Yukleniyor goster
   const coinEl = document.getElementById('petCoinVal');
   const invEl  = document.getElementById('petInventory');
+  const xpEl   = document.getElementById('petXpBonus');
   if (coinEl) coinEl.textContent = '...';
+  if (xpEl)   xpEl.textContent  = '...x';
   if (invEl)  invEl.innerHTML = '<div class="loading">Petler yükleniyor...</div>';
+
+  // Önce debug endpoint ile veri durumunu kontrol et
+  try {
+    const dbg = await fetch('/api/pets/debug');
+    const dbgData = await dbg.json();
+    console.log('[Pets Debug]', dbgData);
+    if (dbgData.error) {
+      if (invEl) invEl.innerHTML = '<div style="color:#ef4444;padding:16px;font-size:12px">Debug hata: ' + dbgData.error + '</div>';
+      return;
+    }
+    if (!dbgData.row_count) {
+      // Veri yok — coin = 0 ile devam et
+      if (coinEl) coinEl.textContent = '0';
+      if (xpEl)   xpEl.textContent  = '1.00x';
+      if (invEl)  invEl.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;font-size:12px">Henüz dinleme verisi yok. Coin kazanmak için Spotify'da müzik dinle!</div>';
+      const bonusCoinEl = document.getElementById('bonusCoin');
+      const bonusXpEl   = document.getElementById('bonusXp');
+      const petCoinBonusEl = document.getElementById('petCoinBonus');
+      if (bonusCoinEl) bonusCoinEl.textContent = '1.00';
+      if (bonusXpEl)   bonusXpEl.textContent   = '1.00';
+      if (petCoinBonusEl) petCoinBonusEl.textContent = 'Coin çarpanı: 1.00x';
+      return;
+    }
+  } catch(e) {
+    console.warn('[Pets Debug hatası]', e);
+  }
 
   try {
     const res = await fetch('/api/pets/state');
     if (!res.ok) {
       const txt = await res.text();
-      console.error('Pets API hatasi:', res.status, txt);
-      if (invEl) invEl.innerHTML = '<div style="color:#ef4444;padding:16px;font-size:12px">API hatası: ' + res.status + '</div>';
+      console.error('Pets API hatası:', res.status, txt);
+      if (invEl) invEl.innerHTML = '<div style="color:#ef4444;padding:16px;font-size:12px">API hatası (' + res.status + '): ' + txt.slice(0,200) + '</div>';
       return;
     }
     _petState = await res.json();
+    console.log('[Pets State]', _petState);
     if (_petState.error) {
-      if (invEl) invEl.innerHTML = '<div style="color:#ef4444;padding:16px;font-size:12px">Hata: ' + _petState.error + '</div>';
+      if (invEl) invEl.innerHTML = '<div style="color:#ef4444;padding:16px;font-size:12px">Sunucu hatası: ' + _petState.error + '</div>';
       return;
     }
     _renderPets(_petState);
