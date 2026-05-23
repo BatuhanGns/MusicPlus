@@ -243,40 +243,52 @@ def compute_coins(headers: list, rows: list, coin_multiplier: float = 1.0) -> in
     +1/5 dakika, +10/farklı şarkı veya albüm, +20/farklı sanatçı
     coin_multiplier: aktif pet bonusu
     """
-    try:
-        idx_sarki   = headers.index("Şarkı Adı")
-        idx_sanatci = headers.index("Sanatçı")
-        idx_sure    = headers.index("Süre (sn)")
-        idx_album   = next(
-            (i for i, h in enumerate(headers) if h.strip() in ("Albüm","Album","albüm","album")),
-            -1,
-        )
-    except ValueError:
+    if not headers or not rows:
         return 0
 
-    total_sn    = 0
-    unique_s    = set()
-    unique_art  = set()
-    unique_alb  = set()
+    # Header eşleşmesi — strip + lower ile encoding sorunlarına karşı güvenli
+    h_lower = [str(h).strip().lower() for h in headers]
+
+    def find_col(names):
+        for name in names:
+            try:
+                return h_lower.index(name.lower())
+            except ValueError:
+                continue
+        return -1
+
+    idx_sarki   = find_col(["şarkı adı", "sarki adi", "track_name", "şarkı"])
+    idx_sanatci = find_col(["sanatçı", "sanatci", "artist_name", "sanatçı adı"])
+    idx_sure    = find_col(["süre (sn)", "sure (sn)", "duration_sec", "süre"])
+    idx_album   = find_col(["albüm", "album", "albüm adı"])
+
+    if idx_sarki == -1 or idx_sanatci == -1 or idx_sure == -1:
+        return 0
+
+    total_sn   = 0
+    unique_s   = set()
+    unique_art = set()
+    unique_alb = set()
 
     for row in rows:
-        if len(row) <= max(idx_sarki, idx_sanatci, idx_sure):
+        max_needed = max(idx_sarki, idx_sanatci, idx_sure)
+        if len(row) <= max_needed:
             continue
         try:
             total_sn += int(row[idx_sure])
         except Exception:
             pass
-        sarki   = row[idx_sarki].strip()
-        sanatci = row[idx_sanatci].strip()
-        album   = row[idx_album].strip() if idx_album != -1 and len(row) > idx_album else ""
+        sarki   = str(row[idx_sarki]).strip()
+        sanatci = str(row[idx_sanatci]).strip()
+        album   = str(row[idx_album]).strip() if idx_album != -1 and len(row) > idx_album else ""
         if sarki:   unique_s.add(sarki)
         if sanatci: unique_art.add(sanatci)
         if album:   unique_alb.add(album)
 
     base_coins = (
-        (total_sn // 300)            # +1 / 5 dk
-        + len(unique_s)  * 10        # +10 / farklı şarkı
-        + len(unique_alb) * 10       # +10 / farklı albüm
-        + len(unique_art) * 20       # +20 / farklı sanatçı
+        (total_sn // 300)         # +1 / 5 dk
+        + len(unique_s)   * 10   # +10 / farklı şarkı
+        + len(unique_alb) * 10   # +10 / farklı albüm
+        + len(unique_art) * 20   # +20 / farklı sanatçı
     )
     return int(base_coins * coin_multiplier)
