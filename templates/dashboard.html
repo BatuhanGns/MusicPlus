@@ -3138,11 +3138,12 @@ async function loadPets() {
       if (invEl) invEl.innerHTML = '<div style="color:#ef4444;padding:16px;font-size:12px">Debug hata: ' + dbgData.error + '</div>';
       return;
     }
-    if (!dbgData.row_count) {
-      // Veri yok — coin = 0 ile devam et
+    // row_count=0 sadece in-memory cache bos demek; Sheets cache'i dolu olabilir.
+    // Gercekten veri yoksa (Sheets de bagli degil) durdur, yoksa /api/pets/state devam eder.
+    if (!dbgData.row_count && !dbgData.sheets_ok) {
       if (coinEl) coinEl.textContent = '0';
       if (xpEl)   xpEl.textContent  = '1.00x';
-      if (invEl)  invEl.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;font-size:12px">Henüz dinleme verisi yok. Coin kazanmak için Spotify'da müzik dinle!</div>';
+      if (invEl)  invEl.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;font-size:12px">Henüz dinleme verisi yok. Coin kazanmak için Spotify\'da müzik dinle!</div>';
       const bonusCoinEl = document.getElementById('bonusCoin');
       const bonusXpEl   = document.getElementById('bonusXp');
       const petCoinBonusEl = document.getElementById('petCoinBonus');
