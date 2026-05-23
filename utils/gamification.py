@@ -240,10 +240,10 @@ def compute_gamification(headers, rows) -> dict:
                 pass
 
     # ── XP ──────────────────────────────────────────────────
-    xp_dakika   = toplam_sure_sn // 60
-    xp_sarki    = len(unique_tracks)  * 25
-    xp_sanatci  = len(unique_artists) * 25
-    xp_album    = len(unique_albums)  * 50
+    xp_dakika   = toplam_sure_sn // 60          # +1 XP / dakika
+    xp_sarki    = len(unique_tracks)  * 25      # +25 XP / yeni sarki
+    xp_sanatci  = len(unique_artists) * 50      # +50 XP / yeni sanatci
+    xp_album    = len(unique_albums)  * 25      # +25 XP / yeni album
     total_xp    = xp_dakika + xp_sarki + xp_sanatci + xp_album
 
     level_info = calc_level(total_xp)
@@ -324,10 +324,10 @@ def compute_xp_from_stats(stats: dict) -> dict:
     farkli_art = stats.get("farkli_sanatci", 0)
     farkli_alb = stats.get("farkli_album",   0)
 
-    xp_dakika  = total_sn // 60
-    xp_sarki   = farkli_s   * 25
-    xp_sanatci = farkli_art * 25
-    xp_album   = farkli_alb * 50
+    xp_dakika  = total_sn // 60        # +1 XP / dakika
+    xp_sarki   = farkli_s   * 25       # +25 XP / yeni sarki
+    xp_sanatci = farkli_art * 50       # +50 XP / yeni sanatci
+    xp_album   = farkli_alb * 25       # +25 XP / yeni album
     total_xp   = xp_dakika + xp_sarki + xp_sanatci + xp_album
 
     level_info = calc_level(total_xp)

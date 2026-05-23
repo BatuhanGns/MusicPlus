@@ -286,10 +286,10 @@ def compute_coins(headers: list, rows: list, coin_multiplier: float = 1.0) -> in
         if album:   unique_alb.add(album)
 
     base_coins = (
-        (total_sn // 300)         # +1 / 5 dk
-        + len(unique_s)   * 10   # +10 / farklı şarkı
-        + len(unique_alb) * 10   # +10 / farklı albüm
-        + len(unique_art) * 20   # +20 / farklı sanatçı
+        (total_sn // 60) * 0.2    # +0.2 coin / dakika
+        + len(unique_s)   * 10    # +10 coin / yeni sarki
+        + len(unique_alb) * 10    # +10 coin / yeni album
+        + len(unique_art) * 20    # +20 coin / yeni sanatci
     )
     return int(base_coins * coin_multiplier)
 
@@ -306,9 +306,9 @@ def compute_coins_from_stats(stats: dict, coin_multiplier: float = 1.0) -> int:
     farkli_art  = stats.get("farkli_sanatci", 0)
 
     base_coins = (
-        (total_sn // 300)     # +1 / 5 dk
-        + farkli_s   * 10    # +10 / farkli sarki
-        + farkli_alb * 10    # +10 / farkli album
-        + farkli_art * 20    # +20 / farkli sanatci
+        (total_sn // 60) * 0.2    # +0.2 coin / dakika
+        + farkli_s   * 10         # +10 coin / yeni sarki
+        + farkli_alb * 10         # +10 coin / yeni album
+        + farkli_art * 20         # +20 coin / yeni sanatci
     )
     return int(base_coins * coin_multiplier)
