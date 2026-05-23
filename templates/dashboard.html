@@ -3122,22 +3122,43 @@ let _fusionPetIds  = [null, null, null];
 let _selectedPetId = null;
 
 async function loadPets() {
+  // Yukleniyor goster
+  const coinEl = document.getElementById('petCoinVal');
+  const invEl  = document.getElementById('petInventory');
+  if (coinEl) coinEl.textContent = '...';
+  if (invEl)  invEl.innerHTML = '<div class="loading">Petler yükleniyor...</div>';
+
   try {
     const res = await fetch('/api/pets/state');
-    if (!res.ok) return;
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error('Pets API hatasi:', res.status, txt);
+      if (invEl) invEl.innerHTML = '<div style="color:#ef4444;padding:16px;font-size:12px">API hatası: ' + res.status + '</div>';
+      return;
+    }
     _petState = await res.json();
+    if (_petState.error) {
+      if (invEl) invEl.innerHTML = '<div style="color:#ef4444;padding:16px;font-size:12px">Hata: ' + _petState.error + '</div>';
+      return;
+    }
     _renderPets(_petState);
-  } catch(e) { console.error('loadPets:', e); }
+  } catch(e) {
+    console.error('loadPets:', e);
+    if (invEl) invEl.innerHTML = '<div style="color:#ef4444;padding:16px;font-size:12px">Bağlantı hatası: ' + e.message + '</div>';
+  }
 }
 
 function _renderPets(s) {
   if (!s) return;
-  document.getElementById('petCoinVal').textContent  = (s.coins || 0).toLocaleString('tr-TR');
+  const coins = (s.coins !== undefined && s.coins !== null) ? s.coins : 0;
+  document.getElementById('petCoinVal').textContent  = coins.toLocaleString('tr-TR');
   const cb = s.active_bonuses || {};
-  document.getElementById('petCoinBonus').textContent = 'Coin carpani: ' + (cb.coin_multiplier||1).toFixed(2) + 'x';
-  document.getElementById('petXpBonus').textContent   = (cb.xp_multiplier||1).toFixed(2) + 'x';
-  document.getElementById('bonusCoin').textContent    = (cb.coin_multiplier||1).toFixed(2);
-  document.getElementById('bonusXp').textContent      = (cb.xp_multiplier||1).toFixed(2);
+  const coinMult = cb.coin_multiplier || 1.0;
+  const xpMult   = cb.xp_multiplier   || 1.0;
+  document.getElementById('petCoinBonus').textContent = 'Coin çarpanı: ' + coinMult.toFixed(2) + 'x';
+  document.getElementById('petXpBonus').textContent   = xpMult.toFixed(2) + 'x';
+  document.getElementById('bonusCoin').textContent    = coinMult.toFixed(2);
+  document.getElementById('bonusXp').textContent      = xpMult.toFixed(2);
   _renderActiveSlots(s.inventory || []);
   _renderInventory(s.inventory || []);
   const invEl = document.getElementById('invCount');
