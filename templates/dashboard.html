@@ -993,7 +993,7 @@ function switchView(viewId) {
     'topluluk':      'Topluluk İstatistikleri',
     'duzenle':       'Çalma Listesi Yönetimi',
     'kullanim':      'Kullanım ve Limitler',
-    'profil':        'Hesap ve Ayarlar'
+    'profil':        'Profilin'
   };
   document.getElementById('headerSubtitle').textContent = titles[viewId] || '';
 
@@ -1004,11 +1004,22 @@ function switchView(viewId) {
 
   if (viewId === 'topluluk') loadTopluluk(_currentAralik);
   if (viewId === 'duzenle')  loadPlaylists();
+
   if (viewId === 'kullanim') {
     loadAiStats();
     if (!_aiStatsInterval) _aiStatsInterval = setInterval(loadAiStats, 30000);
   } else {
     if (_aiStatsInterval) { clearInterval(_aiStatsInterval); _aiStatsInterval = null; }
+  }
+
+  // Gamification — profil sayfasında yükle ve periyodik tazele
+  if (viewId === 'profil') {
+    loadGamification();
+    if (!_gamiInterval) _gamiInterval = setInterval(loadGamification, 60000);
+  } else {
+    if (typeof _gamiInterval !== 'undefined' && _gamiInterval) {
+      clearInterval(_gamiInterval); _gamiInterval = null;
+    }
   }
 }
 
@@ -2875,26 +2886,16 @@ function closeLevelup() {
 
 // Profil sayfası açıldığında yükle, periyodik kontrol
 let _gamiInterval = null;
-const _origSwitchView = switchView;
-// switchView'e gamification yüklemesini ekle
-const switchViewOrig = switchView;
-function switchView(viewId) {
-  switchViewOrig(viewId);
-  if (viewId === 'profil') {
-    loadGamification();
-    if (!_gamiInterval) _gamiInterval = setInterval(loadGamification, 60000);
-  } else {
-    if (_gamiInterval) { clearInterval(_gamiInterval); _gamiInterval = null; }
-  }
-}
 
 // İlk yükleme: arka planda XP hesapla ve seviye atlamayı izle
 setTimeout(async () => {
-  const res = await fetch('/api/gamification').catch(()=>null);
-  if (res && res.ok) {
-    const data = await res.json();
-    _prevLevel = (data.level || {}).level ?? 0;
-  }
+  try {
+    const res = await fetch('/api/gamification');
+    if (res && res.ok) {
+      const data = await res.json();
+      _prevLevel = (data.level || {}).level ?? 0;
+    }
+  } catch(e) {}
 }, 3000);
 </script>
 
