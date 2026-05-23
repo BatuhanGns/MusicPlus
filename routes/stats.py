@@ -113,26 +113,28 @@ def api_gamification():
         if not uid:
             return jsonify({"error": "Giriş yapılmamış"}), 401
 
-        # XP once Sheets cache'ten, yoksa canli hesapla
-        cache = sheets.get_gamification_cache(uid)
-        if cache:
+        # XP ve level: /api/dashboard ile ayni hesaplama,
+        # compute_stats() ciktisini kullan — Sheets'i ekstra taramaya gerek yok.
+        from utils.helpers import compute_stats
+        from utils.gamification import compute_xp_from_stats
+        headers, rows = get_cached_data(uid)
+        if not rows:
+            load_user_data(uid)
             headers, rows = get_cached_data(uid)
-            if not rows:
-                load_user_data(uid)
-                headers, rows = get_cached_data(uid)
-            # Streak ve mastery icin tam hesap yapilmali, sadece xp cache'ten al
-            result = compute_gamification(headers, rows)
-            result['xp']   = cache['xp']
-            from utils.gamification import calc_level
-            result['level'] = calc_level(cache['xp'])
-            result['xp_breakdown'] = result.get('xp_breakdown', {})
-        else:
-            headers, rows = get_cached_data(uid)
-            if not rows:
-                load_user_data(uid)
-                headers, rows = get_cached_data(uid)
-            result = compute_gamification(headers, rows)
 
+        _stats    = compute_stats(headers, rows) or {}
+        xp_result = compute_xp_from_stats(_stats)
+
+        # Streak ve mastery icin ham veri uzerinden tam hesap
+        full = compute_gamification(headers, rows)
+
+        result = {
+            "xp":           xp_result["xp"],
+            "level":        xp_result["level"],
+            "xp_breakdown": xp_result["xp_breakdown"],
+            "streak":       full["streak"],
+            "masteries":    full["masteries"],
+        }
         return jsonify(result)
     except Exception as e:
         logger.error(f"Gamification API hatasi: {e}")

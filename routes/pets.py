@@ -135,17 +135,16 @@ def api_pets_state():
     try:
         data = _load_pet_data(uid)
 
-        # Coin hesapla — once Sheets cache'ten, yoksa canli hesapla
-        cache = sheets.get_gamification_cache(uid)
-        if cache:
-            base_coins = cache['coins']
-        else:
+        # Coin hesapla — /api/dashboard ile ayni compute_stats verisinden,
+        # Sheets'i tekrar taramaya gerek yok.
+        from utils.helpers import compute_stats
+        from utils.pets import compute_coins_from_stats
+        headers, rows = get_cached_data(uid)
+        if not rows:
+            load_user_data(uid)
             headers, rows = get_cached_data(uid)
-            if not rows:
-                load_user_data(uid)
-                headers, rows = get_cached_data(uid)
-            from utils.pets import compute_coins
-            base_coins = compute_coins(headers, rows, 1.0)
+        _stats     = compute_stats(headers, rows) or {}
+        base_coins = compute_coins_from_stats(_stats)
 
         inventory   = data.get('inventory', [])
         active_pets = [p for p in inventory if p.get('active')]
