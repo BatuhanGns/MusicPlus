@@ -306,3 +306,35 @@ def _empty():
         "masteries": [],
         "xp_breakdown": {"dakika": 0, "sarki": 0, "sanatci": 0, "album": 0},
     }
+
+
+def compute_xp_from_stats(stats: dict) -> dict:
+    """
+    /api/dashboard ciktisindaki hazir stats verisinden XP ve seviye hesaplar.
+    Sheets'i tekrar taramaya gerek yok.
+    Streak ve mastery icin hala ham veri gerekir; bunlar ayri tutulur.
+      stats: compute_stats() ciktisi
+    """
+    total_sn   = stats.get("toplam_sure_sn", 0)
+    farkli_s   = stats.get("farkli_sarki",   0)
+    farkli_art = stats.get("farkli_sanatci", 0)
+    farkli_alb = stats.get("farkli_album",   0)
+
+    xp_dakika  = total_sn // 60
+    xp_sarki   = farkli_s   * 25
+    xp_sanatci = farkli_art * 25
+    xp_album   = farkli_alb * 50
+    total_xp   = xp_dakika + xp_sarki + xp_sanatci + xp_album
+
+    level_info = calc_level(total_xp)
+    level_info["xp_breakdown"] = {
+        "dakika":  xp_dakika,
+        "sarki":   xp_sarki,
+        "sanatci": xp_sanatci,
+        "album":   xp_album,
+    }
+    return {
+        "xp":           total_xp,
+        "level":        level_info,
+        "xp_breakdown": level_info["xp_breakdown"],
+    }

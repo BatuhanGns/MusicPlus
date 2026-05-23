@@ -292,3 +292,23 @@ def compute_coins(headers: list, rows: list, coin_multiplier: float = 1.0) -> in
         + len(unique_art) * 20   # +20 / farklı sanatçı
     )
     return int(base_coins * coin_multiplier)
+
+
+def compute_coins_from_stats(stats: dict, coin_multiplier: float = 1.0) -> int:
+    """
+    /api/dashboard ciktisindaki hazir stats verisinden coin hesaplar.
+    Sheets'i tekrar taramaya gerek yok.
+      stats: compute_stats() ciktisi (farkli_sarki, farkli_sanatci, farkli_album, toplam_sure_sn)
+    """
+    total_sn    = stats.get("toplam_sure_sn", 0)
+    farkli_s    = stats.get("farkli_sarki",   0)
+    farkli_alb  = stats.get("farkli_album",   0)
+    farkli_art  = stats.get("farkli_sanatci", 0)
+
+    base_coins = (
+        (total_sn // 300)     # +1 / 5 dk
+        + farkli_s   * 10    # +10 / farkli sarki
+        + farkli_alb * 10    # +10 / farkli album
+        + farkli_art * 20    # +20 / farkli sanatci
+    )
+    return int(base_coins * coin_multiplier)
