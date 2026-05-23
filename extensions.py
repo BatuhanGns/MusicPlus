@@ -81,6 +81,19 @@ def sync_job(user_id: str = None, refresh_token: str = None):
         sheets.update_last_sync(uid)
         config._last_sync = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M") + " UTC"
         load_user_data(uid)
+        # Sync sonrasi coin ve XP hesapla, cache'e yaz
+        try:
+            from utils.gamification import compute_gamification
+            from utils.pets import compute_coins
+            _h, _r = get_cached_data(uid)
+            _gami  = compute_gamification(_h, _r)
+            _coins = compute_coins(_h, _r, 1.0)
+            _xp    = _gami.get('xp', 0)
+            sheets.save_gamification_cache(uid, _coins, _xp)
+            config._user_cache[uid]['coins'] = _coins
+            config._user_cache[uid]['xp']    = _xp
+        except Exception as _ge:
+            logger.warning(f'Gamification cache guncellenemedi: {_ge}')
         logger.info(f"📊 Sync tamamlandı: {uid}")
     except Exception as e:
         logger.error(f"❌ Sync hatası ({uid}): {e}")
