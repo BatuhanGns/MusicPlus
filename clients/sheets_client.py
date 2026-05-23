@@ -365,11 +365,15 @@ class SheetsClient:
         col = ws.col_values(8)  # _played_at_iso sütunu
         return set(col[1:])
 
-    def append_tracks(self, user_id: str, tracks: list) -> int:
-        """Kullanıcının kendi sayfasına yeni şarkıları ekler"""
+    def append_tracks(self, user_id: str, tracks: list):
+        """Kullanıcının kendi sayfasına yeni şarkıları ekler.
+        Döndürür: (new_count, new_tracks)
+          new_tracks: [{track_name, artist_name, album_name, duration_sec}, ...]
+        """
         ws = self._ensure_user_sheet(user_id)
         existing = self._get_existing_played_ats(user_id)
-        new_rows = []
+        new_rows   = []
+        new_tracks = []
         for t in tracks:
             iso = t["played_at"]
             if iso not in existing:
@@ -383,10 +387,16 @@ class SheetsClient:
                     t["duration_sec"],
                     iso,
                 ])
+                new_tracks.append({
+                    "track_name":   t["track_name"],
+                    "artist_name":  t["artist_name"],
+                    "album_name":   t["album_name"],
+                    "duration_sec": t["duration_sec"],
+                })
                 existing.add(iso)
         if new_rows:
             ws.append_rows(new_rows, value_input_option="RAW")
-        return len(new_rows)
+        return len(new_rows), new_tracks
 
     def get_user_data(self, user_id: str):
         """Kullanıcının tüm verisini döndürür → (headers, rows)"""
