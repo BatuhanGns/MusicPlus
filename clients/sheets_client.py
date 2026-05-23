@@ -73,8 +73,8 @@ class SheetsClient:
             return None
         ws = self._find_sheet("Settings")
         if not ws:
-            ws = self.sh.add_worksheet(title="Settings", rows=100, cols=6)
-            ws.append_row(["user_id", "display_name", "stats_permission", "last_sync", "refresh_token"], value_input_option="RAW")
+            ws = self.sh.add_worksheet(title="Settings", rows=100, cols=8)
+            ws.append_row(["user_id", "display_name", "stats_permission", "last_sync", "refresh_token", "coins", "xp"], value_input_option="RAW")
             logger.info("✅ Settings sayfası oluşturuldu.")
         self._ensure_limits_sheet()
         return ws
@@ -314,6 +314,37 @@ class SheetsClient:
             if row and row[0] == user_id:
                 ws.update(f"D{i}", [[now_str]])
                 return
+
+    def save_gamification_cache(self, user_id: str, coins: int, xp: int):
+        """Hesaplanan coin ve XP degerlerini Settings sayfasina yazar (F ve G sutunlari)."""
+        ws = self._find_sheet("Settings") or self._ensure_settings_sheet()
+        if not ws:
+            return
+        try:
+            records = ws.get_all_values()
+            for i, row in enumerate(records[1:], start=2):
+                if row and row[0] == user_id:
+                    ws.update(f"F{i}:G{i}", [[coins, xp]])
+                    return
+            ws.append_row([user_id, "", "False", "", "", coins, xp], value_input_option="RAW")
+        except Exception as e:
+            logger.warning(f"Gamification cache kaydetme hatasi: {e}")
+
+    def get_gamification_cache(self, user_id: str) -> dict:
+        """Settings sayfasindan onceden hesaplanmis coin ve XP degerlerini okur."""
+        ws = self._find_sheet("Settings")
+        if not ws:
+            return {}
+        try:
+            for row in ws.get_all_values()[1:]:
+                if row and row[0] == user_id:
+                    coins_val = row[5] if len(row) > 5 else ""
+                    xp_val    = row[6] if len(row) > 6 else ""
+                    if coins_val and xp_val and str(coins_val).lstrip("-").isdigit() and str(xp_val).lstrip("-").isdigit():
+                        return {"coins": int(coins_val), "xp": int(xp_val), "cached": True}
+        except Exception as e:
+            logger.warning(f"Gamification cache okuma hatasi: {e}")
+        return {}
 
     # ─── Kullanıcı veri sayfası ─────────────────────────────────────────────
 
