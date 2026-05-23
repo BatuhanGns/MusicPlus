@@ -458,7 +458,55 @@
     color: var(--muted); margin: 6px 0;
   }
 
-  /* ── Şarkı Öneri Kartları ─────────────────────────────────────────────── */
+  /* ── GAMİFİCATİON ───────────────────────────────────────────────────────── */
+  .gami-grid { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--border); margin-bottom:16px; }
+  .gami-cell { background:var(--surface); padding:20px 18px; }
+  .gami-label { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+  .gami-val   { font-family:'Syne',sans-serif; font-size:28px; font-weight:800; color:var(--text); line-height:1; }
+  .gami-sub   { font-size:10px; color:var(--muted); margin-top:4px; }
+  .gami-val.green  { color:var(--green); }
+  .gami-val.streak { font-size:36px; }
+
+  /* Seviye kartı */
+  .level-card { background:var(--surface); border:1px solid var(--border); padding:24px 20px; margin-bottom:12px; }
+  .level-top  { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px; }
+  .level-badge { display:flex; align-items:center; gap:12px; }
+  .level-num  { font-family:'Syne',sans-serif; font-size:56px; font-weight:800; color:var(--green); line-height:1; }
+  .level-info { }
+  .level-title{ font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:2px; }
+  .level-xp   { font-family:'DM Mono',monospace; font-size:13px; color:var(--text); }
+  .level-max  { font-size:10px; color:var(--green); margin-top:4px; letter-spacing:1px; }
+  .level-bar-track { height:6px; background:var(--surface2); border:1px solid var(--border); margin-bottom:8px; overflow:hidden; }
+  .level-bar-fill  { height:100%; background:var(--green); transition:width 1s ease; }
+  .level-bar-labels{ display:flex; justify-content:space-between; font-size:10px; color:var(--muted); font-family:'DM Mono',monospace; }
+  .xp-breakdown { display:flex; gap:1px; background:var(--border); margin-top:16px; }
+  .xp-cell { flex:1; background:var(--surface2); padding:10px 8px; text-align:center; }
+  .xp-cell-label { font-size:8px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
+  .xp-cell-val   { font-family:'Syne',sans-serif; font-size:15px; font-weight:700; color:var(--green); }
+
+  /* Mastery kartları */
+  .mastery-section { margin-bottom:12px; }
+  .mastery-list { display:flex; flex-direction:column; gap:1px; }
+  .mastery-item { display:grid; grid-template-columns:36px 1fr auto; align-items:center; gap:12px; background:var(--surface); padding:14px 16px; border-left:3px solid transparent; }
+  .mastery-icon  { font-size:22px; text-align:center; }
+  .mastery-info  { min-width:0; }
+  .mastery-name  { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mastery-meta  { font-size:10px; color:var(--muted); margin-top:2px; }
+  .mastery-badge { font-family:'Syne',sans-serif; font-size:11px; font-weight:700; padding:4px 10px; letter-spacing:1px; text-transform:uppercase; }
+
+  /* Seviye atlama overlay */
+  .levelup-overlay { position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:99999; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .3s; }
+  .levelup-overlay.show { opacity:1; pointer-events:all; }
+  .levelup-box { background:var(--surface); border:2px solid var(--green); padding:48px 36px; text-align:center; max-width:320px; width:90%; position:relative; }
+  .levelup-particles { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .levelup-emoji { font-size:56px; margin-bottom:16px; animation:bounce 0.6s ease infinite alternate; }
+  @keyframes bounce { from { transform:translateY(0); } to { transform:translateY(-10px); } }
+  .levelup-title { font-family:'Syne',sans-serif; font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+  .levelup-level { font-family:'Syne',sans-serif; font-size:72px; font-weight:800; color:var(--green); line-height:1; }
+  .levelup-sub   { font-size:13px; color:var(--muted); margin-top:8px; }
+  .levelup-close { margin-top:24px; background:var(--green); color:#000; border:none; padding:12px 32px; font-family:'Syne',sans-serif; font-size:13px; font-weight:700; cursor:pointer; letter-spacing:1px; width:100%; }
+  @keyframes fadeOut { 0%{opacity:.8;transform:translateY(0) scale(1);} 100%{opacity:0;transform:translateY(-40px) scale(.5);} }
+  /* ────────────────────────────────────────────────────────────────────────── */
   .ai-recommend-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -760,11 +808,76 @@
   </div>
 
   <div id="view-profil" class="view-section">
-    <div class="section-title">Hesap Özetin</div>
-    
-    <div style="background:var(--surface); padding:32px 24px; border:1px solid var(--border); margin-bottom:24px; text-align:center;">
-      <p style="color:var(--muted); font-size:11px; letter-spacing:2px; margin-bottom:8px;">MUSIC+'A KATILIM TARİHİN</p>
-      <h3 id="profilKatilimTarihi" style="font-family:'Syne',sans-serif; font-size:32px; color:var(--green); font-weight:800;">—</h3>
+
+    <!-- SEVİYE KARTI -->
+    <div class="level-card" id="levelCard">
+      <div class="level-top">
+        <div class="level-badge">
+          <div class="level-num" id="profilLevel">—</div>
+          <div class="level-info">
+            <div class="level-title">Mevcut Seviye</div>
+            <div class="level-xp" id="profilXpText">— / — XP</div>
+            <div class="level-max" id="profilMaxBadge" style="display:none">✦ MAX SEVİYE</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Toplam XP</div>
+          <div style="font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--green)" id="profilTotalXp">—</div>
+        </div>
+      </div>
+      <div class="level-bar-track">
+        <div class="level-bar-fill" id="profilLevelBar" style="width:0%"></div>
+      </div>
+      <div class="level-bar-labels">
+        <span id="profilLevelStart">0 XP</span>
+        <span id="profilLevelPct">0%</span>
+        <span id="profilLevelEnd">— XP</span>
+      </div>
+      <div class="xp-breakdown">
+        <div class="xp-cell"><div class="xp-cell-label">Dakika</div><div class="xp-cell-val" id="xpDakika">—</div></div>
+        <div class="xp-cell"><div class="xp-cell-label">Şarkı</div><div class="xp-cell-val" id="xpSarki">—</div></div>
+        <div class="xp-cell"><div class="xp-cell-label">Sanatçı</div><div class="xp-cell-val" id="xpSanatci">—</div></div>
+        <div class="xp-cell"><div class="xp-cell-label">Albüm</div><div class="xp-cell-val" id="xpAlbum">—</div></div>
+      </div>
+    </div>
+
+    <!-- SERİ + GENEL ÖZET -->
+    <div class="gami-grid">
+      <div class="gami-cell">
+        <div class="gami-label">🔥 Günlük Seri</div>
+        <div class="gami-val streak green" id="profilStreak">—</div>
+        <div class="gami-sub" id="profilStreakSub">gün</div>
+      </div>
+      <div class="gami-cell">
+        <div class="gami-label">🏆 En İyi Seri</div>
+        <div class="gami-val streak" id="profilBestStreak">—</div>
+        <div class="gami-sub">gün rekor</div>
+      </div>
+      <div class="gami-cell">
+        <div class="gami-label">📅 Bugün Dinleme</div>
+        <div class="gami-val" id="profilToday" style="font-size:22px">—</div>
+        <div class="gami-sub" id="profilTodaySub">—</div>
+      </div>
+      <div class="gami-cell">
+        <div class="gami-label">✦ Mastery Sayısı</div>
+        <div class="gami-val green" id="profilMasteryCount">—</div>
+        <div class="gami-sub">rozet kazanıldı</div>
+      </div>
+    </div>
+
+    <!-- MASTERY ROZETLERİ -->
+    <div class="mastery-section">
+      <div class="section-title">Mastery Rozetleri</div>
+      <div class="mastery-list" id="masteryList">
+        <div class="loading">Yükleniyor...</div>
+      </div>
+    </div>
+
+    <!-- HESAP ÖZET + AYARLAR -->
+    <div class="section-title" style="margin-top:24px">Hesap Özetin</div>
+    <div style="background:var(--surface);padding:24px;border:1px solid var(--border);margin-bottom:16px;text-align:center;">
+      <p style="color:var(--muted);font-size:11px;letter-spacing:2px;margin-bottom:8px;">MUSIC+'A KATILIM TARİHİN</p>
+      <h3 id="profilKatilimTarihi" style="font-family:'Syne',sans-serif;font-size:32px;color:var(--green);font-weight:800;">—</h3>
     </div>
 
     <div class="section-title">Veri ve Yönetim</div>
@@ -777,9 +890,7 @@
         <div class="setting-name">Desteklenen Sözleri Göster</div>
         <div class="setting-desc">Şu an çalınan şarkı destekliyorsa, söylenen satır otomatik vurgulanır ve istatistikler ile now playing arasında gösterilir</div>
       </div>
-      <div class="setting-toggle" id="toggle-syncedLyrics">
-        <div class="toggle-knob"></div>
-      </div>
+      <div class="setting-toggle" id="toggle-syncedLyrics"><div class="toggle-knob"></div></div>
     </div>
 
     <div class="section-title" style="margin-top:32px">Gizlilik</div>
@@ -788,9 +899,7 @@
         <div class="setting-name">Verilerimi İstatistikler'de Kullan</div>
         <div class="setting-desc">Açıksa dinleme verileriniz topluluk istatistiklerine dahil edilir. Kapalıysa sadece sizin verileriniz görünür.</div>
       </div>
-      <div class="setting-toggle" id="toggle-izin">
-        <div class="toggle-knob"></div>
-      </div>
+      <div class="setting-toggle" id="toggle-izin"><div class="toggle-knob"></div></div>
     </div>
   </div>
 
@@ -798,6 +907,18 @@
     <span>Music+ — Bu Bir Spotify Ürünü Değildir</span>
     <span id="footerTime"></span>
   </footer>
+</div>
+
+<!-- SEVİYE ATLAMA OVERLAY -->
+<div class="levelup-overlay" id="levelupOverlay">
+  <div class="levelup-box">
+    <div class="levelup-particles" id="levelupParticles"></div>
+    <div class="levelup-emoji">🎉</div>
+    <div class="levelup-title">Seviye Atladın!</div>
+    <div class="levelup-level" id="levelupNum">—</div>
+    <div class="levelup-sub" id="levelupSub">Tebrikler, yeni bir seviyeye ulaştın!</div>
+    <button class="levelup-close" onclick="closeLevelup()">Devam Et</button>
+  </div>
 </div>
 
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
@@ -2648,6 +2769,133 @@ function _showWelcome() {
     </div>`;
 }
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ===================== GAMİFİCATİON =====================
+let _gamiData       = null;
+let _prevLevel      = null;
+
+async function loadGamification() {
+  try {
+    const res = await fetch('/api/gamification');
+    if (!res.ok) return;
+    const data = await res.json();
+    _gamiData = data;
+    _renderGamification(data);
+  } catch(e) {}
+}
+
+function _renderGamification(d) {
+  if (!d) return;
+  const lv = d.level || {};
+
+  // Seviye
+  document.getElementById('profilLevel').textContent    = lv.level ?? '—';
+  document.getElementById('profilTotalXp').textContent  = (d.xp || 0).toLocaleString('tr-TR') + ' XP';
+
+  if (lv.max) {
+    document.getElementById('profilXpText').textContent   = 'MAX SEVİYE';
+    document.getElementById('profilMaxBadge').style.display = 'block';
+    document.getElementById('profilLevelBar').style.width   = '100%';
+    document.getElementById('profilLevelPct').textContent  = '100%';
+    document.getElementById('profilLevelStart').textContent = '';
+    document.getElementById('profilLevelEnd').textContent  = '';
+  } else {
+    document.getElementById('profilXpText').textContent   = `${(lv.xp_in_level||0).toLocaleString('tr-TR')} / ${(lv.xp_needed||0).toLocaleString('tr-TR')} XP`;
+    document.getElementById('profilLevelBar').style.width  = (lv.pct || 0) + '%';
+    document.getElementById('profilLevelPct').textContent  = (lv.pct || 0) + '%';
+    document.getElementById('profilLevelStart').textContent = (lv.level_xp||0).toLocaleString('tr-TR') + ' XP';
+    document.getElementById('profilLevelEnd').textContent  = (lv.next_xp||0).toLocaleString('tr-TR') + ' XP';
+  }
+
+  // XP kırılımı
+  const br = d.xp_breakdown || {};
+  document.getElementById('xpDakika').textContent  = (br.dakika  || 0).toLocaleString('tr-TR');
+  document.getElementById('xpSarki').textContent   = (br.sarki   || 0).toLocaleString('tr-TR');
+  document.getElementById('xpSanatci').textContent = (br.sanatci || 0).toLocaleString('tr-TR');
+  document.getElementById('xpAlbum').textContent   = (br.album   || 0).toLocaleString('tr-TR');
+
+  // Seri
+  const st = d.streak || {};
+  document.getElementById('profilStreak').textContent     = st.current ?? '—';
+  document.getElementById('profilStreakSub').textContent   = st.today ? 'gün 🔥 bugün aktif' : 'gün (bugün henüz dinleme yok)';
+  document.getElementById('profilBestStreak').textContent  = st.best ?? '—';
+  document.getElementById('profilToday').textContent       = st.today ? '✅' : '❌';
+  document.getElementById('profilTodaySub').textContent    = st.today ? 'Bugün dinledin' : 'Bugün henüz yok';
+
+  // Mastery sayısı
+  const masteries = d.masteries || [];
+  document.getElementById('profilMasteryCount').textContent = masteries.length;
+
+  // Mastery listesi
+  const list = document.getElementById('masteryList');
+  if (!masteries.length) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">Henüz mastery kazanılmadı.<br><span style="font-size:10px">Bir yılda 1.000+ kez dinle!</span></div>';
+  } else {
+    list.innerHTML = masteries.map(m => `
+      <div class="mastery-item" style="border-left-color:${m.color}">
+        <div class="mastery-icon">${m.icon}</div>
+        <div class="mastery-info">
+          <div class="mastery-name">${m.isim}</div>
+          <div class="mastery-meta">${m.yil} · ${m.tip} · ${m.count.toLocaleString('tr-TR')} dinlenme</div>
+        </div>
+        <div class="mastery-badge" style="background:${m.color}22;color:${m.color};border:1px solid ${m.color}44">${m.name}</div>
+      </div>`).join('');
+  }
+
+  // Seviye atlama kontrolü
+  const currentLevel = lv.level ?? 0;
+  if (_prevLevel !== null && currentLevel > _prevLevel) {
+    _showLevelup(currentLevel);
+  }
+  _prevLevel = currentLevel;
+}
+
+function _showLevelup(level) {
+  document.getElementById('levelupNum').textContent = level;
+  document.getElementById('levelupSub').textContent = `Seviye ${level}'e hoş geldin! XP biriktirmeye devam et.`;
+  const overlay = document.getElementById('levelupOverlay');
+  overlay.classList.add('show');
+  // Parçacık efekti
+  const particles = document.getElementById('levelupParticles');
+  particles.innerHTML = '';
+  const emojis = ['🎵','⭐','🎶','✨','🎸','💫'];
+  for (let i = 0; i < 12; i++) {
+    const p = document.createElement('div');
+    p.style.cssText = `position:absolute;font-size:${14+Math.random()*18}px;
+      left:${Math.random()*100}%;top:${Math.random()*100}%;
+      animation:fadeOut ${1+Math.random()*2}s ease forwards;opacity:0.8;`;
+    p.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    particles.appendChild(p);
+  }
+}
+
+function closeLevelup() {
+  document.getElementById('levelupOverlay').classList.remove('show');
+}
+
+// Profil sayfası açıldığında yükle, periyodik kontrol
+let _gamiInterval = null;
+const _origSwitchView = switchView;
+// switchView'e gamification yüklemesini ekle
+const switchViewOrig = switchView;
+function switchView(viewId) {
+  switchViewOrig(viewId);
+  if (viewId === 'profil') {
+    loadGamification();
+    if (!_gamiInterval) _gamiInterval = setInterval(loadGamification, 60000);
+  } else {
+    if (_gamiInterval) { clearInterval(_gamiInterval); _gamiInterval = null; }
+  }
+}
+
+// İlk yükleme: arka planda XP hesapla ve seviye atlamayı izle
+setTimeout(async () => {
+  const res = await fetch('/api/gamification').catch(()=>null);
+  if (res && res.ok) {
+    const data = await res.json();
+    _prevLevel = (data.level || {}).level ?? 0;
+  }
+}, 3000);
 </script>
 
 </body>
