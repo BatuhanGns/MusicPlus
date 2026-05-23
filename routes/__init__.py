@@ -11,6 +11,7 @@ from routes.playlists import bp as playlists_bp
 from routes.ai import bp as ai_bp
 from routes.system import bp as system_bp
 from routes.topluluk import bp as topluluk_bp
+from routes.pets import bp as pets_bp
 
 
 def register_blueprints(app):
@@ -22,3 +23,4 @@ def register_blueprints(app):
     app.register_blueprint(ai_bp)
     app.register_blueprint(system_bp)
     app.register_blueprint(topluluk_bp)
+    app.register_blueprint(pets_bp)
