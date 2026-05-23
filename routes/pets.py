@@ -84,9 +84,11 @@ def _pet_summary(data: dict) -> str:
 
 def _default_pet_data() -> dict:
     return {
-        "coins":       0,
-        "spent_coins": 0,   # toplam harcanan coin — taze hesaplamadan dusurulur
-        "inventory":   [],  # [{id, rarity, egg_type, coin_mult, xp_mult, xp, active, slot}]
+        "coins":               0,
+        "spent_coins":         0,    # toplam harcanan coin
+        "base_snapshot":       0,    # pet takildigindaki base coin degeri
+        "snapshot_multiplier": 1.0,  # pet takildigindaki carpan
+        "inventory":           [],
     }
 
 # ── Coin Hesaplama ───────────────────────────────────────────────────────────
@@ -103,6 +105,43 @@ def _recalc_coins(uid: str, current_data: dict) -> int:
     base   = compute_coins_from_stats(_stats)
     spent  = current_data.get("spent_coins", 0)
     return max(0, base - spent)
+
+
+def _update_snapshot(uid: str, data: dict):
+    """
+    Pet takildiginda/cikarildiginda snapshot'i guncelle.
+    snapshot = su anki base_coins, snapshot_multiplier = yeni carpan.
+    Boylece carpan sadece bu andan sonraki kazanimlara uygulanir.
+    """
+    from utils.helpers import compute_stats
+    from utils.pets import compute_coins_from_stats
+    headers, rows = get_cached_data(uid)
+    if not rows:
+        load_user_data(uid)
+        headers, rows = get_cached_data(uid)
+    _stats     = compute_stats(headers, rows) or {}
+    base_coins = compute_coins_from_stats(_stats)
+
+    active_pets = [p for p in data.get('inventory', []) if p.get('active')]
+    bonuses     = calc_active_bonuses(active_pets)
+
+    # Mevcut net coini koru: onceki birikim + (snapshot'tan sonraki * eski carpan) - spent
+    old_snapshot  = data.get('base_snapshot', 0)
+    old_mult      = data.get('snapshot_multiplier', 1.0)
+    spent         = data.get('spent_coins', 0)
+    new_since_old = max(0, base_coins - old_snapshot)
+    current_coins = max(0, int(old_snapshot * old_mult) + int(new_since_old * old_mult) - spent)
+
+    # Yeni snapshot: su anki base. Yeni spent: mevcut coini koruyacak sekilde ayarla
+    # current_coins = base_coins * new_mult - new_spent
+    # new_spent = base_coins * new_mult - current_coins
+    new_mult  = bonuses['coin_multiplier']
+    new_spent = max(0, int(base_coins * new_mult) - current_coins)
+
+    data['base_snapshot']       = base_coins
+    data['snapshot_multiplier'] = new_mult
+    data['spent_coins']         = new_spent
+
 
 
 # ── Endpoint'ler ─────────────────────────────────────────────────────────────
@@ -150,10 +189,14 @@ def api_pets_state():
             headers, rows = get_cached_data(uid)
         _stats     = compute_stats(headers, rows) or {}
         base_coins = compute_coins_from_stats(_stats)
-        # Carpan MEVCUT coini artirmaz — sadece bundan sonraki kazanimlari etkiler.
-        # Coin = ham kazanim - harcanan. Carpan bilgi amacli dondurulur.
-        spent  = data.get('spent_coins', 0)
-        coins  = max(0, base_coins - spent)
+        spent      = data.get('spent_coins', 0)
+
+        # Carpan SADECE snapshot'tan sonraki yeni kazanima uygulanir.
+        # coins = (snapshot'a kadar kazanilan) + (snapshot'tan sonra kazanilan * carpan) - harcanan
+        snapshot      = data.get('base_snapshot', 0)
+        snap_mult     = data.get('snapshot_multiplier', 1.0)
+        new_since_snap = max(0, base_coins - snapshot)
+        coins = max(0, int(snapshot * snap_mult) + int(new_since_snap * bonuses['coin_multiplier']) - spent)
         data['coins'] = coins
 
         # Pet level bilgilerini tazele
@@ -371,6 +414,7 @@ def api_pets_equip():
 
         target["active"] = True
         target["slot"]   = slot
+        _update_snapshot(uid, data)
         _save_pet_data(uid, get_current_user_name(), data)
 
         active_pets = [p for p in data["inventory"] if p.get("active")]
@@ -397,6 +441,7 @@ def api_pets_unequip():
 
         target["active"] = False
         target["slot"]   = None
+        _update_snapshot(uid, data)
         _save_pet_data(uid, get_current_user_name(), data)
 
         active_pets = [p for p in data["inventory"] if p.get("active")]
