@@ -1906,11 +1906,11 @@ function _renderWeekList(d) {
   weekEl.innerHTML = (d.hafta||[]).map(w => {
     const pct = Math.round((w.sure_sn/max)*100);
     const min = Math.round((w.sure_sn||0)/60);
-    return \`<div class="week-day">
-      <div class="wd-label">\${w.gun.slice(0,3)}</div>
-      <div class="wd-bar-track"><div class="wd-bar" style="height:\${pct}%"></div></div>
-      <div class="wd-val">\${min}dk</div>
-    </div>\`;
+    return `<div class="week-day">
+      <div class="wd-label">${w.gun.slice(0,3)}</div>
+      <div class="wd-bar-track"><div class="wd-bar" style="height:${pct}%"></div></div>
+      <div class="wd-val">${min}dk</div>
+    </div>`;
   }).join('');
 }
 
