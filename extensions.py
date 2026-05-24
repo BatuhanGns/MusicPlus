@@ -58,11 +58,11 @@ def load_tumveri():
 
 def _apply_sync_rewards(uid: str, new_tracks: list):
     """
-    Sync'te gelen yeni track listesinden coin ve XP hesaplar,
-    pet carpanini uygular ve pet verisine ekler.
-
-    Sadece YENİ gelen veri kullanilir — eski bakiyeye dokunulmaz.
+    Sync'te gelen SADECE YENİ track'lerden coin/XP hesaplar.
+    Eski veriye bakmaz — sadece bu sync'te eklenen kayitlari isler.
     """
+    if not new_tracks:
+        return
     try:
         from routes.pets import _load_pet_data, _save_pet_data
         from utils.pets import calc_active_bonuses, calc_pet_level, level_bonus
@@ -74,34 +74,14 @@ def _apply_sync_rewards(uid: str, new_tracks: list):
         coin_mult   = bonuses.get("coin_multiplier", 1.0)
         xp_mult     = bonuses.get("xp_multiplier",   1.0)
 
-        # Simdi hangi sanatci/sarki/album daha once goruldu?
-        # Bunu bilmek icin tum zamanlar verisini kullan
-        headers, all_rows = get_cached_data(uid)
-        seen_tracks  = set()
-        seen_artists = set()
-        seen_albums  = set()
-        if headers and all_rows:
-            try:
-                ti = headers.index("Şarkı Adı")
-                ai = headers.index("Sanatçı")
-                li = next((i for i, h in enumerate(headers)
-                           if h.strip() in ("Albüm","Album","albüm","album")), -1)
-                # Yeni track'ler haric onceki tum verileri say
-                new_set = {(t["track_name"], t["artist_name"]) for t in new_tracks}
-                for row in all_rows:
-                    if len(row) <= max(ti, ai):
-                        continue
-                    key = (row[ti].strip(), row[ai].strip())
-                    if key in new_set:
-                        continue  # Bu sync'te gelen, simdi sayma
-                    seen_tracks.add(row[ti].strip())
-                    seen_artists.add(row[ai].strip())
-                    if li != -1 and len(row) > li:
-                        seen_albums.add(row[li].strip())
-            except Exception:
-                pass
+        # Hangi sarki/sanatci/album bu sync'te ilk kez geliyor?
+        # Sadece new_tracks icinde tekrar edenleri de engellemek icin
+        # kendi arasindan dedupe yapiyoruz — Sheets'e bakmiyoruz.
+        # Unique bonus: o isim bu sync'te ilk kez goruldugunde verilir.
+        this_sync_tracks  = set()
+        this_sync_artists = set()
+        this_sync_albums  = set()
 
-        # Yeni track'ler icin coin ve XP hesapla
         raw_coin = 0.0
         raw_xp   = 0
 
@@ -111,38 +91,41 @@ def _apply_sync_rewards(uid: str, new_tracks: list):
             artist_name = (t.get("artist_name") or "").strip()
             album_name  = (t.get("album_name")  or "").strip()
 
-            # Dinleme suresi
-            raw_coin += (dur_sec / 60) * 0.2
-            raw_xp   += dur_sec // 60
+            # Her kayit icin sure bazli kazanim
+            raw_coin += (dur_sec / 60) * 0.2   # +0.2 coin/dk
+            raw_xp   += dur_sec // 60           # +1 xp/dk
 
-            # Yeni sanatci bonusu
-            if artist_name and artist_name not in seen_artists:
+            # Yeni sanatci (bu sync'te ilk kez)
+            if artist_name and artist_name not in this_sync_artists:
                 raw_coin += 20
                 raw_xp   += 50
-                seen_artists.add(artist_name)
+                this_sync_artists.add(artist_name)
 
-            # Yeni sarki bonusu
-            if track_name and track_name not in seen_tracks:
+            # Yeni sarki (bu sync'te ilk kez)
+            if track_name and track_name not in this_sync_tracks:
                 raw_coin += 10
                 raw_xp   += 25
-                seen_tracks.add(track_name)
+                this_sync_tracks.add(track_name)
 
-            # Yeni album bonusu
-            if album_name and album_name not in seen_albums:
+            # Yeni album (bu sync'te ilk kez)
+            if album_name and album_name not in this_sync_albums:
                 raw_coin += 10
                 raw_xp   += 25
-                seen_albums.add(album_name)
+                this_sync_albums.add(album_name)
 
         # Carpan uygula
         earned_coin = int(raw_coin * coin_mult)
         earned_xp   = int(raw_xp   * xp_mult)
 
-        # Bakiyeye ekle
+        # Kullanici bakiyesine ekle
         data["coins"] = data.get("coins", 0) + earned_coin
         data["xp"]    = data.get("xp",    0) + earned_xp
 
-        # Pet level'larini guncelle
+        # Pet XP artir (aktif petler kazanilan XP'nin %10'unu alir)
+        pet_xp_share = max(1, earned_xp // 10) if earned_xp > 0 else 0
         for p in inventory:
+            if p.get("active"):
+                p["xp"] = p.get("xp", 0) + pet_xp_share
             p["level_info"] = calc_pet_level(p.get("xp", 0))
             p["lv_bonus"]   = level_bonus(p["level_info"]["level"])
 
