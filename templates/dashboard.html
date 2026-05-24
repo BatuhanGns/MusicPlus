@@ -1885,12 +1885,12 @@ function _renderCharts(d) {
   // Aylık analiz
   const monthType = _chartTypes['monthly'] || 'list';
   if (monthType === 'list') {
-    const aylarHTML = \`<table class="month-table">
+    const aylarHTML = `<table class="month-table">
       <thead><tr><th>Ay</th><th>Kayıt</th><th>Toplam</th><th>Ort/Gün</th></tr></thead>
-      <tbody>\${(d.aylar||[]).slice().reverse().map(a => \`
-        <tr><td>\${a.ay}</td><td>\${a.kayit_sayisi.toLocaleString('tr-TR')}</td>
-        <td>\${a.toplam}</td><td>\${a.ortalama}</td></tr>
-      \`).join('')}</tbody></table>\`;
+      <tbody>${(d.aylar||[]).slice().reverse().map(a => `
+        <tr><td>${a.ay}</td><td>${a.kayit_sayisi.toLocaleString('tr-TR')}</td>
+        <td>${a.toplam}</td><td>${a.ortalama}</td></tr>
+      `).join('')}</tbody></table>`;
     document.getElementById('monthTable').innerHTML = aylarHTML;
   } else {
     const mLabels = (d.aylar||[]).map(a => a.ay.slice(0,7));
