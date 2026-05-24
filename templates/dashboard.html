@@ -498,7 +498,7 @@
   .pet-card.selected{border-color:var(--green);}
   .pet-card.active-pet{border-style:solid;}
   .pet-card:hover{background:var(--surface2);}
-  .pet-card .pc-icon{font-size:26px;display:block;margin-bottom:4px;}
+  .pet-card .pc-icon{display:block;margin-bottom:4px;min-height:52px;line-height:1;}
   .pet-card .pc-rarity{font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px;}
   .pet-card .pc-type{font-size:8px;color:var(--muted);}
   .pet-card .pc-mult{font-size:8px;color:var(--green);margin-top:2px;}
@@ -527,7 +527,7 @@
   .opening-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;max-width:700px;width:90%;max-height:70vh;overflow-y:auto;padding:8px;}
   .open-result-card{background:var(--surface);border:2px solid;padding:14px 10px;text-align:center;animation:popIn .3s ease backwards;}
   @keyframes popIn{from{transform:scale(0.5);opacity:0;}to{transform:scale(1);opacity:1;}}
-  .open-result-card .or-icon{font-size:32px;margin-bottom:6px;display:block;}
+  .open-result-card .or-icon{font-size:32px;margin-bottom:6px;display:block;min-height:60px;line-height:1;}
   .open-result-card .or-rarity{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
   .open-result-card .or-type{font-size:9px;color:var(--muted);margin-top:2px;}
   .open-result-card .or-mult{font-size:9px;margin-top:4px;}
@@ -3142,6 +3142,18 @@ const RARITY_ICONS = {
 };
 const EGG_ICONS = { normal:'🥚', golden:'🌟', diamond:'💎' };
 
+// Pet resim — /static/pets/{egg_type}_{rarity}.png, yoksa emoji fallback
+function petImgHtml(egg_type, rarity, size) {
+  const sz  = size || 52;
+  const key = (egg_type||'normal').toLowerCase() + '_' + (rarity||'common').toLowerCase();
+  const src = '/static/pets/' + key + '.png';
+  const fb  = RARITY_ICONS[rarity] || '?';
+  return '<img src="' + src + '" width="' + sz + '" height="' + sz + '" ' +
+    'style="object-fit:contain;image-rendering:pixelated;display:block;margin:0 auto 2px" ' +
+    'onerror="this.style.display='none';this.nextElementSibling.style.display='block'" alt="' + rarity + '">' +
+    '<span style="font-size:' + Math.round(sz*0.55) + 'px;display:none">' + fb + '</span>';
+}
+
 let _petState      = null;
 let _fusionPetIds  = [null, null, null];
 let _selectedPetId = null;
@@ -3235,7 +3247,7 @@ function _renderActiveSlots(inventory) {
       const lv  = (pet.level_info||{}).level || 0;
       const col = RARITY_COLORS[pet.rarity] || '#fff';
       cell.innerHTML = '<button class="slot-remove" onclick="unequipPet(\'' + pet.id + '\',event)">\u2715</button>' +
-        '<div class="slot-icon">' + (RARITY_ICONS[pet.rarity]||'?') + '</div>' +
+        '<div class="slot-icon">' + petImgHtml(pet.egg_type, pet.rarity, 36) + '</div>' +
         '<div class="slot-name" style="color:' + col + ';font-size:8px;font-weight:700">' + pet.rarity + '</div>' +
         '<div class="slot-name">' + (EGG_ICONS[pet.egg_type]||'') + ' ' + pet.egg_type + '</div>' +
         '<div class="slot-lv" style="color:var(--green)">Lv.' + lv + '</div>';
@@ -3285,7 +3297,7 @@ function _renderInventory(inventory) {
     const lv  = (p.level_info||{}).level||0;
     html += `<div class="pet-card active-pet" style="border-color:${col}" onclick="petCardClick('${p.id}','active')">
       <div class="pc-active-badge"></div>
-      <span class="pc-icon">${RARITY_ICONS[p.rarity]||'?'}</span>
+      <span class="pc-icon">${petImgHtml(p.egg_type, p.rarity, 48)}</span>
       <div class="pc-rarity" style="color:${col}">${p.rarity}</div>
       <div class="pc-type">${EGG_ICONS[p.egg_type]||''} ${p.egg_type}</div>
       <div class="pc-mult">🪙${p.coin_mult}x ⭐${p.xp_mult}x</div>
@@ -3302,7 +3314,7 @@ function _renderInventory(inventory) {
     const selBadge   = isFusion ? `<div class="pc-sel-badge">⚗️</div>` : '';
     html += `<div class="pet-card" style="border-color:${border}" onclick="petCardClick('${ids[0]}','passive','${p.rarity}|${p.egg_type}|${p.coin_mult}|${p.xp_mult}')">
       ${countBadge}${selBadge}
-      <span class="pc-icon">${RARITY_ICONS[p.rarity]||'?'}</span>
+      <span class="pc-icon">${petImgHtml(p.egg_type, p.rarity, 48)}</span>
       <div class="pc-rarity" style="color:${col}">${p.rarity}</div>
       <div class="pc-type">${EGG_ICONS[p.egg_type]||''} ${p.egg_type}</div>
       <div class="pc-mult">🪙${p.coin_mult}x ⭐${p.xp_mult}x</div>
@@ -3340,7 +3352,8 @@ function petCardClick(petId, mode, stackKey) {
   }
 
   document.getElementById('pamTitle').innerHTML =
-    `<span style="color:${col}">${icon} ${pet.rarity}</span> ${EGG_ICONS[pet.egg_type]||''} ${pet.egg_type}`;
+    petImgHtml(pet.egg_type, pet.rarity, 56) +
+    `<div style="margin-top:4px"><span style="color:${col}">${pet.rarity}</span> ${EGG_ICONS[pet.egg_type]||''} ${pet.egg_type}</div>`;
   document.getElementById('pamSub').textContent =
     `🪙${pet.coin_mult}x  ⭐${pet.xp_mult}x` + (stackIds.length > 1 ? `  ·  ${stackIds.length} adet` : '');
 
@@ -3455,7 +3468,7 @@ async function openEggs(eggType, count) {
     results.innerHTML = sorted.map(function(p,i){
       const col = RARITY_COLORS[p.rarity]||'#fff';
       return '<div class="open-result-card" style="border-color:'+col+';animation-delay:'+Math.min(i,30)*0.04+'s">'+
-        '<span class="or-icon">'+(RARITY_ICONS[p.rarity]||'?')+'</span>'+
+        '<span class="or-icon">'+petImgHtml(p.egg_type, p.rarity, 56)+'</span>'+
         '<div class="or-rarity" style="color:'+col+'">'+p.rarity+'</div>'+
         '<div class="or-type">'+(EGG_ICONS[p.egg_type]||'')+' '+p.egg_type+'</div>'+
         '<div class="or-mult" style="color:var(--green)">Coin:'+p.coin_mult+'x XP:'+p.xp_mult+'x</div></div>';
@@ -3530,7 +3543,7 @@ async function doFusion() {
       const col = RARITY_COLORS[d.result_pet.rarity]||'#fff';
       resultEl.innerHTML = '<span style="color:var(--green)">Başarılı! '+( d.message||'')+'</span>'+
         '<div style="margin-top:6px">'+
-        '<span style="font-size:20px">'+(RARITY_ICONS[d.result_pet.rarity]||'?')+'</span> '+
+        petImgHtml(d.result_pet.egg_type, d.result_pet.rarity, 40)+' '+
         '<span style="color:'+col+';font-weight:700">'+d.result_pet.rarity+'</span> '+
         '<span style="color:var(--muted);font-size:10px">'+(EGG_ICONS[d.result_pet.egg_type]||'')+' '+d.result_pet.egg_type+'</span> '+
         '<span style="color:var(--green);font-size:10px">Coin:'+d.result_pet.coin_mult+'x XP:'+d.result_pet.xp_mult+'x</span></div>';
