@@ -506,6 +506,39 @@
   .pet-card .pc-active-badge{position:absolute;top:3px;right:3px;width:8px;height:8px;background:var(--green);border-radius:50%;}
   .pet-card .pc-sel-badge{position:absolute;top:3px;left:3px;font-size:10px;}
   .pet-card .pc-count{position:absolute;top:3px;right:3px;background:var(--green);color:#000;font-size:9px;font-weight:800;padding:1px 5px;border-radius:8px;line-height:1.4;}
+  /* ── Tema değişkenleri ── */
+  :root{
+    --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#222;
+    --text:#f0f0f0;--muted:#666;--green:#22c55e;
+  }
+  .theme-white{
+    --bg:#f8fafc;--surface:#fff;--surface2:#f1f5f9;--border:#e2e8f0;
+    --text:#0f172a;--muted:#94a3b8;--green:#16a34a;
+  }
+  .theme-gray{
+    --bg:#1e1e2e;--surface:#2a2a3e;--surface2:#363650;--border:#404060;
+    --text:#e2e8f0;--muted:#8892b0;--green:#64ffda;
+  }
+  /* ── Tema butonları ── */
+  .theme-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    padding:8px 14px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;
+    transition:all .15s;letter-spacing:.5px;}
+  .theme-btn.active,.theme-btn:hover{border-color:var(--green);color:var(--green);}
+  /* ── Sync interval butonları ── */
+  .sync-int-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);
+    padding:7px 12px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;}
+  .sync-int-btn.active{border-color:var(--green);color:var(--green);background:var(--green)11;}
+  /* ── Section header (başlık + chart menüsü) ── */
+  .section-header{display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+  .chart-type-menu{display:flex;gap:4px;}
+  .chart-type-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);
+    padding:5px 10px;font-family:'DM Mono',monospace;font-size:9px;cursor:pointer;
+    letter-spacing:.5px;transition:all .15s;}
+  .chart-type-btn.active,.chart-type-btn:hover{border-color:var(--green);color:var(--green);}
+  /* ── Chart canvas ── */
+  .chart-wrap{position:relative;width:100%;max-height:280px;margin-top:8px;}
+  .chart-wrap canvas{width:100%!important;}
   /* Egg odds pills */
   .egg-odds{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px;}
   .odd-pill{font-size:8px;font-weight:700;padding:2px 6px;border-radius:10px;letter-spacing:.3px;text-transform:uppercase;}
@@ -698,6 +731,7 @@
   /* ═══════════════════════════════════════════════════════════════════════ */
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 </head>
 <body>
@@ -782,38 +816,79 @@
     </div>
 
     <div class="section">
-      <div class="section-title">Son 7 Gün</div>
-      <div class="week-grid" id="weekGrid"><div class="loading">Yükleniyor...</div></div>
-    </div>
-
-    <div class="two-col">
-      <div class="section">
-        <div class="section-title">En Çok Dinlenen Şarkılar</div>
-        <div class="rank-list" id="topTracks"><div class="loading">Yükleniyor...</div></div>
+      <div class="section-header">
+        <div class="section-title" style="margin:0">Son 7 Gün</div>
+        <div class="chart-type-menu" data-section="week">
+          <button class="chart-type-btn active" data-type="bar" onclick="setChartType('week','bar',this)">▦ Bar</button>
+          <button class="chart-type-btn" data-type="line" onclick="setChartType('week','line',this)">↗ Çizgi</button>
+          <button class="chart-type-btn" data-type="list" onclick="setChartType('week','list',this)">☰ Liste</button>
+        </div>
       </div>
-      <div class="section">
-        <div class="section-title">En Çok Dinlenen Sanatçılar</div>
-        <div class="rank-list" id="topArtists"><div class="loading">Yükleniyor...</div></div>
-      </div>
+      <div id="weekGrid"><div class="loading">Yükleniyor...</div></div>
     </div>
 
     <div class="section">
-      <div class="section-title">En Çok Dinlenen Albümler</div>
-      <div class="rank-list" id="topAlbums"><div class="loading">Yükleniyor...</div></div>
+      <div class="section-header">
+        <div class="section-title" style="margin:0">En Çok Dinlenen Şarkılar</div>
+        <div class="chart-type-menu" data-section="tracks">
+          <button class="chart-type-btn active" data-type="list" onclick="setChartType('tracks','list',this)">☰ Liste</button>
+          <button class="chart-type-btn" data-type="bar"  onclick="setChartType('tracks','bar',this)">▦ Bar</button>
+          <button class="chart-type-btn" data-type="pie"  onclick="setChartType('tracks','pie',this)">◉ Pasta</button>
+        </div>
+      </div>
+      <div id="topTracks"><div class="loading">Yükleniyor...</div></div>
     </div>
 
     <div class="section">
-      <div class="section-title">Tüm Zamanlar Dinleme Alışkanlıkları</div>
-      <div style="background:var(--surface); padding:24px; border:1px solid var(--border);">
-        <div class="modal-section-title" style="margin-top:0">Genel Saat Dağılımı</div>
+      <div class="section-header">
+        <div class="section-title" style="margin:0">En Çok Dinlenen Sanatçılar</div>
+        <div class="chart-type-menu" data-section="artists">
+          <button class="chart-type-btn active" data-type="list" onclick="setChartType('artists','list',this)">☰ Liste</button>
+          <button class="chart-type-btn" data-type="bar"  onclick="setChartType('artists','bar',this)">▦ Bar</button>
+          <button class="chart-type-btn" data-type="pie"  onclick="setChartType('artists','pie',this)">◉ Pasta</button>
+        </div>
+      </div>
+      <div id="topArtists"><div class="loading">Yükleniyor...</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title" style="margin:0">En Çok Dinlenen Albümler</div>
+        <div class="chart-type-menu" data-section="albums">
+          <button class="chart-type-btn active" data-type="list" onclick="setChartType('albums','list',this)">☰ Liste</button>
+          <button class="chart-type-btn" data-type="bar"  onclick="setChartType('albums','bar',this)">▦ Bar</button>
+          <button class="chart-type-btn" data-type="pie"  onclick="setChartType('albums','pie',this)">◉ Pasta</button>
+        </div>
+      </div>
+      <div id="topAlbums"><div class="loading">Yükleniyor...</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title" style="margin:0">Tüm Zamanlar Dinleme Alışkanlıkları</div>
+        <div class="chart-type-menu" data-section="habits">
+          <button class="chart-type-btn active" data-type="bar"  onclick="setChartType('habits','bar',this)">▦ Bar</button>
+          <button class="chart-type-btn" data-type="line" onclick="setChartType('habits','line',this)">↗ Çizgi</button>
+          <button class="chart-type-btn" data-type="list" onclick="setChartType('habits','list',this)">☰ Liste</button>
+        </div>
+      </div>
+      <div style="background:var(--surface);padding:16px;border:1px solid var(--border)">
+        <div class="modal-section-title" style="margin-top:0">Saat Dağılımı</div>
         <div id="globalHourChartContainer"><div class="loading">Yükleniyor...</div></div>
-        <div class="modal-section-title" style="margin-top:24px">Genel Vakit Dağılımı</div>
+        <div class="modal-section-title" style="margin-top:16px">Vakit Dağılımı</div>
         <div id="globalVakitContainer"></div>
       </div>
     </div>
 
     <div class="section">
-      <div class="section-title">Aylık Analiz</div>
+      <div class="section-header">
+        <div class="section-title" style="margin:0">Aylık Analiz</div>
+        <div class="chart-type-menu" data-section="monthly">
+          <button class="chart-type-btn active" data-type="list" onclick="setChartType('monthly','list',this)">☰ Liste</button>
+          <button class="chart-type-btn" data-type="bar"  onclick="setChartType('monthly','bar',this)">▦ Bar</button>
+          <button class="chart-type-btn" data-type="line" onclick="setChartType('monthly','line',this)">↗ Çizgi</button>
+        </div>
+      </div>
       <div id="monthTable"><div class="loading">Yükleniyor...</div></div>
     </div>
   </div>
@@ -1141,7 +1216,37 @@
     <button class="action-btn danger" onclick="if(confirm('Çıkış yapmak istediğine emin misin?')) window.location.href='/logout'">Sistemden Çıkış Yap</button>
 
     <div class="section-title" style="margin-top:32px">Görünüm Ayarları</div>
-    <div class="setting-row" onclick="toggleSetting('syncedLyrics')">
+
+    <!-- RENK TEMASI -->
+    <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px">
+      <div class="setting-info">
+        <div class="setting-name">Renk Teması</div>
+        <div class="setting-desc">Uygulamanın renk temasını seçin</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="theme-btn" id="theme-default" onclick="setTheme('default')">🌑 Varsayılan</button>
+        <button class="theme-btn" id="theme-white"   onclick="setTheme('white')">☀️ Beyaz</button>
+        <button class="theme-btn" id="theme-gray"    onclick="setTheme('gray')">🌫️ Gri</button>
+      </div>
+    </div>
+
+    <!-- SYNC INTERVAL -->
+    <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px;margin-top:16px">
+      <div class="setting-info">
+        <div class="setting-name">Otomatik Sync Sıklığı</div>
+        <div class="setting-desc">Spotify verilerinin kaç dakikada bir güncelleneceği. Tam saate göre hizalanır (ör. 10 dk → :00, :10, :20…)</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="syncIntervalBtns">
+        <button class="sync-int-btn" data-min="5"  onclick="setSyncInterval(5)">5 dk</button>
+        <button class="sync-int-btn" data-min="10" onclick="setSyncInterval(10)">10 dk</button>
+        <button class="sync-int-btn" data-min="20" onclick="setSyncInterval(20)">20 dk</button>
+        <button class="sync-int-btn active" data-min="30" onclick="setSyncInterval(30)">30 dk</button>
+        <button class="sync-int-btn" data-min="60" onclick="setSyncInterval(60)">60 dk</button>
+      </div>
+      <div style="font-size:10px;color:var(--muted)" id="nextSyncLabel">Sonraki sync: hesaplanıyor...</div>
+    </div>
+
+    <div class="setting-row" onclick="toggleSetting('syncedLyrics')" style="margin-top:16px">
       <div class="setting-info">
         <div class="setting-name">Desteklenen Sözleri Göster</div>
         <div class="setting-desc">Şu an çalınan şarkı destekliyorsa, söylenen satır otomatik vurgulanır ve istatistikler ile now playing arasında gösterilir</div>
@@ -1579,6 +1684,236 @@ const _settings = {
   syncedLyrics: JSON.parse(localStorage.getItem('setting_syncedLyrics') || 'false')
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ========================= TEMA ===========================================
+const THEMES = ['default','white','gray'];
+let _currentTheme = localStorage.getItem('app_theme') || 'default';
+
+function setTheme(t) {
+  _currentTheme = t;
+  localStorage.setItem('app_theme', t);
+  document.body.classList.remove('theme-white','theme-gray');
+  if (t === 'white') document.body.classList.add('theme-white');
+  if (t === 'gray')  document.body.classList.add('theme-gray');
+  document.querySelectorAll('.theme-btn').forEach(b => {
+    b.classList.toggle('active', b.id === 'theme-' + t);
+  });
+  // Aktif chart'ları yeniden çiz (renk değişti)
+  Object.keys(_charts).forEach(k => { if (_charts[k]) { _charts[k].destroy(); _charts[k] = null; } });
+  if (_lastStatsData) _renderCharts(_lastStatsData);
+}
+
+function _initTheme() {
+  setTheme(_currentTheme);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ====================== SYNC INTERVAL =====================================
+let _syncIntervalMin = parseInt(localStorage.getItem('sync_interval') || '30');
+let _syncTimer = null;
+
+function setSyncInterval(min) {
+  _syncIntervalMin = min;
+  localStorage.setItem('sync_interval', min);
+  document.querySelectorAll('.sync-int-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.min) === min);
+  });
+  _scheduleSyncTimer();
+  _updateNextSyncLabel();
+}
+
+function _nextSyncTime(min) {
+  const now  = new Date();
+  const step = min;
+  const mins = now.getMinutes();
+  const nextMin = Math.ceil((mins + 1) / step) * step;
+  const next = new Date(now);
+  if (nextMin >= 60) {
+    next.setHours(now.getHours() + 1);
+    next.setMinutes(nextMin - 60);
+  } else {
+    next.setMinutes(nextMin);
+  }
+  next.setSeconds(0);
+  next.setMilliseconds(0);
+  return next;
+}
+
+function _updateNextSyncLabel() {
+  const lbl = document.getElementById('nextSyncLabel');
+  if (!lbl) return;
+  const next = _nextSyncTime(_syncIntervalMin);
+  const hh = String(next.getHours()).padStart(2,'0');
+  const mm = String(next.getMinutes()).padStart(2,'0');
+  lbl.textContent = 'Sonraki sync: ' + hh + ':' + mm;
+}
+
+function _scheduleSyncTimer() {
+  if (_syncTimer) clearTimeout(_syncTimer);
+  const next  = _nextSyncTime(_syncIntervalMin);
+  const delay = next.getTime() - Date.now();
+  _syncTimer = setTimeout(async () => {
+    try {
+      await fetch('/api/sync');
+      reloadStats();
+    } catch(e) {}
+    _scheduleSyncTimer();
+    _updateNextSyncLabel();
+  }, delay);
+}
+
+function _initSyncInterval() {
+  document.querySelectorAll('.sync-int-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.min) === _syncIntervalMin);
+  });
+  _scheduleSyncTimer();
+  _updateNextSyncLabel();
+  setInterval(_updateNextSyncLabel, 30000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ====================== CHART ENGINE ======================================
+const _charts   = {};
+const _chartTypes = {};
+let   _lastStatsData = null;
+
+function setChartType(section, type, btn) {
+  _chartTypes[section] = type;
+  const menu = btn.closest('.chart-type-menu');
+  if (menu) menu.querySelectorAll('.chart-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (_lastStatsData) _renderCharts(_lastStatsData);
+}
+
+function _chartColors(n) {
+  const palette = ['#22c55e','#3b82f6','#a78bfa','#fbbf24','#f472b6','#34d399','#60a5fa','#f87171','#fb923c','#a3e635'];
+  return Array.from({length: n}, (_,i) => palette[i % palette.length]);
+}
+
+function _destroyChart(id) {
+  if (_charts[id]) { _charts[id].destroy(); _charts[id] = null; }
+}
+
+function _makeChart(id, type, labels, data, title) {
+  _destroyChart(id);
+  const wrap = document.getElementById(id);
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="chart-wrap"><canvas id="canvas_' + id + '"></canvas></div>';
+  const ctx = document.getElementById('canvas_' + id).getContext('2d');
+  const colors = _chartColors(data.length);
+  const cfg = {
+    type: type === 'pie' ? 'doughnut' : type,
+    data: {
+      labels,
+      datasets: [{
+        label: title || '',
+        data,
+        backgroundColor: type === 'pie' ? colors : colors.map(c => c + '33'),
+        borderColor: colors,
+        borderWidth: 1,
+        tension: 0.35,
+        fill: type === 'line',
+        pointRadius: type === 'line' ? 3 : 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: type === 'pie', labels: { color: getComputedStyle(document.body).getPropertyValue('--text').trim() || '#f0f0f0', font: {size:10} } },
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.y ?? ctx.parsed } }
+      },
+      scales: type === 'pie' ? {} : {
+        x: { ticks: { color: '#888', font: {size:9}, maxRotation:45 }, grid: { color: '#ffffff0a' } },
+        y: { ticks: { color: '#888', font: {size:9} }, grid: { color: '#ffffff0a' }, beginAtZero: true }
+      }
+    }
+  };
+  _charts[id] = new Chart(ctx, cfg);
+}
+
+function _renderRankOrChart(containerId, items, labelKey, valueKey, sectionKey, openFn) {
+  const type = _chartTypes[sectionKey] || 'list';
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (type === 'list') {
+    // Mevcut rank-list render fonksiyonunu kullan
+    renderRankList(containerId, items, labelKey,
+      labelKey === 'sarki' ? 'sanatci' : null, valueKey, 'kac_gundur', openFn);
+    return;
+  }
+
+  const labels = items.slice(0,15).map(i => (i[labelKey]||'').slice(0,20));
+  const data   = items.slice(0,15).map(i => i[valueKey] || 0);
+  _makeChart(containerId, type, labels, data, labelKey);
+}
+
+function _renderCharts(d) {
+  if (!d) return;
+  _lastStatsData = d;
+
+  // Son 7 gün
+  const weekType = _chartTypes['week'] || 'bar';
+  if (weekType === 'list') {
+    // Mevcut week-grid render
+    _renderWeekList(d);
+  } else {
+    const wLabels = (d.hafta||[]).map(w => w.gun.slice(0,3));
+    const wData   = (d.hafta||[]).map(w => Math.round((w.sure_sn||0)/60));
+    _makeChart('weekGrid', weekType, wLabels, wData, 'Dakika');
+  }
+
+  // Top listeler
+  _renderRankOrChart('topTracks',  d.top_sarkilar||[],   'sarki',   'count', 'tracks',  'openSarkiModal');
+  _renderRankOrChart('topArtists', d.top_sanatcilar||[], 'sanatci', 'count', 'artists', 'openSanatciModal');
+  _renderRankOrChart('topAlbums',  d.top_albumler||[],   'album',   'count', 'albums',  'openAlbumModal');
+
+  // Saat dağılımı (habits section)
+  const habitsType = _chartTypes['habits'] || 'bar';
+  if (habitsType === 'list') {
+    const saatler = d.genel_saatler || [];
+    document.getElementById('globalHourChartContainer').innerHTML =
+      '<div style="font-size:11px;color:var(--muted)">' +
+      saatler.map(s => s.saat + ': ' + s.count + ' kayıt').join('<br>') + '</div>';
+  } else {
+    const hLabels = (d.genel_saatler||[]).map(s => s.saat.replace(':00',''));
+    const hData   = (d.genel_saatler||[]).map(s => s.count);
+    _makeChart('globalHourChartContainer', habitsType, hLabels, hData, 'Kayıt');
+  }
+
+  // Aylık analiz
+  const monthType = _chartTypes['monthly'] || 'list';
+  if (monthType === 'list') {
+    const aylarHTML = \`<table class="month-table">
+      <thead><tr><th>Ay</th><th>Kayıt</th><th>Toplam</th><th>Ort/Gün</th></tr></thead>
+      <tbody>\${(d.aylar||[]).slice().reverse().map(a => \`
+        <tr><td>\${a.ay}</td><td>\${a.kayit_sayisi.toLocaleString('tr-TR')}</td>
+        <td>\${a.toplam}</td><td>\${a.ortalama}</td></tr>
+      \`).join('')}</tbody></table>\`;
+    document.getElementById('monthTable').innerHTML = aylarHTML;
+  } else {
+    const mLabels = (d.aylar||[]).map(a => a.ay.slice(0,7));
+    const mData   = (d.aylar||[]).map(a => a.kayit_sayisi);
+    _makeChart('monthTable', monthType, mLabels, mData, 'Kayıt');
+  }
+}
+
+function _renderWeekList(d) {
+  const weekEl = document.getElementById('weekGrid');
+  if (!weekEl) return;
+  const max = Math.max(...(d.hafta||[]).map(w => w.sure_sn||0), 1);
+  weekEl.innerHTML = (d.hafta||[]).map(w => {
+    const pct = Math.round((w.sure_sn/max)*100);
+    const min = Math.round((w.sure_sn||0)/60);
+    return \`<div class="week-day">
+      <div class="wd-label">\${w.gun.slice(0,3)}</div>
+      <div class="wd-bar-track"><div class="wd-bar" style="height:\${pct}%"></div></div>
+      <div class="wd-val">\${min}dk</div>
+    </div>\`;
+  }).join('');
+}
+
 function toggleSetting(key) {
   _settings[key] = !_settings[key];
   localStorage.setItem('setting_' + key, JSON.stringify(_settings[key]));
@@ -1925,25 +2260,18 @@ async function fetchData(aralik) {
 }
 
 async function reloadStats() {
-  // Listeleri "Yükleniyor..." yap
-  ['topTracks','topArtists','topAlbums'].forEach(id => {
+  ['topTracks','topArtists','topAlbums','weekGrid','monthTable'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '<div class="loading">Yükleniyor...</div>';
   });
   const data = await fetchData(_currentAralik);
   if (!data) return;
   renderStats(data);
-  renderWeek(data.hafta);
-  renderRankList('topTracks',  data.top_sarkilar,   'sarki',   'sanatci', 'count', 'kac_gundur', 'openSarkiModal');
-  renderRankList('topArtists', data.top_sanatcilar, 'sanatci', null,      'count', 'kac_gundur', 'openSanatciModal');
-  if (data.top_albumler) {
-    renderRankList('topAlbums', data.top_albumler, 'album', 'sanatci', 'count', 'kac_gundur', 'openAlbumModal');
-  }
-  if (data.genel_saatler && data.genel_vakitler) {
-    document.getElementById('globalHourChartContainer').innerHTML = renderHourChart(data.genel_saatler);
+  _renderCharts(data);
+  // Vakit dağılımı (chart engine dışında)
+  if (data.genel_vakitler) {
     document.getElementById('globalVakitContainer').innerHTML = renderVakitler(data.genel_vakitler);
   }
-  renderMonths(data.aylar);
 }
 
 function renderStats(d) {
@@ -3620,6 +3948,20 @@ async function doFusion() {
     await loadPets();
   } catch(e) { alert('Hata: ' + e.message); }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ========================= INIT ===========================================
+(function _appInit() {
+  _initTheme();
+  _initSyncInterval();
+  // Profil sayfasındaysa butonları güncelle
+  const saved = localStorage.getItem('sync_interval');
+  if (saved) {
+    document.querySelectorAll('.sync-int-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.min === saved);
+    });
+  }
+})();
 
 async function doAutoFusion() {
   const btn = document.getElementById('autoFusionBtn');
