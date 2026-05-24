@@ -11,8 +11,8 @@
     --green:#1db954; --green-dim:#1aa34a22; --text:#e8e8e8; --muted:#555; --muted2:#333;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
-  html{background:#0a0a0a;}
-  body{background:#0a0a0a;color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;overflow-x:hidden;}
+  html{background:var(--bg);}
+  body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;overflow-x:hidden;}
   body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,#0a0a0a 1px),linear-gradient(90deg,var(--border) 1px,#0a0a0a 1px);background-size:48px 48px;opacity:.3;pointer-events:none;z-index:0;}
   .wrapper{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:48px 24px;}
 
@@ -509,17 +509,128 @@
   /* ── Tema değişkenleri ── */
   :root{
     --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--border:#222;
-    --text:#f0f0f0;--muted:#666;--green:#22c55e;
+    --text:#f0f0f0;--muted:#555;--green:#22c55e;
+    --overlay:rgba(0,0,0,.88);--card-shadow:none;
+    --input-bg:#1a1a1a;--input-border:#333;
   }
+
+  /* ══════════════════════════════════════════
+     BEYAZ TEMA
+  ══════════════════════════════════════════ */
   .theme-white{
-    --bg:#f8fafc;--surface:#fff;--surface2:#f1f5f9;--border:#e2e8f0;
-    --text:#0f172a;--muted:#94a3b8;--green:#16a34a;
+    --bg:#f5f5f5;--surface:#ffffff;--surface2:#eeeeee;--border:#ddd;
+    --text:#111111;--muted:#888;--green:#16a34a;
+    --overlay:rgba(0,0,0,.6);--card-shadow:0 1px 6px rgba(0,0,0,.1);
+    --input-bg:#fafafa;--input-border:#ccc;
   }
+  /* Sayfa */
+  .theme-white,
+  .theme-white body         { background:var(--bg) !important; color:var(--text) !important; }
+  /* Header / Nav */
+  .theme-white .header-bar,
+  .theme-white .top-bar,
+  .theme-white nav          { background:#fff !important; border-bottom:1px solid #ddd !important; }
+  .theme-white .logo-text,
+  .theme-white .logo        { color:#111 !important; }
+  .theme-white .nav-link,
+  .theme-white .menu-item   { color:#444 !important; }
+  .theme-white .nav-link.active,
+  .theme-white .menu-item.active { color:var(--green) !important; }
+  /* Section başlık */
+  .theme-white .section-title { color:#111 !important; border-bottom:2px solid var(--green) !important; padding-bottom:5px; }
+  .theme-white .section-subtitle,
+  .theme-white .modal-section-title { color:#555 !important; }
+  /* Kartlar */
+  .theme-white .section,
+  .theme-white .stat-card,
+  .theme-white .rank-item,
+  .theme-white .pet-card,
+  .theme-white .egg-card,
+  .theme-white .setting-row,
+  .theme-white .pet-action-box,
+  .theme-white .open-result-card { background:#fff !important; border-color:#ddd !important; box-shadow:0 1px 4px rgba(0,0,0,.07) !important; }
+  .theme-white .surface2,
+  .theme-white .xp-breakdown-grid,
+  .theme-white .profil-level-card,
+  .theme-white .streak-grid  { background:#eee !important; border-color:#ddd !important; }
+  /* Metin */
+  .theme-white *             { color:inherit; }
+  .theme-white .muted,
+  .theme-white [style*="color:var(--muted)"] { color:#888 !important; }
+  .theme-white .rank-num     { background:#e8e8e8 !important; color:#777 !important; }
+  .theme-white .rank-count   { color:var(--green) !important; }
+  /* Input */
+  .theme-white input,
+  .theme-white select,
+  .theme-white button.egg-btn-open { background:#fafafa !important; border-color:#ccc !important; color:#111 !important; }
+  /* Pet bar */
+  .theme-white .wd-bar        { background:var(--green) !important; }
+  .theme-white .wd-bar-track  { background:#e0e0e0 !important; }
+  .theme-white .level-bar-fill { background:var(--green) !important; }
+  .theme-white .level-bar-bg  { background:#e0e0e0 !important; }
+  /* Overlay */
+  .theme-white .opening-overlay,
+  .theme-white .pet-action-modal { background:var(--overlay) !important; }
+  /* Butonlar */
+  .theme-white .fusion-btn,
+  .theme-white .auto-fusion-btn { border-color:var(--green) !important; color:var(--green) !important; }
+  .theme-white .egg-card .egg-btn { background:#f0f0f0 !important; border-color:#ccc !important; color:#111 !important; }
+  .theme-white .sync-int-btn.active,
+  .theme-white .theme-btn.active  { border-color:var(--green) !important; color:var(--green) !important; }
+  /* Badge */
+  .theme-white .pc-count      { background:var(--green) !important; color:#fff !important; }
+  .theme-white .dot            { background:var(--green) !important; }
+  /* Footer */
+  .theme-white .footer         { color:#999 !important; border-top-color:#ddd !important; }
+
+  /* ══════════════════════════════════════════
+     GRİ TEMA
+  ══════════════════════════════════════════ */
   .theme-gray{
-    --bg:#1e1e2e;--surface:#2a2a3e;--surface2:#363650;--border:#404060;
-    --text:#e2e8f0;--muted:#8892b0;--green:#64ffda;
+    --bg:#15151f;--surface:#1e1e2c;--surface2:#272738;--border:#35354f;
+    --text:#dde1f0;--muted:#7880a0;--green:#5eead4;
+    --overlay:rgba(0,0,0,.82);--card-shadow:0 2px 10px rgba(0,0,0,.4);
+    --input-bg:#1e1e2c;--input-border:#35354f;
   }
+  .theme-gray,
+  .theme-gray body            { background:var(--bg) !important; color:var(--text) !important; }
+  .theme-gray .header-bar,
+  .theme-gray .top-bar,
+  .theme-gray nav             { background:#0f0f18 !important; border-bottom:1px solid #252535 !important; }
+  .theme-gray .logo-text,
+  .theme-gray .logo           { color:var(--green) !important; }
+  .theme-gray .section-title  { color:var(--green) !important; letter-spacing:.5px; }
+  .theme-gray .section,
+  .theme-gray .stat-card,
+  .theme-gray .rank-item,
+  .theme-gray .pet-card,
+  .theme-gray .egg-card,
+  .theme-gray .setting-row,
+  .theme-gray .pet-action-box,
+  .theme-gray .open-result-card { background:var(--surface) !important; border-color:var(--border) !important; box-shadow:var(--card-shadow) !important; }
+  .theme-gray .xp-breakdown-grid,
+  .theme-gray .profil-level-card,
+  .theme-gray .streak-grid    { background:var(--surface2) !important; border-color:var(--border) !important; }
+  .theme-gray .rank-num       { background:var(--surface2) !important; color:var(--muted) !important; }
+  .theme-gray .rank-item:hover { background:#2e2e42 !important; }
+  .theme-gray input,
+  .theme-gray select          { background:var(--input-bg) !important; border-color:var(--input-border) !important; color:var(--text) !important; }
+  .theme-gray .wd-bar         { background:var(--green) !important; }
+  .theme-gray .wd-bar-track   { background:#25253a !important; }
+  .theme-gray .level-bar-fill { background:var(--green) !important; }
+  .theme-gray .level-bar-bg   { background:#25253a !important; }
+  .theme-gray .opening-overlay,
+  .theme-gray .pet-action-modal { background:var(--overlay) !important; }
+  .theme-gray .fusion-btn     { background:var(--green) !important; color:#0f0f18 !important; font-weight:700; }
+  .theme-gray .auto-fusion-btn { border-color:var(--green) !important; color:var(--green) !important; }
+  .theme-gray .pc-count       { background:var(--green) !important; color:#0f0f18 !important; }
+  .theme-gray .dot            { background:var(--green) !important; }
+  .theme-gray .footer         { color:var(--muted) !important; border-top-color:var(--border) !important; }
+  .theme-gray .sync-int-btn.active,
+  .theme-gray .theme-btn.active { border-color:var(--green) !important; color:var(--green) !important; }
   /* ── Tema butonları ── */
+  .theme-swatch{display:inline-block;width:12px;height:12px;border-radius:50%;
+    border:2px solid;vertical-align:middle;margin-right:7px;flex-shrink:0;}
   .theme-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);
     padding:8px 14px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;
     transition:all .15s;letter-spacing:.5px;}
@@ -533,8 +644,8 @@
     margin-bottom:12px;flex-wrap:wrap;gap:8px;}
   .chart-type-menu{display:flex;gap:4px;}
   .chart-type-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);
-    padding:5px 10px;font-family:'DM Mono',monospace;font-size:9px;cursor:pointer;
-    letter-spacing:.5px;transition:all .15s;}
+    width:28px;height:28px;font-size:12px;cursor:pointer;transition:all .15s;
+    display:flex;align-items:center;justify-content:center;}
   .chart-type-btn.active,.chart-type-btn:hover{border-color:var(--green);color:var(--green);}
   /* ── Chart canvas ── */
   .chart-wrap{position:relative;width:100%;max-height:280px;margin-top:8px;}
@@ -560,7 +671,7 @@
     animation:rainbowShift 2s linear infinite;}
   @keyframes rainbowShift{0%{background-position:0%}100%{background-position:200%}}
   /* Pet action modal */
-  .pet-action-modal{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99997;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .pet-action-modal{position:fixed;inset:0;background:var(--overlay,rgba(0,0,0,.75));z-index:99997;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
   .pet-action-modal.show{opacity:1;pointer-events:all;}
   .pet-action-box{background:var(--surface);border:1px solid var(--border);padding:24px;min-width:220px;max-width:300px;text-align:center;}
   .pet-action-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;margin-bottom:4px;}
@@ -575,7 +686,7 @@
   .auto-fusion-btn:hover{border-color:#f59e0b;background:#f59e0b11;}
 
   /* Açılış animasyonu */
-  .opening-overlay{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99998;display:flex;align-items:center;justify-content:center;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .3s;}
+  .opening-overlay{position:fixed;inset:0;background:var(--overlay,rgba(0,0,0,.92));z-index:99998;display:flex;align-items:center;justify-content:center;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .3s;}
   .opening-overlay.show{opacity:1;pointer-events:all;}
   .opening-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;max-width:700px;width:90%;max-height:70vh;overflow-y:auto;padding:8px;}
   .open-result-card{background:var(--surface);border:2px solid;padding:14px 10px;text-align:center;animation:popIn .3s ease backwards;}
@@ -816,79 +927,37 @@
     </div>
 
     <div class="section">
-      <div class="section-header">
-        <div class="section-title" style="margin:0">Son 7 Gün</div>
-        <div class="chart-type-menu" data-section="week">
-          <button class="chart-type-btn active" data-type="bar" onclick="setChartType('week','bar',this)">▦ Bar</button>
-          <button class="chart-type-btn" data-type="line" onclick="setChartType('week','line',this)">↗ Çizgi</button>
-          <button class="chart-type-btn" data-type="list" onclick="setChartType('week','list',this)">☰ Liste</button>
-        </div>
-      </div>
-      <div id="weekGrid"><div class="loading">Yükleniyor...</div></div>
+      <div class="section-title">Son 7 Gün</div>
+      <div class="week-grid" id="weekGrid"><div class="loading">Yükleniyor...</div></div>
     </div>
 
     <div class="section">
-      <div class="section-header">
-        <div class="section-title" style="margin:0">En Çok Dinlenen Şarkılar</div>
-        <div class="chart-type-menu" data-section="tracks">
-          <button class="chart-type-btn active" data-type="list" onclick="setChartType('tracks','list',this)">☰ Liste</button>
-          <button class="chart-type-btn" data-type="bar"  onclick="setChartType('tracks','bar',this)">▦ Bar</button>
-          <button class="chart-type-btn" data-type="pie"  onclick="setChartType('tracks','pie',this)">◉ Pasta</button>
-        </div>
-      </div>
-      <div id="topTracks"><div class="loading">Yükleniyor...</div></div>
+      <div class="section-title">En Çok Dinlenen Şarkılar</div>
+      <div class="rank-list" id="topTracks"><div class="loading">Yükleniyor...</div></div>
     </div>
 
     <div class="section">
-      <div class="section-header">
-        <div class="section-title" style="margin:0">En Çok Dinlenen Sanatçılar</div>
-        <div class="chart-type-menu" data-section="artists">
-          <button class="chart-type-btn active" data-type="list" onclick="setChartType('artists','list',this)">☰ Liste</button>
-          <button class="chart-type-btn" data-type="bar"  onclick="setChartType('artists','bar',this)">▦ Bar</button>
-          <button class="chart-type-btn" data-type="pie"  onclick="setChartType('artists','pie',this)">◉ Pasta</button>
-        </div>
-      </div>
-      <div id="topArtists"><div class="loading">Yükleniyor...</div></div>
+      <div class="section-title">En Çok Dinlenen Sanatçılar</div>
+      <div class="rank-list" id="topArtists"><div class="loading">Yükleniyor...</div></div>
     </div>
 
     <div class="section">
-      <div class="section-header">
-        <div class="section-title" style="margin:0">En Çok Dinlenen Albümler</div>
-        <div class="chart-type-menu" data-section="albums">
-          <button class="chart-type-btn active" data-type="list" onclick="setChartType('albums','list',this)">☰ Liste</button>
-          <button class="chart-type-btn" data-type="bar"  onclick="setChartType('albums','bar',this)">▦ Bar</button>
-          <button class="chart-type-btn" data-type="pie"  onclick="setChartType('albums','pie',this)">◉ Pasta</button>
-        </div>
-      </div>
-      <div id="topAlbums"><div class="loading">Yükleniyor...</div></div>
+      <div class="section-title">En Çok Dinlenen Albümler</div>
+      <div class="rank-list" id="topAlbums"><div class="loading">Yükleniyor...</div></div>
     </div>
 
     <div class="section">
-      <div class="section-header">
-        <div class="section-title" style="margin:0">Tüm Zamanlar Dinleme Alışkanlıkları</div>
-        <div class="chart-type-menu" data-section="habits">
-          <button class="chart-type-btn active" data-type="bar"  onclick="setChartType('habits','bar',this)">▦ Bar</button>
-          <button class="chart-type-btn" data-type="line" onclick="setChartType('habits','line',this)">↗ Çizgi</button>
-          <button class="chart-type-btn" data-type="list" onclick="setChartType('habits','list',this)">☰ Liste</button>
-        </div>
-      </div>
-      <div style="background:var(--surface);padding:16px;border:1px solid var(--border)">
-        <div class="modal-section-title" style="margin-top:0">Saat Dağılımı</div>
+      <div class="section-title">Tüm Zamanlar Dinleme Alışkanlıkları</div>
+      <div style="background:var(--surface); padding:24px; border:1px solid var(--border);">
+        <div class="modal-section-title" style="margin-top:0">Genel Saat Dağılımı</div>
         <div id="globalHourChartContainer"><div class="loading">Yükleniyor...</div></div>
-        <div class="modal-section-title" style="margin-top:16px">Vakit Dağılımı</div>
+        <div class="modal-section-title" style="margin-top:24px">Genel Vakit Dağılımı</div>
         <div id="globalVakitContainer"></div>
       </div>
     </div>
 
     <div class="section">
-      <div class="section-header">
-        <div class="section-title" style="margin:0">Aylık Analiz</div>
-        <div class="chart-type-menu" data-section="monthly">
-          <button class="chart-type-btn active" data-type="list" onclick="setChartType('monthly','list',this)">☰ Liste</button>
-          <button class="chart-type-btn" data-type="bar"  onclick="setChartType('monthly','bar',this)">▦ Bar</button>
-          <button class="chart-type-btn" data-type="line" onclick="setChartType('monthly','line',this)">↗ Çizgi</button>
-        </div>
-      </div>
+      <div class="section-title">Aylık Analiz</div>
       <div id="monthTable"><div class="loading">Yükleniyor...</div></div>
     </div>
   </div>
@@ -1224,9 +1293,18 @@
         <div class="setting-desc">Uygulamanın renk temasını seçin</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="theme-btn" id="theme-default" onclick="setTheme('default')">🌑 Varsayılan</button>
-        <button class="theme-btn" id="theme-white"   onclick="setTheme('white')">☀️ Beyaz</button>
-        <button class="theme-btn" id="theme-gray"    onclick="setTheme('gray')">🌫️ Gri</button>
+        <button class="theme-btn" id="theme-default" onclick="setTheme('default')">
+          <span class="theme-swatch" style="background:#0a0a0a;border-color:#333"></span>
+          Varsayılan
+        </button>
+        <button class="theme-btn" id="theme-white" onclick="setTheme('white')">
+          <span class="theme-swatch" style="background:#f5f5f5;border-color:#ccc"></span>
+          Beyaz
+        </button>
+        <button class="theme-btn" id="theme-gray" onclick="setTheme('gray')">
+          <span class="theme-swatch" style="background:#15151f;border-color:#35354f"></span>
+          Gri
+        </button>
       </div>
     </div>
 
@@ -1906,11 +1984,11 @@ function _renderWeekList(d) {
   weekEl.innerHTML = (d.hafta||[]).map(w => {
     const pct = Math.round((w.sure_sn/max)*100);
     const min = Math.round((w.sure_sn||0)/60);
-    return \`<div class="week-day">
-      <div class="wd-label">\${w.gun.slice(0,3)}</div>
-      <div class="wd-bar-track"><div class="wd-bar" style="height:\${pct}%"></div></div>
-      <div class="wd-val">\${min}dk</div>
-    </div>\`;
+    return `<div class="week-day">
+      <div class="wd-label">${w.gun.slice(0,3)}</div>
+      <div class="wd-bar-track"><div class="wd-bar" style="height:${pct}%"></div></div>
+      <div class="wd-val">${min}dk</div>
+    </div>`;
   }).join('');
 }
 
@@ -2260,18 +2338,25 @@ async function fetchData(aralik) {
 }
 
 async function reloadStats() {
-  ['topTracks','topArtists','topAlbums','weekGrid','monthTable'].forEach(id => {
+  ['topTracks','topArtists','topAlbums'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '<div class="loading">Yükleniyor...</div>';
   });
   const data = await fetchData(_currentAralik);
   if (!data) return;
+  _lastStatsData = data;
   renderStats(data);
-  _renderCharts(data);
-  // Vakit dağılımı (chart engine dışında)
-  if (data.genel_vakitler) {
+  renderWeek(data.hafta);
+  renderRankList('topTracks',  data.top_sarkilar,   'sarki',   'sanatci', 'count', 'kac_gundur', 'openSarkiModal');
+  renderRankList('topArtists', data.top_sanatcilar, 'sanatci', null,      'count', 'kac_gundur', 'openSanatciModal');
+  if (data.top_albumler) {
+    renderRankList('topAlbums', data.top_albumler, 'album', 'sanatci', 'count', 'kac_gundur', 'openAlbumModal');
+  }
+  if (data.genel_saatler && data.genel_vakitler) {
+    document.getElementById('globalHourChartContainer').innerHTML = renderHourChart(data.genel_saatler);
     document.getElementById('globalVakitContainer').innerHTML = renderVakitler(data.genel_vakitler);
   }
+  renderMonths(data.aylar);
 }
 
 function renderStats(d) {
@@ -2558,7 +2643,7 @@ function openPlaylistActionModal(playlistId, playlistName, trackCount) {
       <button class="pl-action-btn danger" onclick="plAction('${playlistId}', 'remove-unliked', this)">
         <span class="pl-icon">🗑️</span> Beğenilmeyen Şarkıları Çıkar
       </button>
-      <div style="margin-top:12px; padding:12px 14px; background:#1a1a1a; border:1px solid #333; font-size:11px; color:var(--muted); line-height:1.7">
+      <div style="margin-top:12px; padding:12px 14px; background:var(--surface2); border:1px solid #333; font-size:11px; color:var(--muted); line-height:1.7">
         ⚠️ 2026 API Kuralları: Bu işlemler yalnızca Geliştirici Dashboard'da ekli Premium (maksimum 5) hesaplar için çalışır.
       </div>
     </div>
@@ -3947,6 +4032,59 @@ async function doFusion() {
     _fusionPetIds = [null, null, null];
     await loadPets();
   } catch(e) { alert('Hata: ' + e.message); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ====================== SECTION VIEW TOGGLE ================================
+function sectionView(containerId, type, btn) {
+  // Buton aktif yap
+  const menu = btn.closest('.chart-type-menu');
+  if (menu) menu.querySelectorAll('.chart-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  if (!_lastStatsData) return;
+  const d = _lastStatsData;
+
+  // Liste görünümü — eski render fonksiyonlarını kullan
+  if (type === 'list') {
+    _destroyChart(containerId);
+    if (containerId === 'weekGrid')               renderWeek(d.hafta);
+    else if (containerId === 'topTracks')         renderRankList('topTracks',  d.top_sarkilar,   'sarki',   'sanatci', 'count', 'kac_gundur', 'openSarkiModal');
+    else if (containerId === 'topArtists')        renderRankList('topArtists', d.top_sanatcilar, 'sanatci', null,      'count', 'kac_gundur', 'openSanatciModal');
+    else if (containerId === 'topAlbums')         renderRankList('topAlbums',  d.top_albumler,   'album',   'sanatci', 'count', 'kac_gundur', 'openAlbumModal');
+    else if (containerId === 'globalHourChartContainer') document.getElementById('globalHourChartContainer').innerHTML = renderHourChart(d.genel_saatler);
+    else if (containerId === 'monthTable')        renderMonths(d.aylar);
+    return;
+  }
+
+  // Chart görünümü
+  let labels = [], data = [], title = '';
+  if (containerId === 'weekGrid') {
+    labels = (d.hafta||[]).map(w => w.gun.slice(0,3));
+    data   = (d.hafta||[]).map(w => Math.round((w.sure_sn||0)/60));
+    title  = 'Dakika';
+  } else if (containerId === 'topTracks') {
+    labels = (d.top_sarkilar||[]).slice(0,10).map(i => (i.sarki||'').slice(0,18));
+    data   = (d.top_sarkilar||[]).slice(0,10).map(i => i.count||0);
+    title  = 'Oynatma';
+  } else if (containerId === 'topArtists') {
+    labels = (d.top_sanatcilar||[]).slice(0,10).map(i => (i.sanatci||'').slice(0,18));
+    data   = (d.top_sanatcilar||[]).slice(0,10).map(i => i.count||0);
+    title  = 'Oynatma';
+  } else if (containerId === 'topAlbums') {
+    labels = (d.top_albumler||[]).slice(0,10).map(i => (i.album||'').slice(0,18));
+    data   = (d.top_albumler||[]).slice(0,10).map(i => i.count||0);
+    title  = 'Oynatma';
+  } else if (containerId === 'globalHourChartContainer') {
+    labels = (d.genel_saatler||[]).map(s => s.saat.replace(':00',''));
+    data   = (d.genel_saatler||[]).map(s => s.count||0);
+    title  = 'Kayıt';
+  } else if (containerId === 'monthTable') {
+    labels = (d.aylar||[]).map(a => a.ay.slice(0,7));
+    data   = (d.aylar||[]).map(a => a.kayit_sayisi||0);
+    title  = 'Kayıt';
+  }
+  _makeChart(containerId, type, labels, data, title);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
