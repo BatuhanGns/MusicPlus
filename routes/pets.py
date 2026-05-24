@@ -24,8 +24,13 @@ bp = Blueprint("pets", __name__)
 
 # ── Sheets Yardımcıları ──────────────────────────────────────────────────────
 
+# In-memory pet cache — Sheets gecikme sorununu onler
+_pet_cache: dict = {}
+
 def _load_pet_data(uid: str) -> dict:
-    """Sheets'ten pet verisini yükler. Yoksa varsayılan döner."""
+    """Once memory cache, sonra Sheets'ten pet verisini yukler."""
+    if uid in _pet_cache:
+        return json.loads(json.dumps(_pet_cache[uid]))  # deep copy
     try:
         ws = sheets._find_sheet("Pets")
         if not ws:
@@ -35,16 +40,20 @@ def _load_pet_data(uid: str) -> dict:
             if row and row[0] == uid:
                 raw = row[2] if len(row) > 2 else "{}"
                 try:
-                    return json.loads(raw)
+                    data = json.loads(raw)
+                    _pet_cache[uid] = json.loads(json.dumps(data))
+                    return data
                 except Exception:
                     return _default_pet_data()
     except Exception as e:
-        logger.warning(f"Pet data yükleme hatası: {e}")
+        logger.warning(f"Pet data yukleme hatasi: {e}")
     return _default_pet_data()
 
 
 def _save_pet_data(uid: str, display_name: str, data: dict):
-    """Pet verisini Sheets'e kaydeder."""
+    """Pet verisini once memory cache'e, sonra Sheets'e kaydeder."""
+    # Once cache'i guncelle — anlik yanit icin
+    _pet_cache[uid] = json.loads(json.dumps(data))
     try:
         ws = _ensure_pets_sheet()
         if not ws:
@@ -58,7 +67,7 @@ def _save_pet_data(uid: str, display_name: str, data: dict):
                 return
         ws.append_row([uid, display_name, raw, summary], value_input_option="RAW")
     except Exception as e:
-        logger.warning(f"Pet data kaydetme hatası: {e}")
+        logger.warning(f"Pet data kaydetme hatasi: {e}")
 
 
 def _ensure_pets_sheet():
