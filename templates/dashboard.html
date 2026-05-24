@@ -506,6 +506,26 @@
   .pet-card .pc-active-badge{position:absolute;top:3px;right:3px;width:8px;height:8px;background:var(--green);border-radius:50%;}
   .pet-card .pc-sel-badge{position:absolute;top:3px;left:3px;font-size:10px;}
   .pet-card .pc-count{position:absolute;top:3px;right:3px;background:var(--green);color:#000;font-size:9px;font-weight:800;padding:1px 5px;border-radius:8px;line-height:1.4;}
+  /* Egg odds pills */
+  .egg-odds{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px;}
+  .odd-pill{font-size:8px;font-weight:700;padding:2px 6px;border-radius:10px;letter-spacing:.3px;text-transform:uppercase;}
+  .odd-pill.common{background:#6b728022;color:#9ca3af;border:1px solid #6b728044;}
+  .odd-pill.rare{background:#3b82f622;color:#60a5fa;border:1px solid #3b82f644;}
+  .odd-pill.epic{background:#8b5cf622;color:#a78bfa;border:1px solid #8b5cf644;}
+  .odd-pill.legendary{background:#f59e0b22;color:#fbbf24;border:1px solid #f59e0b44;}
+  .odd-pill.mysterious{background:#ec489922;color:#f472b6;border:1px solid #ec489944;}
+  .odd-pill.cosmic{background:linear-gradient(90deg,#f472b622,#818cf822,#34d39922);
+    color:#fff;border:1px solid #ffffff33;
+    animation:cosmicPill 2s linear infinite;background-size:200%;}
+  @keyframes cosmicPill{0%{background-position:0%}100%{background-position:200%}}
+  /* Pet level bar in modal */
+  .pet-lv-bar-wrap{background:#ffffff11;height:4px;margin:6px 0 2px;overflow:hidden;}
+  .pet-lv-bar{height:4px;background:var(--green);transition:width .4s;}
+  /* Cosmic rainbow text */
+  .cosmic-text{background:linear-gradient(90deg,#f472b6,#818cf8,#34d399,#fbbf24,#f472b6);
+    background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    animation:rainbowShift 2s linear infinite;}
+  @keyframes rainbowShift{0%{background-position:0%}100%{background-position:200%}}
   /* Pet action modal */
   .pet-action-modal{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99997;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
   .pet-action-modal.show{opacity:1;pointer-events:all;}
@@ -868,8 +888,12 @@
             <button class="egg-btn" onclick="openEggCustom('normal','customNormal')">AÇ</button>
           </div>
         </div>
-        <div style="margin-top:8px;font-size:9px;color:var(--muted);text-align:left;line-height:1.6">
-          Common 60% · Rare 25%<br>Epic 10% · Legendary 4%<br>Mysterious 1%
+        <div class="egg-odds">
+          <span class="odd-pill common">Common 60%</span>
+          <span class="odd-pill rare">Rare 25%</span>
+          <span class="odd-pill epic">Epic 10%</span>
+          <span class="odd-pill legendary">Legendary 4%</span>
+          <span class="odd-pill mysterious">Mysterious 1%</span>
         </div>
       </div>
 
@@ -888,8 +912,12 @@
             <button class="egg-btn" onclick="openEggCustom('golden','customGolden')">AÇ</button>
           </div>
         </div>
-        <div style="margin-top:8px;font-size:9px;color:var(--muted);text-align:left;line-height:1.6">
-          Common 60% · Rare 25%<br>Epic 10% · Legendary 4%<br>Mysterious 1% · 1.5x çarpan
+        <div class="egg-odds">
+          <span class="odd-pill common">Common 60%</span>
+          <span class="odd-pill rare">Rare 25%</span>
+          <span class="odd-pill epic">Epic 10%</span>
+          <span class="odd-pill legendary">Legendary 4%</span>
+          <span class="odd-pill mysterious">Mysterious 1%</span>
         </div>
       </div>
 
@@ -908,17 +936,22 @@
             <button class="egg-btn" onclick="openEggCustom('diamond','customDiamond')">AÇ</button>
           </div>
         </div>
-        <div style="margin-top:8px;font-size:9px;color:var(--muted);text-align:left;line-height:1.6">
-          Common 60% · Rare 25%<br>Epic 10% · Legendary 4%<br>Mysterious 0.9% · <span style="color:#06b6d4">Cosmic 0.1%</span><br>3x çarpan
+        <div class="egg-odds">
+          <span class="odd-pill common">Common 60%</span>
+          <span class="odd-pill rare">Rare 25%</span>
+          <span class="odd-pill epic">Epic 10%</span>
+          <span class="odd-pill legendary">Legendary 4%</span>
+          <span class="odd-pill mysterious">Mysterious 0.9%</span>
+          <span class="odd-pill cosmic">Cosmic 0.1%</span>
         </div>
       </div>
     </div>
 
     <!-- Fusion -->
-    <div class="section-title">Fusion <span style="font-size:10px;color:var(--muted);font-weight:400">(%20 şans — 3 aynı pet gerekli)</span></div>
+    <div class="section-title">Fusion</div>
     <div class="fusion-panel">
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
-        Normal → Altın (1.5x çarpan) · Altın → Elmas (2x çarpan) · Başarısız olursa 3 pet de gider!
+        Normal → Altın · Altın → Elmas · Başarısız olursa 3 pet de gider!
       </div>
       <div class="fusion-slots" id="fusionSlots">
         <div class="fusion-slot" data-fslot="0" onclick="fusionSlotClick(0)">❓</div>
@@ -3131,12 +3164,16 @@ setTimeout(async () => {
 
 const RARITY_COLORS = {
   Common:     '#9ca3af',
-  Rare:       '#3b82f6',
-  Epic:       '#8b5cf6',
-  Legendary:  '#f59e0b',
-  Mysterious: '#ec4899',
-  Cosmic:     '#06b6d4',
+  Rare:       '#60a5fa',
+  Epic:       '#a78bfa',
+  Legendary:  '#fbbf24',
+  Mysterious: '#f472b6',
+  Cosmic:     '#ffffff',
 };
+function rarityLabel(rarity) {
+  if (rarity === 'Cosmic') return '<span class="cosmic-text">' + rarity + '</span>';
+  return '<span style="color:' + (RARITY_COLORS[rarity]||'#fff') + '">' + rarity + '</span>';
+}
 const RARITY_ICONS = {
   Common:'⬜', Rare:'🔷', Epic:'💜', Legendary:'🌟', Mysterious:'🌸', Cosmic:'🌌'
 };
@@ -3248,7 +3285,7 @@ function _renderActiveSlots(inventory) {
       const col = RARITY_COLORS[pet.rarity] || '#fff';
       cell.innerHTML = '<button class="slot-remove" onclick="unequipPet(\'' + pet.id + '\',event)">\u2715</button>' +
         '<div class="slot-icon">' + petImgHtml(pet.egg_type, pet.rarity, 36) + '</div>' +
-        '<div class="slot-name" style="color:' + col + ';font-size:8px;font-weight:700">' + pet.rarity + '</div>' +
+        '<div class="slot-name" style="font-size:8px;font-weight:700">' + rarityLabel(pet.rarity) + '</div>' +
         '<div class="slot-name">' + (EGG_ICONS[pet.egg_type]||'') + ' ' + pet.egg_type + '</div>' +
         '<div class="slot-lv" style="color:var(--green)">Lv.' + lv + '</div>';
       cell.classList.add('filled');
@@ -3298,7 +3335,7 @@ function _renderInventory(inventory) {
     html += `<div class="pet-card active-pet" style="border-color:${col}" onclick="petCardClick('${p.id}','active')">
       <div class="pc-active-badge"></div>
       <span class="pc-icon">${petImgHtml(p.egg_type, p.rarity, 48)}</span>
-      <div class="pc-rarity" style="color:${col}">${p.rarity}</div>
+      <div class="pc-rarity">${rarityLabel(p.rarity)}</div>
       <div class="pc-type">${EGG_ICONS[p.egg_type]||''} ${p.egg_type}</div>
       <div class="pc-mult">🪙${p.coin_mult}x ⭐${p.xp_mult}x</div>
       <div class="pc-lv">Lv.${lv}</div>
@@ -3315,7 +3352,7 @@ function _renderInventory(inventory) {
     html += `<div class="pet-card" style="border-color:${border}" onclick="petCardClick('${ids[0]}','passive','${p.rarity}|${p.egg_type}|${p.coin_mult}|${p.xp_mult}')">
       ${countBadge}${selBadge}
       <span class="pc-icon">${petImgHtml(p.egg_type, p.rarity, 48)}</span>
-      <div class="pc-rarity" style="color:${col}">${p.rarity}</div>
+      <div class="pc-rarity">${rarityLabel(p.rarity)}</div>
       <div class="pc-type">${EGG_ICONS[p.egg_type]||''} ${p.egg_type}</div>
       <div class="pc-mult">🪙${p.coin_mult}x ⭐${p.xp_mult}x</div>
       ${ids.length > 1 ? `<div class="pc-lv" style="color:${col};font-weight:700">${ids.length} adet</div>` : ''}
@@ -3353,9 +3390,32 @@ function petCardClick(petId, mode, stackKey) {
 
   document.getElementById('pamTitle').innerHTML =
     petImgHtml(pet.egg_type, pet.rarity, 56) +
-    `<div style="margin-top:4px"><span style="color:${col}">${pet.rarity}</span> ${EGG_ICONS[pet.egg_type]||''} ${pet.egg_type}</div>`;
-  document.getElementById('pamSub').textContent =
-    `🪙${pet.coin_mult}x  ⭐${pet.xp_mult}x` + (stackIds.length > 1 ? `  ·  ${stackIds.length} adet` : '');
+    `<div style="margin-top:4px">${rarityLabel(pet.rarity)} ${EGG_ICONS[pet.egg_type]||''} ${pet.egg_type}</div>`;
+
+  // Level bilgisi
+  const lv   = (pet.level_info || {});
+  const lvN  = lv.level  || 0;
+  const xpIn = lv.xp_in  || 0;
+  const xpNd = lv.xp_needed || 1;
+  const pct  = lv.pct    || 0;
+  const isMax = lv.max;
+  let lvHtml = '<div style="font-size:10px;color:var(--muted);margin:8px 0 0;text-align:left">';
+  lvHtml += '<b style="color:var(--text)">Seviye ' + lvN + '</b>';
+  if (!isMax) {
+    lvHtml += ' &nbsp;·&nbsp; sonraki için <b style="color:var(--green)">' + (xpNd - xpIn) + ' XP</b>';
+    lvHtml += '<div class="pet-lv-bar-wrap"><div class="pet-lv-bar" style="width:' + pct + '%"></div></div>';
+    lvHtml += '<div style="font-size:9px;opacity:.6">' + xpIn + ' / ' + xpNd + ' XP (' + pct + '%)</div>';
+  } else {
+    lvHtml += ' &nbsp;<span style="color:var(--green)">MAX</span>';
+  }
+  lvHtml += '<div style="margin-top:4px">🪙 ' + pet.coin_mult + 'x &nbsp;⭐ ' + pet.xp_mult + 'x</div>';
+  lvHtml += '</div>';
+  document.getElementById('pamSub').innerHTML = lvHtml;
+  // stack adet bilgisi level html içinde yer alıyor — pamSub yukarıda set edildi
+  if (stackIds.length > 1) {
+    document.getElementById('pamSub').innerHTML +=
+      '<div style="font-size:10px;color:var(--muted);margin-top:4px">' + stackIds.length + ' adet</div>';
+  }
 
   const btns = document.getElementById('pamBtns');
   btns.innerHTML = '';
@@ -3469,7 +3529,7 @@ async function openEggs(eggType, count) {
       const col = RARITY_COLORS[p.rarity]||'#fff';
       return '<div class="open-result-card" style="border-color:'+col+';animation-delay:'+Math.min(i,30)*0.04+'s">'+
         '<span class="or-icon">'+petImgHtml(p.egg_type, p.rarity, 56)+'</span>'+
-        '<div class="or-rarity" style="color:'+col+'">'+p.rarity+'</div>'+
+        '<div class="or-rarity">'+rarityLabel(p.rarity)+'</div>'+
         '<div class="or-type">'+(EGG_ICONS[p.egg_type]||'')+' '+p.egg_type+'</div>'+
         '<div class="or-mult" style="color:var(--green)">Coin:'+p.coin_mult+'x XP:'+p.xp_mult+'x</div></div>';
     }).join('');
