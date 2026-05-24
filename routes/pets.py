@@ -178,7 +178,6 @@ def api_pets_state():
 
         return jsonify({
             "coins":          coins,
-            "base_coins":     base_coins,
             "inventory":      inventory,
             "active_bonuses": bonuses,
             "egg_costs":      EGG_COST,
