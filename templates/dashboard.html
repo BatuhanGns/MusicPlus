@@ -533,8 +533,8 @@
     margin-bottom:12px;flex-wrap:wrap;gap:8px;}
   .chart-type-menu{display:flex;gap:4px;}
   .chart-type-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);
-    width:28px;height:28px;font-size:12px;cursor:pointer;transition:all .15s;
-    display:flex;align-items:center;justify-content:center;}
+    padding:5px 10px;font-family:'DM Mono',monospace;font-size:9px;cursor:pointer;
+    letter-spacing:.5px;transition:all .15s;}
   .chart-type-btn.active,.chart-type-btn:hover{border-color:var(--green);color:var(--green);}
   /* ── Chart canvas ── */
   .chart-wrap{position:relative;width:100%;max-height:280px;margin-top:8px;}
@@ -818,10 +818,10 @@
     <div class="section">
       <div class="section-header">
         <div class="section-title" style="margin:0">Son 7 Gün</div>
-        <div class="chart-type-menu">
-          <button class="chart-type-btn active" onclick="sectionView('weekGrid','list',this)">☰</button>
-          <button class="chart-type-btn" onclick="sectionView('weekGrid','bar',this)">▦</button>
-          <button class="chart-type-btn" onclick="sectionView('weekGrid','line',this)">↗</button>
+        <div class="chart-type-menu" data-section="week">
+          <button class="chart-type-btn active" data-type="bar" onclick="setChartType('week','bar',this)">▦ Bar</button>
+          <button class="chart-type-btn" data-type="line" onclick="setChartType('week','line',this)">↗ Çizgi</button>
+          <button class="chart-type-btn" data-type="list" onclick="setChartType('week','list',this)">☰ Liste</button>
         </div>
       </div>
       <div id="weekGrid"><div class="loading">Yükleniyor...</div></div>
@@ -830,10 +830,10 @@
     <div class="section">
       <div class="section-header">
         <div class="section-title" style="margin:0">En Çok Dinlenen Şarkılar</div>
-        <div class="chart-type-menu">
-          <button class="chart-type-btn active" onclick="sectionView('topTracks','list',this)">☰</button>
-          <button class="chart-type-btn" onclick="sectionView('topTracks','bar',this)">▦</button>
-          <button class="chart-type-btn" onclick="sectionView('topTracks','pie',this)">◉</button>
+        <div class="chart-type-menu" data-section="tracks">
+          <button class="chart-type-btn active" data-type="list" onclick="setChartType('tracks','list',this)">☰ Liste</button>
+          <button class="chart-type-btn" data-type="bar"  onclick="setChartType('tracks','bar',this)">▦ Bar</button>
+          <button class="chart-type-btn" data-type="pie"  onclick="setChartType('tracks','pie',this)">◉ Pasta</button>
         </div>
       </div>
       <div id="topTracks"><div class="loading">Yükleniyor...</div></div>
@@ -842,10 +842,10 @@
     <div class="section">
       <div class="section-header">
         <div class="section-title" style="margin:0">En Çok Dinlenen Sanatçılar</div>
-        <div class="chart-type-menu">
-          <button class="chart-type-btn active" onclick="sectionView('topArtists','list',this)">☰</button>
-          <button class="chart-type-btn" onclick="sectionView('topArtists','bar',this)">▦</button>
-          <button class="chart-type-btn" onclick="sectionView('topArtists','pie',this)">◉</button>
+        <div class="chart-type-menu" data-section="artists">
+          <button class="chart-type-btn active" data-type="list" onclick="setChartType('artists','list',this)">☰ Liste</button>
+          <button class="chart-type-btn" data-type="bar"  onclick="setChartType('artists','bar',this)">▦ Bar</button>
+          <button class="chart-type-btn" data-type="pie"  onclick="setChartType('artists','pie',this)">◉ Pasta</button>
         </div>
       </div>
       <div id="topArtists"><div class="loading">Yükleniyor...</div></div>
@@ -854,10 +854,10 @@
     <div class="section">
       <div class="section-header">
         <div class="section-title" style="margin:0">En Çok Dinlenen Albümler</div>
-        <div class="chart-type-menu">
-          <button class="chart-type-btn active" onclick="sectionView('topAlbums','list',this)">☰</button>
-          <button class="chart-type-btn" onclick="sectionView('topAlbums','bar',this)">▦</button>
-          <button class="chart-type-btn" onclick="sectionView('topAlbums','pie',this)">◉</button>
+        <div class="chart-type-menu" data-section="albums">
+          <button class="chart-type-btn active" data-type="list" onclick="setChartType('albums','list',this)">☰ Liste</button>
+          <button class="chart-type-btn" data-type="bar"  onclick="setChartType('albums','bar',this)">▦ Bar</button>
+          <button class="chart-type-btn" data-type="pie"  onclick="setChartType('albums','pie',this)">◉ Pasta</button>
         </div>
       </div>
       <div id="topAlbums"><div class="loading">Yükleniyor...</div></div>
@@ -866,10 +866,10 @@
     <div class="section">
       <div class="section-header">
         <div class="section-title" style="margin:0">Tüm Zamanlar Dinleme Alışkanlıkları</div>
-        <div class="chart-type-menu">
-          <button class="chart-type-btn active" onclick="sectionView('globalHourChartContainer','bar',this)">▦</button>
-          <button class="chart-type-btn" onclick="sectionView('globalHourChartContainer','line',this)">↗</button>
-          <button class="chart-type-btn" onclick="sectionView('globalHourChartContainer','list',this)">☰</button>
+        <div class="chart-type-menu" data-section="habits">
+          <button class="chart-type-btn active" data-type="bar"  onclick="setChartType('habits','bar',this)">▦ Bar</button>
+          <button class="chart-type-btn" data-type="line" onclick="setChartType('habits','line',this)">↗ Çizgi</button>
+          <button class="chart-type-btn" data-type="list" onclick="setChartType('habits','list',this)">☰ Liste</button>
         </div>
       </div>
       <div style="background:var(--surface);padding:16px;border:1px solid var(--border)">
@@ -883,10 +883,10 @@
     <div class="section">
       <div class="section-header">
         <div class="section-title" style="margin:0">Aylık Analiz</div>
-        <div class="chart-type-menu">
-          <button class="chart-type-btn active" onclick="sectionView('monthTable','list',this)">☰</button>
-          <button class="chart-type-btn" onclick="sectionView('monthTable','bar',this)">▦</button>
-          <button class="chart-type-btn" onclick="sectionView('monthTable','line',this)">↗</button>
+        <div class="chart-type-menu" data-section="monthly">
+          <button class="chart-type-btn active" data-type="list" onclick="setChartType('monthly','list',this)">☰ Liste</button>
+          <button class="chart-type-btn" data-type="bar"  onclick="setChartType('monthly','bar',this)">▦ Bar</button>
+          <button class="chart-type-btn" data-type="line" onclick="setChartType('monthly','line',this)">↗ Çizgi</button>
         </div>
       </div>
       <div id="monthTable"><div class="loading">Yükleniyor...</div></div>
@@ -1906,11 +1906,11 @@ function _renderWeekList(d) {
   weekEl.innerHTML = (d.hafta||[]).map(w => {
     const pct = Math.round((w.sure_sn/max)*100);
     const min = Math.round((w.sure_sn||0)/60);
-    return `<div class="week-day">
-      <div class="wd-label">${w.gun.slice(0,3)}</div>
-      <div class="wd-bar-track"><div class="wd-bar" style="height:${pct}%"></div></div>
-      <div class="wd-val">${min}dk</div>
-    </div>`;
+    return \`<div class="week-day">
+      <div class="wd-label">\${w.gun.slice(0,3)}</div>
+      <div class="wd-bar-track"><div class="wd-bar" style="height:\${pct}%"></div></div>
+      <div class="wd-val">\${min}dk</div>
+    </div>\`;
   }).join('');
 }
 
@@ -2260,25 +2260,18 @@ async function fetchData(aralik) {
 }
 
 async function reloadStats() {
-  ['topTracks','topArtists','topAlbums'].forEach(id => {
+  ['topTracks','topArtists','topAlbums','weekGrid','monthTable'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '<div class="loading">Yükleniyor...</div>';
   });
   const data = await fetchData(_currentAralik);
   if (!data) return;
-  _lastStatsData = data;
   renderStats(data);
-  renderWeek(data.hafta);
-  renderRankList('topTracks',  data.top_sarkilar,   'sarki',   'sanatci', 'count', 'kac_gundur', 'openSarkiModal');
-  renderRankList('topArtists', data.top_sanatcilar, 'sanatci', null,      'count', 'kac_gundur', 'openSanatciModal');
-  if (data.top_albumler) {
-    renderRankList('topAlbums', data.top_albumler, 'album', 'sanatci', 'count', 'kac_gundur', 'openAlbumModal');
-  }
-  if (data.genel_saatler && data.genel_vakitler) {
-    document.getElementById('globalHourChartContainer').innerHTML = renderHourChart(data.genel_saatler);
+  _renderCharts(data);
+  // Vakit dağılımı (chart engine dışında)
+  if (data.genel_vakitler) {
     document.getElementById('globalVakitContainer').innerHTML = renderVakitler(data.genel_vakitler);
   }
-  renderMonths(data.aylar);
 }
 
 function renderStats(d) {
@@ -3954,59 +3947,6 @@ async function doFusion() {
     _fusionPetIds = [null, null, null];
     await loadPets();
   } catch(e) { alert('Hata: ' + e.message); }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// ====================== SECTION VIEW TOGGLE ================================
-function sectionView(containerId, type, btn) {
-  // Buton aktif yap
-  const menu = btn.closest('.chart-type-menu');
-  if (menu) menu.querySelectorAll('.chart-type-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-
-  if (!_lastStatsData) return;
-  const d = _lastStatsData;
-
-  // Liste görünümü — eski render fonksiyonlarını kullan
-  if (type === 'list') {
-    _destroyChart(containerId);
-    if (containerId === 'weekGrid')               renderWeek(d.hafta);
-    else if (containerId === 'topTracks')         renderRankList('topTracks',  d.top_sarkilar,   'sarki',   'sanatci', 'count', 'kac_gundur', 'openSarkiModal');
-    else if (containerId === 'topArtists')        renderRankList('topArtists', d.top_sanatcilar, 'sanatci', null,      'count', 'kac_gundur', 'openSanatciModal');
-    else if (containerId === 'topAlbums')         renderRankList('topAlbums',  d.top_albumler,   'album',   'sanatci', 'count', 'kac_gundur', 'openAlbumModal');
-    else if (containerId === 'globalHourChartContainer') document.getElementById('globalHourChartContainer').innerHTML = renderHourChart(d.genel_saatler);
-    else if (containerId === 'monthTable')        renderMonths(d.aylar);
-    return;
-  }
-
-  // Chart görünümü
-  let labels = [], data = [], title = '';
-  if (containerId === 'weekGrid') {
-    labels = (d.hafta||[]).map(w => w.gun.slice(0,3));
-    data   = (d.hafta||[]).map(w => Math.round((w.sure_sn||0)/60));
-    title  = 'Dakika';
-  } else if (containerId === 'topTracks') {
-    labels = (d.top_sarkilar||[]).slice(0,10).map(i => (i.sarki||'').slice(0,18));
-    data   = (d.top_sarkilar||[]).slice(0,10).map(i => i.count||0);
-    title  = 'Oynatma';
-  } else if (containerId === 'topArtists') {
-    labels = (d.top_sanatcilar||[]).slice(0,10).map(i => (i.sanatci||'').slice(0,18));
-    data   = (d.top_sanatcilar||[]).slice(0,10).map(i => i.count||0);
-    title  = 'Oynatma';
-  } else if (containerId === 'topAlbums') {
-    labels = (d.top_albumler||[]).slice(0,10).map(i => (i.album||'').slice(0,18));
-    data   = (d.top_albumler||[]).slice(0,10).map(i => i.count||0);
-    title  = 'Oynatma';
-  } else if (containerId === 'globalHourChartContainer') {
-    labels = (d.genel_saatler||[]).map(s => s.saat.replace(':00',''));
-    data   = (d.genel_saatler||[]).map(s => s.count||0);
-    title  = 'Kayıt';
-  } else if (containerId === 'monthTable') {
-    labels = (d.aylar||[]).map(a => a.ay.slice(0,7));
-    data   = (d.aylar||[]).map(a => a.kayit_sayisi||0);
-    title  = 'Kayıt';
-  }
-  _makeChart(containerId, type, labels, data, title);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
