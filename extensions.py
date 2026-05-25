@@ -80,41 +80,11 @@ def _apply_sync_rewards(uid: str, new_tracks: list):
         # Unique bonus: o isim bu sync'te ilk kez goruldugunde verilir.
         this_sync_tracks  = set()
         this_sync_artists = set()
-        this_sync_albums  = set()
+        # Her yeni kayit = 1 coin * carpan, 1 XP * carpan
+        earned_coin = int(len(new_tracks) * coin_mult)
+        earned_xp   = int(len(new_tracks) * xp_mult)
 
-        raw_coin = 0.0
-        raw_xp   = 0
-
-        for t in new_tracks:
-            dur_sec     = int(t.get("duration_sec") or 0)
-            track_name  = (t.get("track_name")  or "").strip()
-            artist_name = (t.get("artist_name") or "").strip()
-            album_name  = (t.get("album_name")  or "").strip()
-
-            # Her kayit icin sure bazli kazanim
-            raw_coin += (dur_sec / 60) * 0.2   # +0.2 coin/dk
-            raw_xp   += dur_sec // 60           # +1 xp/dk
-
-            # Yeni sanatci (bu sync'te ilk kez)
-            if artist_name and artist_name not in this_sync_artists:
-                raw_coin += 20
-                raw_xp   += 50
-                this_sync_artists.add(artist_name)
-
-            # Yeni sarki (bu sync'te ilk kez)
-            if track_name and track_name not in this_sync_tracks:
-                raw_coin += 10
-                raw_xp   += 25
-                this_sync_tracks.add(track_name)
-
-            # Yeni album (bu sync'te ilk kez)
-            if album_name and album_name not in this_sync_albums:
-                raw_coin += 10
-                raw_xp   += 25
-                this_sync_albums.add(album_name)
-
-        # Carpan uygula
-        earned_coin = int(raw_coin * coin_mult)
+        # Kullanici bakiyesine ekle
         earned_xp   = int(raw_xp   * xp_mult)
 
         # Kullanici bakiyesine ekle
