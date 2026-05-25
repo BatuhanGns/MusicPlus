@@ -208,6 +208,16 @@ def api_sanatci_detay(sanatci_adi):
                 except Exception:
                     pass
 
+        # Farklı şarkı ve albüm sayısı
+        idx_album = next((i for i,h in enumerate(headers) if h.strip() in ("Albüm","Album","albüm","album")), -1)
+        unique_albums = set()
+        if idx_album != -1:
+            for row in rows:
+                if len(row) > max(idx_sanatci, idx_album) and row[idx_sanatci].strip() == sanatci_adi:
+                    alb = row[idx_album].strip()
+                    if alb:
+                        unique_albums.add(alb)
+
         top_sarkilar = sorted(
             [{"sarki": k, "count": v["count"], "sure": fmt_sure(v["sure"])} for k, v in sarki_counts.items()],
             key=lambda x: -x["count"],
@@ -218,12 +228,14 @@ def api_sanatci_detay(sanatci_adi):
 
         return jsonify(
             {
-                "sanatci": sanatci_adi,
-                "toplam_count": toplam_count,
-                "toplam_sure": fmt_sure(toplam_sure),
-                "top_sarkilar": top_sarkilar,
-                "saatler": saatler,
-                "vakitler": vakitler,
+                "sanatci":       sanatci_adi,
+                "toplam_count":  toplam_count,
+                "toplam_sure":   fmt_sure(toplam_sure),
+                "farkli_sarki":  len(sarki_counts),
+                "farkli_album":  len(unique_albums),
+                "top_sarkilar":  top_sarkilar,
+                "saatler":       saatler,
+                "vakitler":      vakitler,
             }
         )
     except Exception as e:
@@ -277,15 +289,16 @@ def api_album(album_adi):
         top_sarkilar = sorted(
             [{"sarki": k, "sanatci": v["sanatci"], "count": v["count"]} for k, v in sarki_counts.items()],
             key=lambda x: -x["count"],
-        )[:10]
+        )[:20]
 
         return jsonify(
             {
-                "album": album_adi,
-                "sanatci": sanatci_ad,
-                "toplam_count": toplam_count,
-                "toplam_sure": fmt_sure(toplam_sure),
-                "top_sarkilar": top_sarkilar,
+                "album":         album_adi,
+                "sanatci":       sanatci_ad,
+                "toplam_count":  toplam_count,
+                "toplam_sure":   fmt_sure(toplam_sure),
+                "farkli_sarki":  len(sarki_counts),
+                "top_sarkilar":  top_sarkilar,
             }
         )
     except Exception as e:
