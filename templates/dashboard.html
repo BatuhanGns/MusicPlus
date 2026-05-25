@@ -891,7 +891,7 @@
   <a class="menu-item active" onclick="switchView('istatistikler');toggleMenu()" id="nav-istatistikler">İstatistiklerim</a>
   <a class="menu-item" onclick="switchView('topluluk');toggleMenu()" id="nav-topluluk">İstatistikleriniz</a>
   <a class="menu-item" onclick="switchView('duzenle');toggleMenu()" id="nav-duzenle">Çalma Listeleri</a>
-  <a class="menu-item" onclick="switchView('hayvanlar');toggleMenu()" id="nav-hayvanlar">Hayvanlarım 🥚</a>
+  <a class="menu-item" onclick="switchView('hayvanlar');toggleMenu()" id="nav-hayvanlar">Hayvanlarım</a>
   <a class="menu-item" onclick="switchView('kullanim');toggleMenu()" id="nav-kullanim">Kullanım ve Limitler</a>
   <a class="menu-item" onclick="switchView('profil');toggleMenu()" id="nav-profil">Profilin</a>
 </div>
@@ -971,14 +971,15 @@
       <div class="week-grid" id="weekGrid"><div class="loading">Yükleniyor...</div></div>
     </div>
 
-    <div class="section">
-      <div class="section-title">En Çok Dinlenen Şarkılar</div>
-      <div class="rank-list" id="topTracks"><div class="loading">Yükleniyor...</div></div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">En Çok Dinlenen Sanatçılar</div>
-      <div class="rank-list" id="topArtists"><div class="loading">Yükleniyor...</div></div>
+    <div class="two-col">
+      <div class="section">
+        <div class="section-title">En Çok Dinlenen Şarkılar</div>
+        <div class="rank-list" id="topTracks"><div class="loading">Yükleniyor...</div></div>
+      </div>
+      <div class="section">
+        <div class="section-title">En Çok Dinlenen Sanatçılar</div>
+        <div class="rank-list" id="topArtists"><div class="loading">Yükleniyor...</div></div>
+      </div>
     </div>
 
     <div class="section">
@@ -1093,7 +1094,7 @@
       <div>
         <div style="font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Coinlerim</div>
         <div class="pet-coin-val">🪙 <span id="petCoinVal">—</span></div>
-        <div class="pet-coin-bonus" id="petCoinBonus">Coin çarpanı yükleniyor...</div>
+        <div class="pet-coin-bonus" id="petCoinBonus"></div>
       </div>
       <div style="text-align:right">
         <div style="font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">XP Çarpanı</div>
@@ -1196,9 +1197,6 @@
     <!-- Fusion -->
     <div class="section-title">Fusion</div>
     <div class="fusion-panel">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
-        Normal → Altın · Altın → Elmas · Başarısız olursa 3 pet de gider!
-      </div>
       <div class="fusion-slots" id="fusionSlots">
         <div class="fusion-slot" data-fslot="0" onclick="fusionSlotClick(0)">❓</div>
         <div class="fusion-slot" data-fslot="1" onclick="fusionSlotClick(1)">❓</div>
@@ -1211,7 +1209,6 @@
 
     <!-- Envanter -->
     <div class="section-title">Envanterim <span style="font-size:10px;color:var(--muted);font-weight:400" id="invCount"></span></div>
-    <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Tıkla → <b>Tak</b>, <b>Fusion'a Ekle</b> veya <b>Çıkar</b></div>
     <div class="pet-inv-grid" id="petInventory">
       <div class="loading">Yükleniyor...</div>
     </div>
@@ -1514,7 +1511,7 @@ function switchView(viewId) {
     'istatistikler': 'Kişisel Spotify Verilerin',
     'topluluk':      'Topluluk İstatistikleri',
     'duzenle':       'Çalma Listesi Yönetimi',
-    'hayvanlar':     'Hayvanlarım 🥚',
+    'hayvanlar':     'Hayvanlarım',
     'kullanim':      'Kullanım ve Limitler',
     'profil':        'Profilin'
   };
@@ -2729,7 +2726,6 @@ function openPlaylistActionModal(playlistId, playlistName, trackCount) {
         <span class="pl-icon">🗑️</span> Beğenilmeyen Şarkıları Çıkar
       </button>
       <div style="margin-top:12px; padding:12px 14px; background:var(--surface2); border:1px solid #333; font-size:11px; color:var(--muted); line-height:1.7">
-        ⚠️ 2026 API Kuralları: Bu işlemler yalnızca Geliştirici Dashboard'da ekli Premium (maksimum 5) hesaplar için çalışır.
       </div>
     </div>
   `;
