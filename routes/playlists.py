@@ -199,3 +199,148 @@ def api_remove_unliked(playlist_id):
         return jsonify({"status": "ok", "removed": count})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@bp.route("/api/player/play", methods=["POST"])
+def api_player_play():
+    try:
+        spotify.play()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@bp.route("/api/player/pause", methods=["POST"])
+def api_player_pause():
+    try:
+        spotify.pause()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@bp.route("/api/player/next", methods=["POST"])
+def api_player_next():
+    try:
+        spotify.next_track()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@bp.route("/api/player/previous", methods=["POST"])
+def api_player_previous():
+    try:
+        spotify.previous_track()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/playlist/create", methods=["POST"])
+def api_create_playlist():
+    """
+    Gelismis playlist olusturma.
+    Body: {
+      type: "top-tracks" | "top-artists",
+      count: int,
+      max_duration_min: int | null
+    }
+    """
+    try:
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giris yapilmamis"}), 401
+        body = request.get_json() or {}
+        ptype         = body.get("type", "top-tracks")
+        count         = int(body.get("count", 50))
+        max_dur_min   = body.get("max_duration_min")  # dakika cinsinden, None = sinirsiz
+        max_dur_ms    = int(max_dur_min) * 60 * 1000 if max_dur_min else None
+
+        headers, rows = get_cached_data(uid)
+        if not rows:
+            return jsonify({"error": "Veri yok"}), 400
+
+        idx_sarki    = headers.index("Sarki Adi") if "Sarki Adi" in headers else headers.index("Şarkı Adı")
+        idx_sarki_id = headers.index("Sarki ID")  if "Sarki ID"  in headers else headers.index("Şarkı ID")
+        idx_sanatci  = next((i for i,h in enumerate(headers) if h.strip() in ("Sanatci","Sanatçı")), -1)
+        idx_sure     = next((i for i,h in enumerate(headers) if h.strip() in ("Sure (sn)","Süre (sn)")), -1)
+
+        sarki_counts   = Counter()
+        sarki_id_map   = {}
+        sarki_sure_map = {}
+        sanatci_counts = Counter()
+        sanatci_sarki  = defaultdict(dict)
+
+        for row in rows:
+            if len(row) <= max(idx_sarki, idx_sarki_id):
+                continue
+            sarki  = row[idx_sarki].strip()
+            sid    = row[idx_sarki_id].strip()
+            sure   = int(row[idx_sure]) * 1000 if idx_sure != -1 and len(row) > idx_sure and row[idx_sure].isdigit() else 0
+            san    = row[idx_sanatci].strip() if idx_sanatci != -1 and len(row) > idx_sanatci else ""
+            if sarki and sid:
+                sarki_counts[sarki] += 1
+                sarki_id_map[sarki]  = sid
+                sarki_sure_map[sarki] = sure
+            if san:
+                sanatci_counts[san] += 1
+                if sarki and sid:
+                    tid = _extract_track_id(sid)
+                    if tid:
+                        sanatci_sarki[san][sarki] = tid
+
+        track_uris = []
+        total_ms   = 0
+        pl_name    = ""
+
+        if ptype == "top-tracks":
+            pl_name = f"En Cok Dinlediklerim (Top {count})"
+            for s, _ in sarki_counts.most_common(count * 3):  # 3x fazla al, sure filtrele
+                if len(track_uris) >= count:
+                    break
+                tid = _extract_track_id(sarki_id_map.get(s,""))
+                if not tid:
+                    continue
+                dur = sarki_sure_map.get(s, 210000)
+                if max_dur_ms and (total_ms + dur) > max_dur_ms:
+                    continue
+                track_uris.append(f"spotify:track:{tid}")
+                total_ms += dur
+
+        elif ptype == "top-artists":
+            pl_name = f"En Cok Dinledigim Sanatcilar (Top {count})"
+            top_san = [s for s,_ in sanatci_counts.most_common(count)]
+            seen    = set()
+            for san in top_san:
+                for sarki_name, tid in list(sanatci_sarki[san].items())[:5]:
+                    if tid in seen:
+                        continue
+                    dur = sarki_sure_map.get(sarki_name, 210000)
+                    if max_dur_ms and (total_ms + dur) > max_dur_ms:
+                        continue
+                    seen.add(tid)
+                    track_uris.append(f"spotify:track:{tid}")
+                    total_ms += dur
+
+        if not track_uris:
+            return jsonify({"error": "Yeterli sarki bulunamadi"}), 400
+
+        dur_str = f"{total_ms//60000} dk" if total_ms else "?"
+        pl = spotify._req("POST", "/me/playlists", json={
+            "name": pl_name,
+            "public": False,
+            "description": f"Music+ tarafindan olusturuldu | Toplam sure: {dur_str}"
+        })
+        playlist_id = pl["id"]
+        for i in range(0, len(track_uris), 100):
+            chunk = track_uris[i:i+100]
+            if chunk:
+                spotify._req("POST", f"/playlists/{playlist_id}/items", json={"uris": chunk})
+
+        return jsonify({
+            "status": "ok",
+            "playlist_id":  playlist_id,
+            "track_count":  len(track_uris),
+            "total_min":    total_ms // 60000,
+        })
+    except Exception as e:
+        logger.error(f"Playlist olusturma hatasi: {e}")
+        return jsonify({"error": str(e)}), 500
+
