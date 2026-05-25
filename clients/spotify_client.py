@@ -227,6 +227,61 @@ class SpotifyClient:
             "progress_pct": round(progress_ms / duration_ms * 100, 1) if duration_ms else 0,
         }
 
+    # ── Playback Kontrolü ──────────────────────────────────────────────────
+    def play(self):
+        """Çalmayı başlat/devam ettir."""
+        return self._req("PUT", "/me/player/play")
+
+    def pause(self):
+        """Çalmayı duraklat."""
+        return self._req("PUT", "/me/player/pause")
+
+    def next_track(self):
+        """Sonraki şarkıya geç."""
+        return self._req("POST", "/me/player/next")
+
+    def previous_track(self):
+        """Önceki şarkıya geç."""
+        return self._req("POST", "/me/player/previous")
+
+    # ── Beğenilen Şarkılar ─────────────────────────────────────────────────
+    def get_liked_songs(self, limit=50):
+        """Kullanıcının beğendiği şarkıları getirir."""
+        items = []
+        url = f"/me/tracks?limit=50"
+        while url and len(items) < limit:
+            data = self._req("GET", url)
+            if not data or "items" not in data:
+                break
+            for it in data["items"]:
+                t = it.get("track")
+                if t:
+                    items.append({
+                        "id":       t["id"],
+                        "name":     t["name"],
+                        "artist":   ", ".join(a["name"] for a in t.get("artists",[])),
+                        "duration_ms": t.get("duration_ms", 0),
+                        "uri":      t["uri"],
+                    })
+                if len(items) >= limit:
+                    break
+            next_href = data.get("next")
+            url = next_href.replace("https://api.spotify.com/v1","") if next_href else None
+        return items[:limit]
+
+    def get_all_user_playlists(self):
+        """Kullanıcının tüm playlist'lerini getirir (otomatik oluşturulanlar dahil)."""
+        items = []
+        url = "/me/playlists?limit=50"
+        while url:
+            data = self._req("GET", url)
+            if not data or "items" not in data:
+                break
+            items.extend(data["items"] or [])
+            next_href = data.get("next")
+            url = next_href.replace("https://api.spotify.com/v1","") if next_href else None
+        return items
+
     def get_recently_played(self, limit=50):
         data   = self._req("GET", "/me/player/recently-played", params={"limit": limit})
         tracks = []
