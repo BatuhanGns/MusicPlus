@@ -91,22 +91,6 @@ def calc_level(total_xp: int) -> dict:
     }
 
 
-# ── Mastery ──────────────────────────────────────────────────────────────────
-
-MASTERY_TIERS = [
-    (10000, "Otorite",  "#f59e0b", "👑"),
-    (5000,  "Gurme",    "#8b5cf6", "💎"),
-    (2500,  "Keşifçi",  "#3b82f6", "🔭"),
-    (1000,  "Acemi",    "#22c55e", "🌱"),
-]
-
-def get_mastery(count: int):
-    for threshold, name, color, icon in MASTERY_TIERS:
-        if count >= threshold:
-            return {"name": name, "color": color, "icon": icon, "threshold": threshold}
-    return None
-
-
 # ── Seri Hesaplama ────────────────────────────────────────────────────────────
 
 def calc_streak(daily_dates: set) -> dict:
@@ -257,47 +241,10 @@ def compute_gamification(headers, rows) -> dict:
     # ── Seri ────────────────────────────────────────────────
     streak = calc_streak(daily_dates)
 
-    # ── Mastery (her yıl için ayrı) ─────────────────────────
-    masteries = []
-    all_years = sorted(set(yearly_track) | set(yearly_artist) | set(yearly_album))
-
-    for yil in all_years:
-        # Şarkı
-        if yearly_track[yil]:
-            top_sarki  = max(yearly_track[yil], key=yearly_track[yil].get)
-            top_s_cnt  = yearly_track[yil][top_sarki]
-            m = get_mastery(top_s_cnt)
-            if m:
-                masteries.append({
-                    "yil":   yil, "tip": "Şarkı", "isim": top_sarki,
-                    "count": top_s_cnt, **m
-                })
-        # Sanatçı
-        if yearly_artist[yil]:
-            top_san    = max(yearly_artist[yil], key=yearly_artist[yil].get)
-            top_san_c  = yearly_artist[yil][top_san]
-            m = get_mastery(top_san_c)
-            if m:
-                masteries.append({
-                    "yil":   yil, "tip": "Sanatçı", "isim": top_san,
-                    "count": top_san_c, **m
-                })
-        # Albüm
-        if yearly_album[yil]:
-            top_alb    = max(yearly_album[yil], key=yearly_album[yil].get)
-            top_alb_c  = yearly_album[yil][top_alb]
-            m = get_mastery(top_alb_c)
-            if m:
-                masteries.append({
-                    "yil":   yil, "tip": "Albüm", "isim": top_alb,
-                    "count": top_alb_c, **m
-                })
-
     return {
         "xp":        total_xp,
         "level":     level_info,
         "streak":    streak,
-        "masteries": masteries,
         "xp_breakdown": level_info["xp_breakdown"],
     }
 
@@ -307,7 +254,6 @@ def _empty():
         "xp":        0,
         "level":     calc_level(0),
         "streak":    {"current": 0, "best": 0, "today": False},
-        "masteries": [],
         "xp_breakdown": {"dakika": 0, "sarki": 0, "sanatci": 0, "album": 0},
     }
 
