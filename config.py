@@ -25,7 +25,6 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 AI_MAX_REQUESTS = 3000
 
 # ── UptimeRobot ──────────────────────────────────────────────────────────────
-UPTIMEROBOT_API_KEY = os.environ.get("UPTIMEROBOT_API_KEY", "")
 
 # ── Uygulama Sabitleri ───────────────────────────────────────────────────────
 TR_GUNLER = {
@@ -51,7 +50,6 @@ HAM_HEADERS = [
 SERVER_START_TIME = time.time()
 ai_requests_used = 0
 _ai_total_cache = {"value": 0, "ts": 0}
-_ur_cache = {"data": {"status": "Sorgulanıyor...", "uptime_ratio": "—"}, "last_fetch": 0}
 _user_cache = {}
 _ai_history = {}
 AI_MAX_HISTORY = 20
