@@ -15,7 +15,6 @@ from flask import Blueprint, Response, request, jsonify, stream_with_context
 
 import config
 from extensions import get_current_user_id, get_cached_data, sheets, sync_job
-from utils.helpers import get_uptimerobot_data
 
 logger = logging.getLogger(__name__)
 bp = Blueprint("system", __name__)
@@ -57,7 +56,6 @@ def api_system_stats():
                 "uptime": f"{uptime_hours}s {uptime_mins}dk",
                 "ai_remaining": ai_remaining,
                 "ai_total": config.AI_MAX_REQUESTS,
-                "uptimerobot": get_uptimerobot_data(),
             }
         )
     except Exception as e:
