@@ -50,46 +50,6 @@ def _extract_track_id(raw):
 
 # ── UptimeRobot ──────────────────────────────────────────────────────────────
 
-def get_uptimerobot_data():
-    cache = config._ur_cache
-    now = time.time()
-    if now - cache["last_fetch"] < 60:
-        return cache["data"]
-
-    ur_api_key = config.UPTIMEROBOT_API_KEY
-    if not ur_api_key:
-        return {"status": "API Key Bekleniyor", "uptime_ratio": "—"}
-
-    try:
-        resp = requests.post(
-            "https://api.uptimerobot.com/v2/getMonitors",
-            data={"api_key": ur_api_key, "format": "json"},
-            timeout=3,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("stat") == "ok" and data.get("monitors"):
-                m = data["monitors"][0]
-                s_code = m.get("status")
-                if s_code == 2:
-                    status_str = "AKTİF (UP)"
-                elif s_code in [8, 9]:
-                    status_str = "KAPALI (DOWN)"
-                elif s_code == 0:
-                    status_str = "DURAKLATILDI"
-                else:
-                    status_str = "BİLİNMİYOR"
-                cache["data"] = {
-                    "status": status_str,
-                    "uptime_ratio": m.get("all_time_uptime_ratio", "—"),
-                }
-                cache["last_fetch"] = now
-    except Exception as e:
-        logger.error(f"❌ UptimeRobot API hatası: {e}")
-
-    return cache["data"]
-
-
 # ── İstatistik Hesaplama (CORE) ─────────────────────────────────────────────
 
 def compute_stats(headers, rows):
