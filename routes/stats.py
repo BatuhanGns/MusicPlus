@@ -3,6 +3,7 @@ Kullanıcı istatistik API'leri.
 - GET  /api/dashboard?aralik=1hafta|1ay|1yil|tumzamanlar  -> Kişisel dashboard verisi
 - GET  /api/now-playing      -> Şu an çalan şarkı
 - GET  /api/playlists        -> Kullanıcı playlist'leri
+- GET  /api/gamification     -> XP / Seviye / Seri durumu
 """
 
 import logging
@@ -12,7 +13,7 @@ from flask import Blueprint, jsonify, request
 import config
 from extensions import get_current_user_id, get_cached_data, load_user_data, spotify, sheets
 from utils.helpers import compute_stats
-from utils.gamification import compute_gamification
+from utils.gamification import compute_gamification, compute_xp_from_stats
 
 logger = logging.getLogger(__name__)
 bp = Blueprint("stats", __name__)
@@ -67,7 +68,7 @@ def api_dashboard():
             load_user_data(uid)
             headers, rows = get_cached_data(uid)
 
-        aralik = request.args.get("aralik", "tumzamanlar")
+        aralik        = request.args.get("aralik", "tumzamanlar")
         filtered_rows = _filter_rows_by_aralik(headers, rows, aralik)
 
         stats = compute_stats(headers, filtered_rows)
@@ -75,7 +76,7 @@ def api_dashboard():
             return jsonify({"error": "Veri yok"})
 
         stats["son_sync"] = config._last_sync
-        stats["aralik"] = aralik
+        stats["aralik"]   = aralik
         return jsonify(stats)
     except Exception as e:
         logger.error(f"Dashboard API hatasi: {e}")
@@ -105,7 +106,7 @@ def api_playlists():
 @bp.route("/api/gamification")
 def api_gamification():
     """
-    Kullanıcının XP / Seviye / Seri / Mastery durumunu döner.
+    Kullanıcının XP / Seviye / Seri durumunu döner.
     Gamification her zaman TÜM zamanlar verisi üzerinden hesaplanır.
     """
     try:
@@ -113,19 +114,16 @@ def api_gamification():
         if not uid:
             return jsonify({"error": "Giriş yapılmamış"}), 401
 
-        # XP ve level: /api/dashboard ile ayni hesaplama,
-        # compute_stats() ciktisini kullan — Sheets'i ekstra taramaya gerek yok.
-        from utils.helpers import compute_stats
-        from utils.gamification import compute_xp_from_stats
         headers, rows = get_cached_data(uid)
         if not rows:
             load_user_data(uid)
             headers, rows = get_cached_data(uid)
 
+        # XP + level: compute_stats() çıktısından hızlı hesapla (Sheets'i ekstra taramaz)
         _stats    = compute_stats(headers, rows) or {}
         xp_result = compute_xp_from_stats(_stats)
 
-        # Streak ve mastery icin ham veri uzerinden tam hesap
+        # Streak: ham veri üzerinden hesapla
         full = compute_gamification(headers, rows)
 
         result = {
@@ -133,7 +131,6 @@ def api_gamification():
             "level":        xp_result["level"],
             "xp_breakdown": xp_result["xp_breakdown"],
             "streak":       full["streak"],
-            "masteries":    full["masteries"],
         }
         return jsonify(result)
     except Exception as e:
