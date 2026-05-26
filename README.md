@@ -136,7 +136,6 @@ musicplus/
 | `GOOGLE_SHEETS_ID` | ✅ | Veri depolama için Sheets ID |
 | `GOOGLE_CREDENTIALS_JSON` | ✅ | Service Account JSON (string olarak) |
 | `GEMINI_API_KEY` | ⬜ | AI sohbet özelliği için (opsiyonel) |
-| `UPTIMEROBOT_API_KEY` | ⬜ | Uptime takibi için (opsiyonel) |
 
 > Her değişkeni adım adım nasıl alacağını öğrenmek için → **[docs/ENVIRONMENT.md](docs/ENVIRONMENT.md)**
 
@@ -166,4 +165,4 @@ Music+ tamamen kendi altyapında çalışır. Dinleme verilerini kendi Google Sh
 
 ## 📄 Lisans
 
-[MIT](LICENSE)
+[MIT](LICENSE) — dilediğin gibi kullan, fork'la, değiştir.

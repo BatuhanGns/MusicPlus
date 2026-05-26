@@ -24,8 +24,6 @@ GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS_JSON", "{}")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 AI_MAX_REQUESTS = 3000
 
-# ── UptimeRobot ──────────────────────────────────────────────────────────────
-
 # ── Uygulama Sabitleri ───────────────────────────────────────────────────────
 TR_GUNLER = {
     0: "Pazartesi", 1: "Salı", 2: "Çarşamba", 3: "Perşembe",

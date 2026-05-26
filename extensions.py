@@ -74,18 +74,9 @@ def _apply_sync_rewards(uid: str, new_tracks: list):
         coin_mult   = bonuses.get("coin_multiplier", 1.0)
         xp_mult     = bonuses.get("xp_multiplier",   1.0)
 
-        # Hangi sarki/sanatci/album bu sync'te ilk kez geliyor?
-        # Sadece new_tracks icinde tekrar edenleri de engellemek icin
-        # kendi arasindan dedupe yapiyoruz — Sheets'e bakmiyoruz.
-        # Unique bonus: o isim bu sync'te ilk kez goruldugunde verilir.
-        this_sync_tracks  = set()
-        this_sync_artists = set()
         # Her yeni kayit = 1 coin * carpan, 1 XP * carpan
         earned_coin = int(len(new_tracks) * coin_mult)
         earned_xp   = int(len(new_tracks) * xp_mult)
-
-        # Kullanici bakiyesine ekle
-        earned_xp   = int(raw_xp   * xp_mult)
 
         # Kullanici bakiyesine ekle
         data["coins"] = data.get("coins", 0) + earned_coin
