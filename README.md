@@ -165,4 +165,4 @@ Music+ tamamen kendi altyapında çalışır. Dinleme verilerini kendi Google Sh
 
 ## 📄 Lisans
 
-[MIT](LICENSE) — dilediğin gibi kullan, fork'la, değiştir.
+[MIT](LICENSE)
