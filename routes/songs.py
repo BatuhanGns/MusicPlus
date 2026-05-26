@@ -184,7 +184,9 @@ def api_sanatci_detay(sanatci_adi):
         for row in rows:
             if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_iso):
                 continue
-            if row[idx_sanatci].strip() != sanatci_adi:
+            # "Pera" için "Milat, Pera" gibi işbirliklerini de say
+            sanatcilar_raw = [s.strip() for s in row[idx_sanatci].split(",")]
+            if sanatci_adi not in sanatcilar_raw:
                 continue
 
             toplam_count += 1
@@ -213,10 +215,12 @@ def api_sanatci_detay(sanatci_adi):
         unique_albums = set()
         if idx_album != -1:
             for row in rows:
-                if len(row) > max(idx_sanatci, idx_album) and row[idx_sanatci].strip() == sanatci_adi:
-                    alb = row[idx_album].strip()
-                    if alb:
-                        unique_albums.add(alb)
+                if len(row) > max(idx_sanatci, idx_album):
+                    sanatcilar_raw = [s.strip() for s in row[idx_sanatci].split(",")]
+                    if sanatci_adi in sanatcilar_raw:
+                        alb = row[idx_album].strip()
+                        if alb:
+                            unique_albums.add(alb)
 
         top_sarkilar = sorted(
             [{"sarki": k, "count": v["count"], "sure": fmt_sure(v["sure"])} for k, v in sarki_counts.items()],
@@ -364,11 +368,14 @@ def api_tum_sanatcilar():
             sanatci = row[idx_sanatci].strip()
             if not sanatci:
                 continue
-            artist_counts[sanatci]["count"] += 1
             try:
-                artist_counts[sanatci]["sure"] += int(row[idx_sure])
+                sure = int(row[idx_sure])
             except Exception:
-                pass
+                sure = 0
+            # "X, Y" işbirliklerini bireysel olarak say
+            for tek in [s.strip() for s in sanatci.split(",") if s.strip()]:
+                artist_counts[tek]["count"] += 1
+                artist_counts[tek]["sure"] += sure
 
         sanatcilar = sorted(
             [{"sanatci": k, "count": v["count"], "sure": fmt_sure(v["sure"])} for k, v in artist_counts.items()],
