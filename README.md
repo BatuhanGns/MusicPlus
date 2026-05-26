@@ -1,4 +1,5 @@
 <div align="center">
+<img width="1189" height="468" alt="IMG_20260526_114416_215" src="https://github.com/user-attachments/assets/bc18bd8c-18f5-4162-807e-52fe9e5795f1" />
 
 # Music+
 
