@@ -116,11 +116,13 @@ def compute_stats(headers, rows):
                     track_counts[sarki]["ilk_iso"] = iso
 
         if sanatci:
-            artist_counts[sanatci]["count"] += 1
-            artist_counts[sanatci]["sure"] += sure
-            if iso and iso != "—":
-                if artist_counts[sanatci]["ilk_iso"] is None or iso < artist_counts[sanatci]["ilk_iso"]:
-                    artist_counts[sanatci]["ilk_iso"] = iso
+            # "X, Y" gibi ortak sanatçıları bireysel olarak say
+            for tek_sanatci in [s.strip() for s in sanatci.split(",") if s.strip()]:
+                artist_counts[tek_sanatci]["count"] += 1
+                artist_counts[tek_sanatci]["sure"] += sure
+                if iso and iso != "—":
+                    if artist_counts[tek_sanatci]["ilk_iso"] is None or iso < artist_counts[tek_sanatci]["ilk_iso"]:
+                        artist_counts[tek_sanatci]["ilk_iso"] = iso
 
         if album:
             album_counts[album]["count"] += 1
@@ -176,7 +178,7 @@ def compute_stats(headers, rows):
             for k, v in artist_counts.items()
         ],
         key=lambda x: -x["count"],
-    )[:10]
+    )
 
     top_albumler = sorted(
         [
