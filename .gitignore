@@ -1,14 +1,43 @@
+# Ortam değişkenleri — asla commit etme
 .env
-*.json
+.env.local
+.env.*.local
+
+# Google Service Account JSON — asla commit etme
+*service-account*.json
+*credentials*.json
+*serviceaccount*.json
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
 .venv/
 venv/
 env/
+ENV/
+
+# IDE
 .idea/
 .vscode/
 *.swp
+*.swo
+
+# OS
 .DS_Store
 Thumbs.db
+
+# Logs
 *.log
+
+# Test / coverage
+.coverage
+htmlcov/
+.pytest_cache/
