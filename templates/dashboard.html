@@ -1712,7 +1712,7 @@ function buildToplulukHTML(d) {
     <div class="stats-row">
       <div class="stat-card"><div class="label">Toplam Dinlenme</div><div class="value">${(d.toplam_kayit||0).toLocaleString('tr')}</div><div class="sub">kayıt · ${d.katilimci_sayisi||0} kişi</div></div>
       <div class="stat-card"><div class="label">Farklı Şarkı</div><div class="value">${(d.farkli_sarki||0).toLocaleString('tr')}</div></div>
-      <div class="stat-card"><div class="label">Farklı Sanatçı</div><div class="value">${(d.farkli_sanatci||0).toLocaleString('tr')}</div></div>
+      <div class="stat-card"><div class="label">Farklı Sanatçı</div><div class="value">${_normalizeArtistData(d.top_sanatcilar||[]).length.toLocaleString('tr')}</div></div>
       <div class="stat-card"><div class="label">Toplam Süre</div><div class="value">${Math.floor((d.toplam_sure_sn||0)/3600).toLocaleString('tr')}</div><div class="sub">saat</div></div>
     </div>
     <div class="section">
@@ -2472,7 +2472,9 @@ async function reloadStats() {
 function renderStats(d) {
   document.getElementById('statTotal').textContent   = (d.toplam_kayit||0).toLocaleString('tr');
   document.getElementById('statTracks').textContent  = (d.farkli_sarki||0).toLocaleString('tr');
-  document.getElementById('statArtists').textContent = (d.farkli_sanatci||0).toLocaleString('tr');
+  // Virgüllü işbirliği sanatçılarını normalize ederek gerçek farklı sanatçı sayısını hesapla
+  const _normalizedArtists = _normalizeArtistData(d.top_sanatcilar || []);
+  document.getElementById('statArtists').textContent = _normalizedArtists.length.toLocaleString('tr');
   const albumEl = document.getElementById('statAlbums');
   if (albumEl) albumEl.textContent = (d.farkli_album||0).toLocaleString('tr');
   document.getElementById('statHours').textContent   = Math.floor((d.toplam_sure_sn||0)/3600).toLocaleString('tr');
