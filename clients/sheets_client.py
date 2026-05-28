@@ -398,6 +398,33 @@ class SheetsClient:
             ws.append_rows(new_rows, value_input_option="RAW")
         return len(new_rows), new_tracks
 
+
+    def get_last_played_at_ms(self, user_id: str):
+        """
+        Kullanıcının Sheets'indeki en son _played_at_iso değerini
+        Unix timestamp (milisaniye) olarak döndürür.
+
+        Bu değer Spotify'ın 'after' parametresine gönderilir.
+        Böylece her sync sadece son kayıttan SONRA dinlenenleri çeker
+        → Render uyku sonrası kaçırılan şarkılar da telafi edilir.
+
+        Hiç kayıt yoksa None döner → Spotify son 50 şarkıyı getirir.
+        """
+        ws = self._find_sheet(user_id)
+        if not ws:
+            return None
+        try:
+            col = ws.col_values(8)  # _played_at_iso sütunu
+            values = [v.strip() for v in col[1:] if v.strip() and v.strip() != "—"]
+            if not values:
+                return None
+            latest_iso = max(values)
+            dt = datetime.strptime(latest_iso, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+            return int(dt.timestamp() * 1000) + 1
+        except Exception as e:
+            logger.warning(f"get_last_played_at_ms hatası ({user_id}): {e}")
+            return None
+
     def get_user_data(self, user_id: str):
         """Kullanıcının tüm verisini döndürür → (headers, rows)"""
         ws = self._find_sheet(user_id)

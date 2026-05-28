@@ -15,10 +15,11 @@ API_BASE  = "https://api.spotify.com/v1"
 
 
 class SpotifyClient:
-    def __init__(self):
+    def __init__(self, refresh_token: str = None):
         self.client_id        = os.environ.get("SPOTIFY_CLIENT_ID", "")
         self.client_secret    = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
-        self.refresh_token    = os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
+        # Eğer dışarıdan token verilmişse onu kullan (per-user sync için)
+        self.refresh_token    = refresh_token or os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
         self._access_token    = None
         self._token_expires_at = 0
         self._user_id         = None
@@ -118,10 +119,11 @@ class SpotifyClient:
                             or self.refresh_token
                             or os.environ.get("SPOTIFY_REFRESH_TOKEN", ""))
         else:
+            # Background sync — sadece instance'a ait token'ı kullan
+            # (global state kirliliğini önlemek için session'a yazma)
             access_token = self._access_token
             expires_at   = self._token_expires_at
-            r_token      = (self.refresh_token
-                            or os.environ.get("SPOTIFY_REFRESH_TOKEN", ""))
+            r_token      = self.refresh_token or os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
 
         if access_token and time.time() < expires_at - 60:
             return access_token
@@ -152,14 +154,17 @@ class SpotifyClient:
         new_expires = time.time() + d["expires_in"]
         new_refresh = d.get("refresh_token", r_token)
 
+        # Her zaman instance'a yaz
+        self._access_token     = new_token
+        self._token_expires_at = new_expires
+        self.refresh_token     = new_refresh
+
+        # Sadece request context varsa session'a da yaz
         if in_req:
             session["access_token"]    = new_token
             session["token_expires_at"] = new_expires
             session["refresh_token"]   = new_refresh
 
-        self._access_token     = new_token
-        self._token_expires_at = new_expires
-        self.refresh_token     = new_refresh
         return new_token
 
     # ------------------------------------------------------------------ #
@@ -229,24 +234,19 @@ class SpotifyClient:
 
     # ── Playback Kontrolü ──────────────────────────────────────────────────
     def play(self):
-        """Çalmayı başlat/devam ettir."""
         return self._req("PUT", "/me/player/play")
 
     def pause(self):
-        """Çalmayı duraklat."""
         return self._req("PUT", "/me/player/pause")
 
     def next_track(self):
-        """Sonraki şarkıya geç."""
         return self._req("POST", "/me/player/next")
 
     def previous_track(self):
-        """Önceki şarkıya geç."""
         return self._req("POST", "/me/player/previous")
 
     # ── Beğenilen Şarkılar ─────────────────────────────────────────────────
     def get_liked_songs(self, limit=50):
-        """Kullanıcının beğendiği şarkıları getirir."""
         items = []
         url = f"/me/tracks?limit=50"
         while url and len(items) < limit:
@@ -270,7 +270,6 @@ class SpotifyClient:
         return items[:limit]
 
     def get_all_user_playlists(self):
-        """Kullanıcının tüm playlist'lerini getirir (otomatik oluşturulanlar dahil)."""
         items = []
         url = "/me/playlists?limit=50"
         while url:
@@ -282,15 +281,44 @@ class SpotifyClient:
             url = next_href.replace("https://api.spotify.com/v1","") if next_href else None
         return items
 
-    def get_recently_played(self, limit=50):
-        data   = self._req("GET", "/me/player/recently-played", params={"limit": limit})
+    def get_recently_played(self, limit=50, after_ms: int = None):
+        """
+        Son dinlenen şarkıları getirir.
+        
+        - limit: max 50 (Spotify API kısıtı)
+        - after_ms: Unix timestamp (ms). Verilirse bu zamandan sonrasını getirir.
+          Bu sayede kaçırılan sync periyotları telafi edilebilir.
+          
+        DÜZELTİLDİ: Aynı şarkı birden fazla dinlenince Spotify aynı track_id
+        ama farklı played_at döndürür — bunlar artık doğru işleniyor.
+        Milisaniye hassasiyeti saniyeye yuvarlanarak normalize edildi
+        (Spotify bazen .000Z, bazen .123Z döndürür; aynı dinlemeyi kaçırmamak için).
+        """
+        params = {"limit": min(limit, 50)}
+        if after_ms:
+            params["after"] = after_ms
+
+        data   = self._req("GET", "/me/player/recently-played", params=params)
         tracks = []
         for item in data.get("items", []):
             track = item.get("track", {})
             if not track:
                 continue
+            
+            raw_played_at = item["played_at"]
+            # Normalize: milisaniyeyi sıfırla → "2025-05-28T14:23:45.000Z"
+            # Bu sayede Spotify'ın .123Z / .000Z tutarsızlığı duplicate'e yol açmaz
+            try:
+                from datetime import datetime, timezone
+                dt = datetime.strptime(raw_played_at, "%Y-%m-%dT%H:%M:%S.%fZ").replace(
+                    microsecond=0, tzinfo=timezone.utc
+                )
+                normalized_played_at = dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+            except Exception:
+                normalized_played_at = raw_played_at
+
             tracks.append({
-                "played_at":   item["played_at"],
+                "played_at":   normalized_played_at,
                 "track_id":    track.get("id", ""),
                 "track_name":  track.get("name", ""),
                 "artist_name": ", ".join(a["name"] for a in track.get("artists", [])),
@@ -332,10 +360,6 @@ class SpotifyClient:
         return all_playlists
 
     def _get_playlist_tracks(self, playlist_id):
-        """
-        Şubat 2026: GET /playlists/{id}/tracks  →  GET /playlists/{id}/items
-        Alan adı: "track"  →  "item" (geriye dönük uyum için ikisi de denenir)
-        """
         tracks = []
         url    = f"/playlists/{playlist_id}/items"
         params = {"limit": 50, "offset": 0}
@@ -362,12 +386,7 @@ class SpotifyClient:
     # ------------------------------------------------------------------ #
 
     def _search_track(self, query):
-        """
-        Şarkı adına göre Spotify track ID döndürür.
-        FIX: market parametresi kaldırıldı (Kasım 2024 deprecated).
-        """
         try:
-            # market parametresi Kasım 2024'te deprecated oldu → kaldırıldı
             data  = self._req("GET", "/search",
                               params={"q": query, "type": "track", "limit": 1})
             items = data.get("tracks", {}).get("items", [])
@@ -377,9 +396,6 @@ class SpotifyClient:
             return None
 
     def create_playlist_from_track_names(self, name, track_names, description=""):
-        """
-        Şubat 2026: POST /users/{id}/playlists KALDIRILDI → POST /me/playlists
-        """
         pl = self._req("POST", "/me/playlists", json={
             "name":        name,
             "public":      False,
@@ -402,11 +418,6 @@ class SpotifyClient:
         return playlist_id
 
     def shuffle_playlist(self, playlist_id):
-        """
-        Playlist'i karıştırır.
-        PUT /playlists/{id}/items ile ilk 100 replace, POST ile kalanları ekle.
-        DELETE kullanılmaz; 2026 API ile tam uyumlu.
-        """
         import random
 
         tracks = self._get_playlist_tracks(playlist_id)
@@ -434,10 +445,6 @@ class SpotifyClient:
         logger.info(f"Playlist karistirildi: {len(track_uris)} sarki")
 
     def _remove_tracks_from_playlist(self, playlist_id, track_ids):
-        """
-        Şubat 2026: DELETE /playlists/{id}/tracks KALDIRILDI → /playlists/{id}/items
-        Body: {"items": [{"uri": "spotify:track:..."}, ...]}
-        """
         if not track_ids:
             return 0
         uris = [f"spotify:track:{tid}" for tid in track_ids]
@@ -453,10 +460,6 @@ class SpotifyClient:
     # ------------------------------------------------------------------ #
 
     def _get_liked_track_ids(self, track_ids):
-        """
-        Şubat 2026: GET /me/tracks/contains KALDIRILDI → GET /me/library/contains
-        Parametre: uris (virgülle ayrılmış query param)
-        """
         liked = set()
         for i in range(0, len(track_ids), 50):
             chunk = track_ids[i:i + 50]
@@ -473,10 +476,6 @@ class SpotifyClient:
         return liked
 
     def like_all_tracks_in_playlist(self, playlist_id):
-        """
-        Şubat 2026: PUT /me/tracks KALDIRILDI → PUT /me/library
-        uris = virgülle ayrılmış query param
-        """
         tracks    = self._get_playlist_tracks(playlist_id)
         track_ids = [t["id"] for t in tracks if t.get("id")]
         uris      = [f"spotify:track:{tid}" for tid in track_ids]
@@ -486,10 +485,6 @@ class SpotifyClient:
         return len(uris)
 
     def unlike_all_tracks_in_playlist(self, playlist_id):
-        """
-        Şubat 2026: DELETE /me/tracks KALDIRILDI → DELETE /me/library
-        uris = virgülle ayrılmış query param
-        """
         tracks    = self._get_playlist_tracks(playlist_id)
         track_ids = [t["id"] for t in tracks if t.get("id")]
         uris      = [f"spotify:track:{tid}" for tid in track_ids]
@@ -516,10 +511,6 @@ class SpotifyClient:
     # ------------------------------------------------------------------ #
 
     def follow_all_artists_in_playlist(self, playlist_id):
-        """
-        Şubat 2026: PUT /me/following KALDIRILDI → PUT /me/library
-        uris = virgülle ayrılmış query param
-        """
         tracks     = self._get_playlist_tracks(playlist_id)
         artist_ids = list({
             a["id"]
@@ -534,10 +525,6 @@ class SpotifyClient:
         return len(artist_ids)
 
     def unfollow_all_artists_in_playlist(self, playlist_id):
-        """
-        Şubat 2026: DELETE /me/following KALDIRILDI → DELETE /me/library
-        uris = virgülle ayrılmış query param
-        """
         tracks     = self._get_playlist_tracks(playlist_id)
         artist_ids = list({
             a["id"]
