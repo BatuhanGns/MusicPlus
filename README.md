@@ -163,6 +163,13 @@ Music+ tamamen kendi altyapında çalışır. Dinleme verilerini kendi Google Sh
 
 ---
 
+## 🎤 Şarkı Sözleri
+
+Şarkı sözleri [**LRCLIB**](https://github.com/tranxuanthang/lrclib) tarafından sağlanmaktadır.
+LRCLIB, açık kaynak ve reklamsız bir şarkı sözü API'sidir.
+
+---
+
 ## 📄 Lisans
 
 [MIT](LICENSE)
