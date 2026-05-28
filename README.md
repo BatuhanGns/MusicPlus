@@ -29,7 +29,7 @@ Music+, Spotify hesabına bağlanarak dinleme geçmişini **Google Sheets**'e ka
 | 🐾 Pet sistemi | Yumurta aç, fusion yap, aktif pet çarpanları kazan |
 | 🤖 AI sohbet | Gemini ile şarkı önerisi, playlist oluşturma, analiz |
 | 🎧 Playlist yönetimi | Otomatik & manuel playlist oluşturma / düzenleme |
-| 🔄 Otomatik sync | Her 30 dakikada bir Spotify'dan yeni dinlemeleri çeker |
+| 🔄 Otomatik sync | Her 15 dakikada bir Spotify'dan yeni dinlemeleri çeker |
 
 ---
 
