@@ -14,6 +14,8 @@ from clients.gemini_client import GeminiClient
 logger = logging.getLogger(__name__)
 
 # ── Client Instance'ları ─────────────────────────────────────────────────────
+# spotify: sadece HTTP request context'te (login, now-playing vs.) kullanılır.
+# Background sync'te per-user SpotifyClient instance oluşturulur — race condition yok.
 spotify = SpotifyClient()
 sheets = SheetsClient()
 gemini = GeminiClient()
@@ -54,12 +56,9 @@ def load_tumveri():
 
 # ── Sync İşlemleri ───────────────────────────────────────────────────────────
 
-
-
 def _apply_sync_rewards(uid: str, new_tracks: list):
     """
     Sync'te gelen SADECE YENİ track'lerden coin/XP hesaplar.
-    Eski veriye bakmaz — sadece bu sync'te eklenen kayitlari isler.
     """
     if not new_tracks:
         return
@@ -74,15 +73,12 @@ def _apply_sync_rewards(uid: str, new_tracks: list):
         coin_mult   = bonuses.get("coin_multiplier", 1.0)
         xp_mult     = bonuses.get("xp_multiplier",   1.0)
 
-        # Her yeni kayit = 1 coin * carpan, 1 XP * carpan
         earned_coin = int(len(new_tracks) * coin_mult)
         earned_xp   = int(len(new_tracks) * xp_mult)
 
-        # Kullanici bakiyesine ekle
         data["coins"] = data.get("coins", 0) + earned_coin
         data["xp"]    = data.get("xp",    0) + earned_xp
 
-        # Pet XP artir (aktif petler kazanilan XP'nin %10'unu alir)
         pet_xp_share = max(1, earned_xp // 10) if earned_xp > 0 else 0
         for p in inventory:
             if p.get("active"):
@@ -90,9 +86,7 @@ def _apply_sync_rewards(uid: str, new_tracks: list):
             p["level_info"] = calc_pet_level(p.get("xp", 0))
             p["lv_bonus"]   = level_bonus(p["level_info"]["level"])
 
-        # Display icin user_name al
         try:
-            from extensions import get_current_user_name
             uname = get_current_user_name()
         except Exception:
             uname = uid
@@ -105,36 +99,53 @@ def _apply_sync_rewards(uid: str, new_tracks: list):
     except Exception as e:
         logger.warning(f"⚠️ _apply_sync_rewards hatasi: {e}")
 
+
 def sync_job(user_id: str = None, refresh_token: str = None):
-    global _last_sync
-    uid = user_id or get_current_user_id()
+    """
+    DÜZELTİLDİ:
+    1. Her sync için ayrı SpotifyClient instance'ı oluşturulur.
+       Böylece singleton race condition ortadan kalkar.
+    2. Sheets'teki son played_at zamanı okunarak 'after' parametresiyle
+       sadece yeni şarkılar çekilir — kaçırılan periyotlar telafi edilir.
+    3. Aynı şarkıyı tekrar dinleme artık duplicate sayılmaz (played_at farklı).
+    """
+    uid = user_id
+    if not uid:
+        # Request context varsa session'dan al (manuel sync butonu)
+        try:
+            uid = get_current_user_id()
+        except Exception:
+            pass
     if not uid:
         logger.warning("⚠️ Sync: user_id yok, atlanıyor")
         return
 
-    if refresh_token:
-        spotify.refresh_token = refresh_token
-    elif not spotify.refresh_token:
-        spotify.refresh_token = config.SPOTIFY_REFRESH_TOKEN
-
-    if not spotify.refresh_token:
+    token = refresh_token or config.SPOTIFY_REFRESH_TOKEN
+    if not token:
         logger.warning(f"⚠️ Sync: {uid} için refresh_token yok, atlanıyor")
         return
 
+    # Her kullanıcı için izole edilmiş yeni bir client — global state kirlenmez
+    client = SpotifyClient(refresh_token=token)
+
     logger.info(f"🎵 Sync başladı: {uid}")
     try:
-        tracks = spotify.get_recently_played()
+        # Son kaydedilen played_at zamanını al → Spotify 'after' parametresi için
+        after_ms = sheets.get_last_played_at_ms(uid)
+        
+        tracks = client.get_recently_played(limit=50, after_ms=after_ms)
+        
         new_tracks = []
         if tracks:
             new_count, new_tracks = sheets.append_tracks(uid, tracks)
             logger.info(f"✅ {new_count} yeni kayıt eklendi ({uid})")
         else:
-            logger.info("Yeni dinleme yok.")
+            logger.info(f"Yeni dinleme yok ({uid}).")
+            
         sheets.update_last_sync(uid)
         config._last_sync = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M") + " UTC"
         load_user_data(uid)
 
-        # Sadece yeni gelen track'lerden coin ve XP hesapla, pet carpani uygula
         if new_tracks:
             _apply_sync_rewards(uid, new_tracks)
 
