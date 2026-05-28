@@ -582,8 +582,6 @@
   .theme-white .fusion-btn,
   .theme-white .auto-fusion-btn { border-color:var(--green) !important; color:var(--green) !important; }
   .theme-white .egg-card .egg-btn { background:#f0f0f0 !important; border-color:#ccc !important; color:#111 !important; }
-  .theme-white .sync-int-btn.active,
-  .theme-white .theme-btn.active  { border-color:var(--green) !important; color:var(--green) !important; }
   /* Badge */
   .theme-white .pc-count      { background:var(--green) !important; color:#fff !important; }
   .theme-white .dot            { background:var(--green) !important; }
@@ -633,8 +631,6 @@
   .theme-gray .pc-count       { background:var(--green) !important; color:#0f0f18 !important; }
   .theme-gray .dot            { background:var(--green) !important; }
   .theme-gray .footer         { color:var(--muted) !important; border-top-color:var(--border) !important; }
-  .theme-gray .sync-int-btn.active,
-  .theme-gray .theme-btn.active { border-color:var(--green) !important; color:var(--green) !important; }
   /* ── Tema butonları ── */
   .theme-swatch{display:inline-block;width:12px;height:12px;border-radius:50%;
     border:2px solid;vertical-align:middle;margin-right:7px;flex-shrink:0;}
@@ -643,9 +639,6 @@
     transition:all .15s;letter-spacing:.5px;}
   .theme-btn.active,.theme-btn:hover{border-color:var(--green);color:var(--green);}
   /* ── Sync interval butonları ── */
-  .sync-int-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);
-    padding:7px 12px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;}
-  .sync-int-btn.active{border-color:var(--green);color:var(--green);background:var(--green)11;}
   /* ── Playlist create kartları ── */
   .pl-create-card{background:var(--surface);border:1px solid var(--border);margin-bottom:12px;overflow:hidden;}
   .pl-create-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;cursor:pointer;transition:background .15s;}
@@ -1364,21 +1357,6 @@
 
     <div class="section-title">Görünüm Ayarları</div>
 
-    <!-- SYNC INTERVAL -->
-    <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px;margin-top:16px">
-      <div class="setting-info">
-        <div class="setting-name">Otomatik Sync Sıklığı</div>
-        <div class="setting-desc">Spotify verilerinin kaç dakikada bir güncelleneceği. Tam saate göre hizalanır (ör. 10 dk → :00, :10, :20…)</div>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap" id="syncIntervalBtns">
-        <button class="sync-int-btn" data-min="5"  onclick="setSyncInterval(5)">5 dk</button>
-        <button class="sync-int-btn" data-min="10" onclick="setSyncInterval(10)">10 dk</button>
-        <button class="sync-int-btn" data-min="20" onclick="setSyncInterval(20)">20 dk</button>
-        <button class="sync-int-btn active" data-min="30" onclick="setSyncInterval(30)">30 dk</button>
-        <button class="sync-int-btn" data-min="60" onclick="setSyncInterval(60)">60 dk</button>
-      </div>
-      <div style="font-size:10px;color:var(--muted)" id="nextSyncLabel">Sonraki sync: hesaplanıyor...</div>
-    </div>
 
     <div class="setting-row" onclick="toggleSetting('syncedLyrics')" style="margin-top:16px">
       <div class="setting-info">
@@ -1856,71 +1834,6 @@ function _initTheme() {
   setTheme(_currentTheme);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ====================== SYNC INTERVAL =====================================
-let _syncIntervalMin = parseInt(localStorage.getItem('sync_interval') || '30');
-let _syncTimer = null;
-
-function setSyncInterval(min) {
-  _syncIntervalMin = min;
-  localStorage.setItem('sync_interval', min);
-  document.querySelectorAll('.sync-int-btn').forEach(b => {
-    b.classList.toggle('active', parseInt(b.dataset.min) === min);
-  });
-  _scheduleSyncTimer();
-  _updateNextSyncLabel();
-}
-
-function _nextSyncTime(min) {
-  const now  = new Date();
-  const step = min;
-  const mins = now.getMinutes();
-  const nextMin = Math.ceil((mins + 1) / step) * step;
-  const next = new Date(now);
-  if (nextMin >= 60) {
-    next.setHours(now.getHours() + 1);
-    next.setMinutes(nextMin - 60);
-  } else {
-    next.setMinutes(nextMin);
-  }
-  next.setSeconds(0);
-  next.setMilliseconds(0);
-  return next;
-}
-
-function _updateNextSyncLabel() {
-  const lbl = document.getElementById('nextSyncLabel');
-  if (!lbl) return;
-  const next = _nextSyncTime(_syncIntervalMin);
-  const hh = String(next.getHours()).padStart(2,'0');
-  const mm = String(next.getMinutes()).padStart(2,'0');
-  lbl.textContent = 'Sonraki sync: ' + hh + ':' + mm;
-}
-
-function _scheduleSyncTimer() {
-  if (_syncTimer) clearTimeout(_syncTimer);
-  const next  = _nextSyncTime(_syncIntervalMin);
-  const delay = next.getTime() - Date.now();
-  _syncTimer = setTimeout(async () => {
-    try {
-      await fetch('/api/sync');
-      reloadStats();
-    } catch(e) {}
-    _scheduleSyncTimer();
-    _updateNextSyncLabel();
-  }, delay);
-}
-
-function _initSyncInterval() {
-  document.querySelectorAll('.sync-int-btn').forEach(b => {
-    b.classList.toggle('active', parseInt(b.dataset.min) === _syncIntervalMin);
-  });
-  _scheduleSyncTimer();
-  _updateNextSyncLabel();
-  setInterval(_updateNextSyncLabel, 30000);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // ====================== CHART ENGINE ======================================
 const _charts   = {};
 const _chartTypes = {};
@@ -4299,13 +4212,9 @@ function sectionView(containerId, type, btn) {
 // ========================= INIT ===========================================
 (function _appInit() {
   _initTheme();
-  _initSyncInterval();
   // Profil sayfasındaysa butonları güncelle
   const saved = localStorage.getItem('sync_interval');
   if (saved) {
-    document.querySelectorAll('.sync-int-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.min === saved);
-    });
   }
 })();
 
