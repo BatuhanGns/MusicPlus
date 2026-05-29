@@ -465,9 +465,10 @@ class SpotifyClient:
             chunk = track_ids[i:i + 50]
             uris  = ",".join(f"spotify:track:{tid}" for tid in chunk)
             try:
-                # Doğru endpoint: GET /me/tracks/contains, param: ids (virgülle, max 50)
-                data = self._req("GET", "/me/tracks/contains",
-                                 params={"ids": ",".join(chunk)})
+                # Yeni unified endpoint: GET /me/library/contains, URIs ile
+                uris = [f"spotify:track:{tid}" for tid in chunk]
+                data = self._req("GET", "/me/library/contains",
+                                 params={"uris": ",".join(uris)})
                 if isinstance(data, list):
                     for j, is_liked in enumerate(data):
                         if is_liked:
@@ -477,20 +478,20 @@ class SpotifyClient:
         return liked
 
     def like_all_tracks_in_playlist(self, playlist_id):
-        tracks    = self._get_playlist_tracks(playlist_id)
-        track_ids = [t["id"] for t in tracks if t.get("id")]
-        # Doğru endpoint: PUT /me/tracks, body: {"ids": [...]} (max 50)
-        for i in range(0, len(track_ids), 50):
-            self._req("PUT", "/me/tracks", json={"ids": track_ids[i:i + 50]})
-        return len(track_ids)
+        tracks = self._get_playlist_tracks(playlist_id)
+        uris   = [f"spotify:track:{t['id']}" for t in tracks if t.get("id")]
+        # Yeni unified endpoint: PUT /me/library, body: {"uris": [...]} (max 50)
+        for i in range(0, len(uris), 50):
+            self._req("PUT", "/me/library", json={"uris": uris[i:i + 50]})
+        return len(uris)
 
     def unlike_all_tracks_in_playlist(self, playlist_id):
-        tracks    = self._get_playlist_tracks(playlist_id)
-        track_ids = [t["id"] for t in tracks if t.get("id")]
-        # Doğru endpoint: DELETE /me/tracks, body: {"ids": [...]} (max 50)
-        for i in range(0, len(track_ids), 50):
-            self._req("DELETE", "/me/tracks", json={"ids": track_ids[i:i + 50]})
-        return len(track_ids)
+        tracks = self._get_playlist_tracks(playlist_id)
+        uris   = [f"spotify:track:{t['id']}" for t in tracks if t.get("id")]
+        # Yeni unified endpoint: DELETE /me/library, body: {"uris": [...]} (max 50)
+        for i in range(0, len(uris), 50):
+            self._req("DELETE", "/me/library", json={"uris": uris[i:i + 50]})
+        return len(uris)
 
     def remove_liked_tracks_from_playlist(self, playlist_id):
         tracks    = self._get_playlist_tracks(playlist_id)
@@ -517,11 +518,10 @@ class SpotifyClient:
             for a in t.get("artists", [])
             if a.get("id")
         })
-        # Doğru endpoint: PUT /me/following?type=artist, body: {"ids": [...]} (max 50)
-        for i in range(0, len(artist_ids), 50):
-            self._req("PUT", "/me/following",
-                      params={"type": "artist"},
-                      json={"ids": artist_ids[i:i + 50]})
+        # Yeni unified endpoint: PUT /me/library, sanatçı URI'ları ile (max 50)
+        uris = [f"spotify:artist:{aid}" for aid in artist_ids]
+        for i in range(0, len(uris), 50):
+            self._req("PUT", "/me/library", json={"uris": uris[i:i + 50]})
         return len(artist_ids)
 
     def unfollow_all_artists_in_playlist(self, playlist_id):
@@ -532,9 +532,8 @@ class SpotifyClient:
             for a in t.get("artists", [])
             if a.get("id")
         })
-        # Doğru endpoint: DELETE /me/following?type=artist, body: {"ids": [...]} (max 50)
-        for i in range(0, len(artist_ids), 50):
-            self._req("DELETE", "/me/following",
-                      params={"type": "artist"},
-                      json={"ids": artist_ids[i:i + 50]})
+        # Yeni unified endpoint: DELETE /me/library, sanatçı URI'ları ile (max 50)
+        uris = [f"spotify:artist:{aid}" for aid in artist_ids]
+        for i in range(0, len(uris), 50):
+            self._req("DELETE", "/me/library", json={"uris": uris[i:i + 50]})
         return len(artist_ids)
