@@ -461,12 +461,14 @@ class SpotifyClient:
 
     def _get_liked_track_ids(self, track_ids):
         liked = set()
-        for i in range(0, len(track_ids), 50):
-            chunk = track_ids[i:i + 50]
+        for i in range(0, len(track_ids), 40):
+            chunk = track_ids[i:i + 40]
             uris  = ",".join(f"spotify:track:{tid}" for tid in chunk)
             try:
+                # GET /me/library/contains — uris query param, virgülle ayrılmış, max 40
+                uris = [f"spotify:track:{tid}" for tid in chunk]
                 data = self._req("GET", "/me/library/contains",
-                                 params={"uris": uris})
+                                 params={"uris": ",".join(uris)})
                 if isinstance(data, list):
                     for j, is_liked in enumerate(data):
                         if is_liked:
@@ -476,20 +478,20 @@ class SpotifyClient:
         return liked
 
     def like_all_tracks_in_playlist(self, playlist_id):
-        tracks    = self._get_playlist_tracks(playlist_id)
-        track_ids = [t["id"] for t in tracks if t.get("id")]
-        uris      = [f"spotify:track:{tid}" for tid in track_ids]
-        for i in range(0, len(uris), 50):
-            chunk = ",".join(uris[i:i + 50])
+        tracks = self._get_playlist_tracks(playlist_id)
+        uris   = [f"spotify:track:{t['id']}" for t in tracks if t.get("id")]
+        # PUT /me/library — uris query param olarak, virgülle ayrılmış, max 40
+        for i in range(0, len(uris), 40):
+            chunk = ",".join(uris[i:i + 40])
             self._req("PUT", "/me/library", params={"uris": chunk})
         return len(uris)
 
     def unlike_all_tracks_in_playlist(self, playlist_id):
-        tracks    = self._get_playlist_tracks(playlist_id)
-        track_ids = [t["id"] for t in tracks if t.get("id")]
-        uris      = [f"spotify:track:{tid}" for tid in track_ids]
-        for i in range(0, len(uris), 50):
-            chunk = ",".join(uris[i:i + 50])
+        tracks = self._get_playlist_tracks(playlist_id)
+        uris   = [f"spotify:track:{t['id']}" for t in tracks if t.get("id")]
+        # DELETE /me/library — uris query param olarak, virgülle ayrılmış, max 40
+        for i in range(0, len(uris), 40):
+            chunk = ",".join(uris[i:i + 40])
             self._req("DELETE", "/me/library", params={"uris": chunk})
         return len(uris)
 
@@ -518,9 +520,10 @@ class SpotifyClient:
             for a in t.get("artists", [])
             if a.get("id")
         })
+        # PUT /me/library — sanatçı URI'ları, query param, max 40
         uris = [f"spotify:artist:{aid}" for aid in artist_ids]
-        for i in range(0, len(uris), 50):
-            chunk = ",".join(uris[i:i + 50])
+        for i in range(0, len(uris), 40):
+            chunk = ",".join(uris[i:i + 40])
             self._req("PUT", "/me/library", params={"uris": chunk})
         return len(artist_ids)
 
@@ -532,8 +535,9 @@ class SpotifyClient:
             for a in t.get("artists", [])
             if a.get("id")
         })
+        # DELETE /me/library — sanatçı URI'ları, query param, max 40
         uris = [f"spotify:artist:{aid}" for aid in artist_ids]
-        for i in range(0, len(uris), 50):
-            chunk = ",".join(uris[i:i + 50])
+        for i in range(0, len(uris), 40):
+            chunk = ",".join(uris[i:i + 40])
             self._req("DELETE", "/me/library", params={"uris": chunk})
         return len(artist_ids)
