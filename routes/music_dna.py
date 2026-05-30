@@ -164,3 +164,31 @@ def api_music_dna():
     except Exception as e:
         logger.error(f"MusicDNA API hatası: {e}")
         return jsonify({"error": str(e)}), 500
+
+@bp.route("/api/img-proxy")
+def img_proxy():
+    """
+    Spotify CDN görsellerini backend üzerinden servis eder.
+    - Tarayıcıda CORS sorunu olmadan görseller yüklenir
+    - html2canvas tainted canvas hatası almaz → PDF temiz çıkar
+    - Güvenlik: sadece i.scdn.co ve mosaic.scdn.co domainlerine izin verilir
+    """
+    import requests as _req
+    from flask import request as freq, Response
+
+    url = freq.args.get("u", "").strip()
+    allowed = ("https://i.scdn.co/", "https://mosaic.scdn.co/", "https://image-cdn-ak.spotifycdn.com/", "https://image-cdn-fa.spotifycdn.com/")
+    if not url or not any(url.startswith(a) for a in allowed):
+        return "", 400
+
+    try:
+        r = _req.get(url, timeout=6, headers={"User-Agent": "MusicPlus/1.0"})
+        return Response(
+            r.content,
+            content_type=r.headers.get("content-type", "image/jpeg"),
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+    except Exception as e:
+        logger.warning(f"img-proxy hatası: {e}")
+        return "", 502
+
