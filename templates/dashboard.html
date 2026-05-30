@@ -900,11 +900,12 @@
 
 
   /* ═══════════════ MusicDNA ═══════════════ */
-  .dna-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;}
+  /* Ayar Overlay */
+  .dna-overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;}
   .dna-overlay.open{opacity:1;pointer-events:all;}
-  .dna-modal{background:var(--surface);border:1px solid var(--border);width:min(500px,95vw);max-height:92vh;overflow-y:auto;padding:28px;position:relative;}
-  .dna-modal h2{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;margin:0 0 4px;}
-  .dna-modal .sub{font-size:11px;color:var(--muted);margin-bottom:22px;}
+  .dna-settings{background:var(--surface);border:1px solid var(--border);width:min(460px,95vw);max-height:92vh;overflow-y:auto;padding:26px;}
+  .dna-settings h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;margin:0 0 3px;}
+  .dna-settings .sub{font-size:11px;color:var(--muted);margin-bottom:20px;}
   .dna-opt{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border);}
   .dna-opt:last-of-type{border-bottom:none;}
   .dna-opt-label{font-size:13px;font-weight:600;}
@@ -912,43 +913,64 @@
   .dna-toggle.on{background:var(--green);}
   .dna-toggle .k{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;}
   .dna-toggle.on .k{transform:translateX(18px);}
-  .dna-actions{display:flex;gap:8px;margin-top:22px;}
-  .dna-actions button{flex:1;padding:11px;font-size:13px;font-weight:700;border:none;cursor:pointer;}
+  .dna-set-actions{display:flex;gap:8px;margin-top:20px;}
+  .dna-set-actions button{flex:1;padding:11px;font-size:13px;font-weight:700;border:none;cursor:pointer;}
   .btn-dna-gen{background:var(--green);color:#000;}
   .btn-dna-gen:disabled{opacity:.5;cursor:not-allowed;}
-  .btn-dna-close{background:var(--surface);border:1px solid var(--border) !important;color:var(--text);}
-  /* ── Kart ── */
-  .dna-card-wrap{display:none;margin-top:24px;}
-  .dna-card-wrap.show{display:block;}
-  .dna-card{
-    background:linear-gradient(160deg,#0a0a0f 0%,#0d1f0f 40%,#0a0a0f 100%);
-    color:#fff;width:100%;border-radius:4px;overflow:hidden;
-    font-family:'Syne','Inter',sans-serif;
-    box-shadow:0 0 40px rgba(29,185,84,.15);
-  }
-  .dna-header{padding:28px 24px 20px;background:linear-gradient(135deg,rgba(29,185,84,.18) 0%,transparent 60%);}
-  .dna-logo{font-size:10px;letter-spacing:3px;color:var(--green);text-transform:uppercase;margin-bottom:10px;opacity:.8;}
-  .dna-title{font-size:28px;font-weight:900;line-height:1.1;margin-bottom:4px;}
-  .dna-date{font-size:10px;color:rgba(255,255,255,.4);letter-spacing:1px;}
-  .dna-section{padding:20px 24px;border-top:1px solid rgba(255,255,255,.06);}
-  .dna-section-label{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:rgba(29,185,84,.7);margin-bottom:12px;}
-  .dna-hero{font-size:22px;font-weight:800;line-height:1.2;color:#fff;margin-bottom:2px;}
-  .dna-hero-sub{font-size:12px;color:rgba(255,255,255,.5);}
-  .dna-hero-count{font-size:11px;color:var(--green);margin-top:4px;font-weight:700;}
-  .dna-list{list-style:none;padding:0;margin:0;}
-  .dna-list li{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);}
-  .dna-list li:last-child{border-bottom:none;}
-  .dna-rank{font-size:11px;color:rgba(255,255,255,.3);width:16px;flex-shrink:0;text-align:right;}
-  .dna-rank-gold{color:#f5c518 !important;}
-  .dna-item-name{font-size:13px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .dna-item-sub{font-size:10px;color:rgba(255,255,255,.4);flex-shrink:0;}
-  .dna-two-col{display:grid;grid-template-columns:1fr 1fr;gap:0;}
-  .dna-stat-box{padding:20px 24px;border-top:1px solid rgba(255,255,255,.06);}
-  .dna-stat-box:nth-child(2){border-left:1px solid rgba(255,255,255,.06);}
-  .dna-big-num{font-size:30px;font-weight:900;color:var(--green);line-height:1;}
-  .dna-big-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.4);margin-top:6px;}
-  .dna-footer{padding:16px 24px;background:rgba(0,0,0,.3);font-size:9px;color:rgba(255,255,255,.2);letter-spacing:1.5px;text-align:center;text-transform:uppercase;}
-  .dna-dl-btn{width:100%;padding:12px;background:var(--green);color:#000;font-weight:800;font-size:13px;border:none;cursor:pointer;margin-top:12px;letter-spacing:.5px;}
+  .btn-dna-cls{background:var(--surface);border:1px solid var(--border) !important;color:var(--text);}
+  /* Wrapped Viewer */
+  .dna-viewer{position:fixed;inset:0;background:#000;z-index:1200;display:none;flex-direction:column;align-items:center;justify-content:center;}
+  .dna-viewer.open{display:flex;}
+  .dna-slides-wrap{position:relative;width:min(360px,90vw);height:min(640px,80vh);overflow:hidden;}
+  .dna-slide{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 24px;box-sizing:border-box;opacity:0;transition:opacity .35s;pointer-events:none;}
+  .dna-slide.active{opacity:1;pointer-events:all;}
+  /* slide gradyanları */
+  .dna-s0{background:linear-gradient(160deg,#0a0f1a,#0d1f0f);}
+  .dna-s1{background:linear-gradient(160deg,#1a0a0a,#2d1400);}
+  .dna-s2{background:linear-gradient(160deg,#0a0a1a,#14002d);}
+  .dna-s3{background:linear-gradient(160deg,#001a12,#001a2d);}
+  .dna-s4{background:linear-gradient(160deg,#1a1400,#1a0a00);}
+  .dna-s5{background:linear-gradient(160deg,#0a0f1a,#001a12);}
+  .dna-s6{background:linear-gradient(160deg,#1a0012,#0a000f);}
+  .dna-s7{background:linear-gradient(160deg,#001014,#000a14);}
+  .dna-s8{background:linear-gradient(160deg,#14001a,#0a0a0a);}
+  /* slide içerikleri */
+  .dna-cover{width:180px;height:180px;object-fit:cover;border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,.6);margin-bottom:20px;background:#1a1a1a;}
+  .dna-cover-placeholder{width:180px;height:180px;border-radius:4px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;font-size:48px;margin-bottom:20px;}
+  .dna-artist-img{width:160px;height:160px;border-radius:50%;object-fit:cover;box-shadow:0 8px 40px rgba(0,0,0,.6);margin-bottom:20px;background:#1a1a1a;}
+  .dna-sl-eyebrow{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:14px;}
+  .dna-sl-title{font-family:'Syne',sans-serif;font-size:26px;font-weight:900;color:#fff;line-height:1.15;margin-bottom:6px;}
+  .dna-sl-sub{font-size:13px;color:rgba(255,255,255,.55);margin-bottom:10px;}
+  .dna-sl-badge{display:inline-block;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;margin-top:8px;}
+  .dna-sl-green{background:rgba(29,185,84,.2);color:#1db954;border:1px solid rgba(29,185,84,.3);}
+  .dna-big-stat{font-family:'Syne',sans-serif;font-size:72px;font-weight:900;color:#1db954;line-height:1;}
+  .dna-big-unit{font-size:16px;color:rgba(255,255,255,.5);margin-top:8px;letter-spacing:2px;}
+  /* Top 5 liste slide */
+  .dna-top5-list{width:100%;text-align:left;}
+  .dna-top5-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);}
+  .dna-top5-item:last-child{border-bottom:none;}
+  .dna-top5-cover{width:40px;height:40px;border-radius:3px;object-fit:cover;background:#1a1a1a;flex-shrink:0;}
+  .dna-top5-cover-ph{width:40px;height:40px;border-radius:3px;background:rgba(255,255,255,.06);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;}
+  .dna-top5-rank{font-size:11px;color:rgba(255,255,255,.3);width:14px;flex-shrink:0;text-align:right;}
+  .dna-top5-rank-1{color:#f5c518 !important;}
+  .dna-top5-info{flex:1;min-width:0;}
+  .dna-top5-name{font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .dna-top5-meta{font-size:10px;color:rgba(255,255,255,.4);margin-top:1px;}
+  .dna-top5-cnt{font-size:11px;color:#1db954;font-weight:700;flex-shrink:0;}
+  /* Nav + toolbar */
+  .dna-nav{display:flex;align-items:center;gap:16px;margin-top:18px;}
+  .dna-nav button{background:rgba(255,255,255,.1);border:none;color:#fff;width:40px;height:40px;border-radius:50%;font-size:16px;cursor:pointer;transition:background .2s;}
+  .dna-nav button:hover{background:rgba(255,255,255,.2);}
+  .dna-nav button:disabled{opacity:.25;cursor:default;}
+  .dna-dot-row{display:flex;gap:6px;align-items:center;}
+  .dna-dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.25);transition:all .25s;}
+  .dna-dot.on{background:#1db954;width:14px;border-radius:3px;}
+  .dna-toolbar{position:absolute;top:14px;right:14px;display:flex;gap:8px;}
+  .dna-tb-btn{background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.15);color:#fff;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border-radius:2px;letter-spacing:.5px;}
+  .dna-tb-btn:hover{background:rgba(255,255,255,.1);}
+  .dna-progress-bar{position:absolute;top:0;left:0;height:2px;background:#1db954;transition:width .3s;}
+  .dna-sl-logo{font-size:9px;letter-spacing:3px;color:rgba(255,255,255,.2);text-transform:uppercase;position:absolute;bottom:16px;left:0;right:0;text-align:center;}
+
 
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1488,43 +1510,42 @@
 
 
 
-<!-- MusicDNA MODALI -->
-<div class="dna-overlay" id="dnaOverlay" onclick="if(event.target===this)closeDnaModal()">
-  <div class="dna-modal">
+<!-- MusicDNA AYAR MODALI -->
+<div class="dna-overlay" id="dnaOverlay" onclick="if(event.target===this)closeDnaSettings()">
+  <div class="dna-settings">
     <h2>🧬 MusicDNA'nı Oluştur</h2>
-    <div class="sub">Dinleme geçmişinden kişisel müzik kimliğini oluştur ve indir</div>
+    <div class="sub">Spotify Wrapped gibi kişisel müzik kimliğini oluştur ve indir</div>
+    <div class="dna-opt"><div class="dna-opt-label">🎵 Top 5 Şarkıyı dahil et</div><div class="dna-toggle on" id="dnaTop5Sarki" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">🎤 Top 5 Sanatçıyı dahil et</div><div class="dna-toggle on" id="dnaTop5Sanatci" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">💿 Top 5 Albümü dahil et</div><div class="dna-toggle on" id="dnaTop5Album" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">🤖 AI kullanımını dahil et</div><div class="dna-toggle on" id="dnaAI" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">⏰ En çok dinlenen zamanı dahil et</div><div class="dna-toggle on" id="dnaVakit" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">📅 En çok dinlenen Ay'ı dahil et</div><div class="dna-toggle on" id="dnaAy" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">👑 En çok dinlenen sanatçıyı dahil et</div><div class="dna-toggle on" id="dnaEnSanatci" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">🏆 En çok dinlenen şarkıyı dahil et</div><div class="dna-toggle on" id="dnaEnSarki" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-set-actions">
+      <button class="btn-dna-cls" onclick="closeDnaSettings()">Kapat</button>
+      <button class="btn-dna-gen" id="dnaGenBtn" onclick="startDnaGenerate()">Oluştur</button>
+    </div>
+  </div>
+</div>
 
-    <div class="dna-opt">
-      <div class="dna-opt-label">🎵 Top 5 Şarkıyı dahil et</div>
-      <div class="dna-toggle on" id="dnaTop5Sarki" onclick="this.classList.toggle('on')"><div class="k"></div></div>
-    </div>
-    <div class="dna-opt">
-      <div class="dna-opt-label">🎤 Top 5 Sanatçıyı dahil et</div>
-      <div class="dna-toggle on" id="dnaTop5Sanatci" onclick="this.classList.toggle('on')"><div class="k"></div></div>
-    </div>
-    <div class="dna-opt">
-      <div class="dna-opt-label">💿 Top 5 Albümü dahil et</div>
-      <div class="dna-toggle on" id="dnaTop5Album" onclick="this.classList.toggle('on')"><div class="k"></div></div>
-    </div>
-    <div class="dna-opt">
-      <div class="dna-opt-label">🤖 AI kullanımını dahil et</div>
-      <div class="dna-toggle on" id="dnaAI" onclick="this.classList.toggle('on')"><div class="k"></div></div>
-    </div>
-    <div class="dna-opt">
-      <div class="dna-opt-label">⏰ En çok dinlenen zamanı dahil et</div>
-      <div class="dna-toggle on" id="dnaVakit" onclick="this.classList.toggle('on')"><div class="k"></div></div>
-    </div>
-    <div class="dna-opt">
-      <div class="dna-opt-label">📅 En çok dinlenen Ay'ı dahil et</div>
-      <div class="dna-toggle on" id="dnaAy" onclick="this.classList.toggle('on')"><div class="k"></div></div>
-    </div>
-    <div class="dna-opt">
-      <div class="dna-opt-label">👑 En çok dinlenen sanatçıyı dahil et</div>
-      <div class="dna-toggle on" id="dnaEnSanatci" onclick="this.classList.toggle('on')"><div class="k"></div></div>
-    </div>
-    <div class="dna-opt">
-      <div class="dna-opt-label">🏆 En çok dinlenen şarkıyı dahil et</div>
-      <div class="dna-toggle on" id="dnaEnSarki" onclick="this.classList.toggle('on')"><div class="k"></div></div>
+<!-- MusicDNA WRAPPED VİEWER -->
+<div class="dna-viewer" id="dnaViewer">
+  <div class="dna-toolbar">
+    <button class="dna-tb-btn" onclick="downloadDnaPdf()">⬇ PDF İndir</button>
+    <button class="dna-tb-btn" onclick="closeDnaViewer()">✕ Kapat</button>
+  </div>
+  <div class="dna-slides-wrap" id="dnaSlidesWrap">
+    <div class="dna-progress-bar" id="dnaProgressBar"></div>
+  </div>
+  <div class="dna-nav">
+    <button id="dnaPrev" onclick="dnaGo(-1)">‹</button>
+    <div class="dna-dot-row" id="dnaDots"></div>
+    <button id="dnaNext" onclick="dnaGo(1)">›</button>
+  </div>
+</div>
+
     </div>
 
     <div class="dna-actions">
@@ -4429,236 +4450,292 @@ function sectionView(containerId, type, btn) {
 // ========================= MusicDNA ========================================
 // ═══════════════════════════════════════════════════════════════════════════
 
-function openDnaModal() {
-  document.getElementById('dnaOverlay').classList.add('open');
-  document.getElementById('dnaCardWrap').classList.remove('show');
-  document.getElementById('dnaGenBtn').disabled = false;
-  document.getElementById('dnaGenBtn').textContent = 'Oluştur';
-}
+let _dnaSlides   = [];
+let _dnaIndex    = 0;
+let _dnaData     = null;
 
-function closeDnaModal() {
-  document.getElementById('dnaOverlay').classList.remove('open');
-}
+function openDnaModal()     { document.getElementById('dnaOverlay').classList.add('open'); }
+function closeDnaSettings() { document.getElementById('dnaOverlay').classList.remove('open'); }
+function closeDnaViewer()   { document.getElementById('dnaViewer').classList.remove('open'); }
+function _dnaOn(id)         { return document.getElementById(id).classList.contains('on'); }
 
-function _dnaOn(id) {
-  return document.getElementById(id).classList.contains('on');
-}
-
-async function generateDna() {
+async function startDnaGenerate() {
   const btn = document.getElementById('dnaGenBtn');
-  btn.disabled = true;
-  btn.textContent = 'Yükleniyor...';
-
+  btn.disabled = true; btn.textContent = 'Yükleniyor...';
   try {
-    const res  = await fetch('/api/music-dna');
-    const d    = await res.json();
-    if (!res.ok) { alert(d.error || 'Hata oluştu'); btn.disabled=false; btn.textContent='Oluştur'; return; }
-
-    const card = document.getElementById('dnaCard');
-    card.innerHTML = _buildDnaCard(d);
-    document.getElementById('dnaCardWrap').classList.add('show');
-    btn.textContent = 'Yeniden Oluştur';
-    btn.disabled = false;
-    card.scrollIntoView({behavior:'smooth', block:'start'});
+    const res = await fetch('/api/music-dna');
+    const d   = await res.json();
+    if (!res.ok) { alert(d.error || 'Hata'); btn.disabled=false; btn.textContent='Oluştur'; return; }
+    _dnaData = d;
+    closeDnaSettings();
+    _buildSlides(d);
+    document.getElementById('dnaViewer').classList.add('open');
   } catch(e) {
-    alert('Bağlantı hatası: ' + e.message);
-    btn.disabled = false;
-    btn.textContent = 'Oluştur';
+    alert('Hata: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Oluştur';
   }
 }
 
-function _buildDnaCard(d) {
-  const incTop5Sarki   = _dnaOn('dnaTop5Sarki');
-  const incTop5Sanatci = _dnaOn('dnaTop5Sanatci');
-  const incTop5Album   = _dnaOn('dnaTop5Album');
-  const incAI          = _dnaOn('dnaAI');
-  const incVakit       = _dnaOn('dnaVakit');
-  const incAy          = _dnaOn('dnaAy');
-  const incEnSanatci   = _dnaOn('dnaEnSanatci');
-  const incEnSarki     = _dnaOn('dnaEnSarki');
+function _buildSlides(d) {
+  const wrap = document.getElementById('dnaSlidesWrap');
+  // progress bar'ı koru, geri kalanı temizle
+  const pb = document.getElementById('dnaProgressBar');
+  wrap.innerHTML = '';
+  wrap.appendChild(pb);
+  _dnaSlides = [];
+  _dnaIndex  = 0;
 
-  let html = '';
+  const secs = d.toplam_sure_sn || 0;
+  const days = Math.floor(secs / 86400);
+  const hrs  = Math.floor(secs / 3600);
+  const dayStr = days > 0 ? days + '+ gün' : hrs + '+ saat';
 
-  // ── Header ──────────────────────────────────────────────────────────────
-  html += `
-    <div class="dna-header">
-      <div class="dna-logo">Music+</div>
-      <div class="dna-title">${_esc(d.display_name)}'in<br>MusicDNA'sı</div>
-      <div class="dna-date">${d.generated_at} • ${d.toplam_kayit} dinleme kaydı</div>
-    </div>`;
+  // ── Slide 0: Giriş ────────────────────────────────────────────────────
+  _addSlide('dna-s0', `
+    <div class="dna-sl-eyebrow">Music+ • ${d.generated_at}</div>
+    <div class="dna-sl-title" style="font-size:34px">${_esc(d.display_name)}'in<br>MusicDNA'sı</div>
+    <div class="dna-sl-sub" style="margin-top:12px">${d.toplam_kayit} dinleme kaydından<br>oluşturuldu</div>
+    <div class="dna-sl-badge dna-sl-green" style="margin-top:20px">İlk kayıt: ${d.ilk_kayit}</div>
+  `);
 
-  // ── Özet istatistikler (her zaman göster) ────────────────────────────────
-  html += `
-    <div class="dna-two-col">
-      <div class="dna-stat-box">
-        <div class="dna-big-num">${d.toplam_sure}</div>
-        <div class="dna-big-label">Toplam Dinleme</div>
-      </div>
-      <div class="dna-stat-box">
-        <div class="dna-big-num">${d.farkli_sarki}</div>
-        <div class="dna-big-label">Farklı Şarkı</div>
-      </div>
-    </div>
-    <div class="dna-two-col">
-      <div class="dna-stat-box">
-        <div class="dna-big-num">${d.farkli_sanatci}</div>
-        <div class="dna-big-label">Farklı Sanatçı</div>
-      </div>
-      <div class="dna-stat-box">
-        <div class="dna-big-num">${d.farkli_album || '—'}</div>
-        <div class="dna-big-label">Farklı Albüm</div>
-      </div>
-    </div>`;
+  // ── Slide 1: Toplam dinleme süresi ────────────────────────────────────
+  _addSlide('dna-s3', `
+    <div class="dna-sl-eyebrow">Bu kadar müzik dinledin</div>
+    <div class="dna-big-stat">${dayStr.split('+')[0]}+</div>
+    <div class="dna-big-unit">${days > 0 ? 'GÜN' : 'SAAT'}</div>
+    <div class="dna-sl-sub" style="margin-top:20px">${d.toplam_sure}</div>
+    <div class="dna-sl-sub" style="font-size:11px">${d.farkli_sarki} farklı şarkı • ${d.farkli_sanatci} farklı sanatçı</div>
+  `);
 
-  // ── En çok dinlenen şarkı ────────────────────────────────────────────────
-  if (incEnSarki && d.en_cok_sarki) {
+  // ── Slide 2: #1 Şarkı ────────────────────────────────────────────────
+  if (_dnaOn('dnaEnSarki') && d.en_cok_sarki) {
     const s = d.en_cok_sarki;
-    html += `
-      <div class="dna-section">
-        <div class="dna-section-label">🏆 Senin şarkın</div>
-        <div class="dna-hero">${_esc(s.sarki)}</div>
-        <div class="dna-hero-sub">${_esc(s.sanatci)}</div>
-        <div class="dna-hero-count">${s.count} kez dinlendi</div>
-      </div>`;
+    const img = s.artwork ? `<img class="dna-cover" src="${s.artwork}" crossorigin="anonymous" onerror="this.style.display='none'">` : `<div class="dna-cover-placeholder">🎵</div>`;
+    _addSlide('dna-s1', `
+      ${img}
+      <div class="dna-sl-eyebrow">Senin şarkın</div>
+      <div class="dna-sl-title">${_esc(s.sarki)}</div>
+      <div class="dna-sl-sub">${_esc(s.sanatci)}</div>
+      <div class="dna-sl-badge dna-sl-green">${s.count} kez dinlendi</div>
+    `);
   }
 
-  // ── En çok dinlenen sanatçı ──────────────────────────────────────────────
-  if (incEnSanatci && d.en_cok_sanatci) {
+  // ── Slide 3: #1 Sanatçı ──────────────────────────────────────────────
+  if (_dnaOn('dnaEnSanatci') && d.en_cok_sanatci) {
     const a = d.en_cok_sanatci;
-    html += `
-      <div class="dna-section">
-        <div class="dna-section-label">👑 Senin sanatçın</div>
-        <div class="dna-hero">${_esc(a.sanatci)}</div>
-        <div class="dna-hero-count">${a.count} kez dinlendi</div>
+    const img = a.artwork ? `<img class="dna-artist-img" src="${a.artwork}" crossorigin="anonymous" onerror="this.style.display='none'">` : `<div class="dna-cover-placeholder" style="border-radius:50%">🎤</div>`;
+    _addSlide('dna-s2', `
+      ${img}
+      <div class="dna-sl-eyebrow">Senin sanatçın</div>
+      <div class="dna-sl-title">${_esc(a.sanatci)}</div>
+      <div class="dna-sl-badge dna-sl-green">${a.count} kez dinlendi</div>
+    `);
+  }
+
+  // ── Slide 4: Top 5 Şarkı ─────────────────────────────────────────────
+  if (_dnaOn('dnaTop5Sarki') && d.top5_sarki && d.top5_sarki.length) {
+    let rows = '';
+    d.top5_sarki.forEach((s,i) => {
+      const img = s.artwork ? `<img class="dna-top5-cover" src="${s.artwork}" crossorigin="anonymous" onerror="this.style.display='none'">` : `<div class="dna-top5-cover-ph">🎵</div>`;
+      rows += `<div class="dna-top5-item">
+        <span class="dna-top5-rank ${i===0?'dna-top5-rank-1':''}">${i+1}</span>
+        ${img}
+        <div class="dna-top5-info"><div class="dna-top5-name">${_esc(s.sarki)}</div><div class="dna-top5-meta">${_esc(s.sanatci)}</div></div>
+        <span class="dna-top5-cnt">${s.count}x</span>
       </div>`;
-  }
-
-  // ── Top 5 Şarkı ──────────────────────────────────────────────────────────
-  if (incTop5Sarki && d.top5_sarki && d.top5_sarki.length) {
-    html += `<div class="dna-section"><div class="dna-section-label">🎵 Top 5 Şarkın</div><ul class="dna-list">`;
-    d.top5_sarki.forEach((s, i) => {
-      html += `
-        <li>
-          <span class="dna-rank ${i===0?'dna-rank-gold':''}">${i+1}</span>
-          <span class="dna-item-name">${_esc(s.sarki)}</span>
-          <span class="dna-item-sub">${s.count}x</span>
-        </li>`;
     });
-    html += `</ul></div>`;
+    _addSlide('dna-s4', `
+      <div class="dna-sl-eyebrow" style="margin-bottom:14px">Top 5 Şarkın</div>
+      <div class="dna-top5-list">${rows}</div>
+    `);
   }
 
-  // ── Top 5 Sanatçı ────────────────────────────────────────────────────────
-  if (incTop5Sanatci && d.top5_sanatci && d.top5_sanatci.length) {
-    html += `<div class="dna-section"><div class="dna-section-label">🎤 Top 5 Sanatçın</div><ul class="dna-list">`;
-    d.top5_sanatci.forEach((a, i) => {
-      html += `
-        <li>
-          <span class="dna-rank ${i===0?'dna-rank-gold':''}">${i+1}</span>
-          <span class="dna-item-name">${_esc(a.sanatci)}</span>
-          <span class="dna-item-sub">${a.count}x</span>
-        </li>`;
-    });
-    html += `</ul></div>`;
-  }
-
-  // ── Top 5 Albüm ──────────────────────────────────────────────────────────
-  if (incTop5Album && d.top5_album && d.top5_album.length) {
-    html += `<div class="dna-section"><div class="dna-section-label">💿 Top 5 Albümün</div><ul class="dna-list">`;
-    d.top5_album.forEach((al, i) => {
-      html += `
-        <li>
-          <span class="dna-rank ${i===0?'dna-rank-gold':''}">${i+1}</span>
-          <span class="dna-item-name">${_esc(al.album)}</span>
-          <span class="dna-item-sub">${al.count}x</span>
-        </li>`;
-    });
-    html += `</ul></div>`;
-  }
-
-  // ── En çok dinlenen zaman & ay (yan yana) ────────────────────────────────
-  if (incVakit || incAy) {
-    html += `<div class="dna-two-col">`;
-    if (incVakit) {
-      html += `
-        <div class="dna-stat-box">
-          <div class="dna-section-label" style="margin-bottom:8px">⏰ En Çok Zamanın</div>
-          <div style="font-size:16px;font-weight:800;color:#fff">${_esc(d.en_cok_vakit)}</div>
-        </div>`;
-    }
-    if (incAy && d.en_cok_ay) {
-      html += `
-        <div class="dna-stat-box">
-          <div class="dna-section-label" style="margin-bottom:8px">📅 En Çok Ayın</div>
-          <div style="font-size:16px;font-weight:800;color:#fff">${_esc(d.en_cok_ay.ay)}</div>
-          <div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:4px">${d.en_cok_ay.kayit_sayisi} dinleme</div>
-        </div>`;
-    }
-    html += `</div>`;
-  }
-
-  // ── AI Kullanımı ─────────────────────────────────────────────────────────
-  if (incAI) {
-    html += `
-      <div class="dna-section">
-        <div class="dna-section-label">🤖 AI Kullanımın</div>
-        <div class="dna-big-num" style="font-size:36px">${d.ai_total}</div>
-        <div class="dna-big-label">toplam AI önerisi alındı</div>
+  // ── Slide 5: Top 5 Sanatçı ───────────────────────────────────────────
+  if (_dnaOn('dnaTop5Sanatci') && d.top5_sanatci && d.top5_sanatci.length) {
+    let rows = '';
+    d.top5_sanatci.forEach((a,i) => {
+      const img = a.artwork ? `<img class="dna-top5-cover" src="${a.artwork}" crossorigin="anonymous" style="border-radius:50%" onerror="this.style.display='none'">` : `<div class="dna-top5-cover-ph">🎤</div>`;
+      rows += `<div class="dna-top5-item">
+        <span class="dna-top5-rank ${i===0?'dna-top5-rank-1':''}">${i+1}</span>
+        ${img}
+        <div class="dna-top5-info"><div class="dna-top5-name">${_esc(a.sanatci)}</div><div class="dna-top5-meta">${a.count} dinleme</div></div>
+        <span class="dna-top5-cnt">${a.count}x</span>
       </div>`;
+    });
+    _addSlide('dna-s5', `
+      <div class="dna-sl-eyebrow" style="margin-bottom:14px">Top 5 Sanatçın</div>
+      <div class="dna-top5-list">${rows}</div>
+    `);
   }
 
-  // ── İlk kayıt bilgisi ────────────────────────────────────────────────────
-  if (d.ilk_kayit && d.ilk_kayit !== 'Bilinmiyor') {
-    html += `
-      <div class="dna-section" style="text-align:center;padding:16px 24px">
-        <div style="font-size:10px;color:rgba(255,255,255,.3);letter-spacing:1px">
-          Music+'la müzik yolculuğun ${_esc(d.ilk_kayit)}'den beri sürüyor
-        </div>
+  // ── Slide 6: Top 5 Albüm ─────────────────────────────────────────────
+  if (_dnaOn('dnaTop5Album') && d.top5_album && d.top5_album.length) {
+    let rows = '';
+    d.top5_album.forEach((al,i) => {
+      const img = al.artwork ? `<img class="dna-top5-cover" src="${al.artwork}" crossorigin="anonymous" onerror="this.style.display='none'">` : `<div class="dna-top5-cover-ph">💿</div>`;
+      rows += `<div class="dna-top5-item">
+        <span class="dna-top5-rank ${i===0?'dna-top5-rank-1':''}">${i+1}</span>
+        ${img}
+        <div class="dna-top5-info"><div class="dna-top5-name">${_esc(al.album)}</div><div class="dna-top5-meta">${_esc(al.sanatci)}</div></div>
+        <span class="dna-top5-cnt">${al.count}x</span>
       </div>`;
+    });
+    _addSlide('dna-s6', `
+      <div class="dna-sl-eyebrow" style="margin-bottom:14px">Top 5 Albümün</div>
+      <div class="dna-top5-list">${rows}</div>
+    `);
   }
 
-  // ── Footer ───────────────────────────────────────────────────────────────
-  html += `<div class="dna-footer">Music+ • musicplus.app • ${d.generated_at}</div>`;
+  // ── Slide 7: En çok dinlenen zaman ───────────────────────────────────
+  if (_dnaOn('dnaVakit') && d.en_cok_vakit) {
+    const icons = {'Sabah (06-12)':'🌅','Öğleden Sonra (12-18)':'☀️','Akşam (18-24)':'🌆','Gece (00-06)':'🌙'};
+    const icon  = icons[d.en_cok_vakit] || '⏰';
+    _addSlide('dna-s7', `
+      <div style="font-size:72px;margin-bottom:16px">${icon}</div>
+      <div class="dna-sl-eyebrow">En çok dinlediğin zaman</div>
+      <div class="dna-sl-title">${_esc(d.en_cok_vakit)}</div>
+    `);
+  }
 
-  return html;
+  // ── Slide 8: En çok dinlenen ay ──────────────────────────────────────
+  if (_dnaOn('dnaAy') && d.en_cok_ay) {
+    _addSlide('dna-s8', `
+      <div style="font-size:64px;margin-bottom:16px">📅</div>
+      <div class="dna-sl-eyebrow">En çok dinlediğin ay</div>
+      <div class="dna-sl-title">${_esc(d.en_cok_ay.ay)}</div>
+      <div class="dna-sl-badge dna-sl-green">${d.en_cok_ay.kayit_sayisi} dinleme</div>
+    `);
+  }
+
+  // ── Slide 9: AI ──────────────────────────────────────────────────────
+  if (_dnaOn('dnaAI')) {
+    _addSlide('dna-s0', `
+      <div style="font-size:64px;margin-bottom:16px">🤖</div>
+      <div class="dna-sl-eyebrow">AI kullanımın</div>
+      <div class="dna-big-stat" style="font-size:64px">${d.ai_total}</div>
+      <div class="dna-big-unit">AI ÖNERİSİ ALDIN</div>
+    `);
+  }
+
+  // ── Son slide ─────────────────────────────────────────────────────────
+  _addSlide('dna-s3', `
+    <div style="font-size:48px;margin-bottom:20px">🧬</div>
+    <div class="dna-sl-title">Bu senin<br>MusicDNA'n</div>
+    <div class="dna-sl-sub" style="margin-top:12px">${_esc(d.display_name)}</div>
+    <div class="dna-sl-logo" style="position:relative;bottom:auto;margin-top:24px;font-size:10px;color:rgba(255,255,255,.3);letter-spacing:3px;">MUSIC+</div>
+  `);
+
+  _buildDots();
+  _dnaShowSlide(0);
 }
 
-async function downloadDna() {
-  const card = document.getElementById('dnaCard');
-  const btn  = document.querySelector('.dna-dl-btn');
-  btn.textContent = 'Hazırlanıyor...';
+function _addSlide(gradClass, inner) {
+  const wrap = document.getElementById('dnaSlidesWrap');
+  const div  = document.createElement('div');
+  div.className = 'dna-slide ' + gradClass;
+  div.innerHTML = inner + '<div class="dna-sl-logo">MUSIC+</div>';
+  wrap.appendChild(div);
+  _dnaSlides.push(div);
+}
+
+function _buildDots() {
+  const row = document.getElementById('dnaDots');
+  row.innerHTML = '';
+  _dnaSlides.forEach((_,i) => {
+    const d = document.createElement('div');
+    d.className = 'dna-dot' + (i===0?' on':'');
+    d.onclick = () => _dnaShowSlide(i);
+    row.appendChild(d);
+  });
+}
+
+function _dnaShowSlide(idx) {
+  _dnaSlides.forEach((s,i) => s.classList.toggle('active', i===idx));
+  document.querySelectorAll('.dna-dot').forEach((d,i) => d.classList.toggle('on', i===idx));
+  document.getElementById('dnaPrev').disabled = idx === 0;
+  document.getElementById('dnaNext').disabled = idx === _dnaSlides.length - 1;
+  const pct = _dnaSlides.length > 1 ? ((idx+1)/(_dnaSlides.length))*100 : 100;
+  document.getElementById('dnaProgressBar').style.width = pct + '%';
+  _dnaIndex = idx;
+}
+
+function dnaGo(dir) {
+  const next = _dnaIndex + dir;
+  if (next >= 0 && next < _dnaSlides.length) _dnaShowSlide(next);
+}
+
+// Klavye navigasyon
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('dnaViewer').classList.contains('open')) return;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') dnaGo(1);
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   dnaGo(-1);
+  if (e.key === 'Escape') closeDnaViewer();
+});
+
+// Dokunmatik kaydırma
+(function() {
+  let startX = 0;
+  document.addEventListener('touchstart', e => { if (document.getElementById('dnaViewer').classList.contains('open')) startX = e.touches[0].clientX; });
+  document.addEventListener('touchend',   e => {
+    if (!document.getElementById('dnaViewer').classList.contains('open')) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 50) dnaGo(dx < 0 ? 1 : -1);
+  });
+})();
+
+async function downloadDnaPdf() {
+  const btn = document.querySelector('.dna-tb-btn');
+  btn.textContent = '⏳ Hazırlanıyor...';
   btn.disabled    = true;
 
   try {
-    const canvas = await html2canvas(card, {
-      backgroundColor: '#0a0a0f',
-      scale: 2,          // retina kalitesi
-      useCORS: true,
-      logging: false,
-    });
-    const link  = document.createElement('a');
-    const name  = (document.querySelector('.dna-title')?.textContent || 'MusicDNA')
-                    .replace(/[^a-zA-Z0-9ğüşöçıİĞÜŞÖÇ ]/g,'').trim();
-    link.download = name + '.png';
-    link.href     = canvas.toDataURL('image/png');
-    link.click();
+    // jsPDF'i dinamik yükle
+    if (!window.jsPDF) {
+      await new Promise((res,rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    const { jsPDF } = window.jspdf;
+    const prev = _dnaIndex;
+
+    // Slide başına 360x640 boyut (px → pt: 1pt = 1.333px)
+    const W = 360, H = 640;
+    const pdf = new jsPDF({ orientation:'portrait', unit:'px', format:[W,H] });
+
+    for (let i = 0; i < _dnaSlides.length; i++) {
+      _dnaShowSlide(i);
+      await new Promise(r => setTimeout(r, 120)); // animasyon bekle
+      const canvas = await html2canvas(_dnaSlides[i], {
+        backgroundColor: null,
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        width: W, height: H,
+      });
+      if (i > 0) pdf.addPage([W, H]);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
+    }
+    const name = (_dnaData?.display_name || 'MusicDNA').replace(/[^a-zA-Z0-9]/g,' ').trim();
+    pdf.save(name + '-MusicDNA.pdf');
+    _dnaShowSlide(prev);
   } catch(e) {
-    alert('İndirme hatası: ' + e.message);
+    alert('PDF hatası: ' + e.message);
   } finally {
-    btn.textContent = '⬇ PNG Olarak İndir';
+    btn.textContent = '⬇ PDF İndir';
     btn.disabled    = false;
   }
 }
 
 function _esc(str) {
   if (!str) return '—';
-  return String(str)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ========================= IMPORT HISTORY ==================================
 // ═══════════════════════════════════════════════════════════════════════════
