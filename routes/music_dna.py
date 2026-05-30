@@ -177,18 +177,37 @@ def img_proxy():
     from flask import request as freq, Response
 
     url = freq.args.get("u", "").strip()
-    allowed = ("https://i.scdn.co/", "https://mosaic.scdn.co/", "https://image-cdn-ak.spotifycdn.com/", "https://image-cdn-fa.spotifycdn.com/")
+    # Spotify CDN domainleri (genişletilmiş liste)
+    allowed = (
+        "https://i.scdn.co/",
+        "https://mosaic.scdn.co/",
+        "https://image-cdn-ak.spotifycdn.com/",
+        "https://image-cdn-fa.spotifycdn.com/",
+        "https://thisis-images.spotifycdn.com/",
+        "https://lineup-images.scdn.co/",
+        "https://newjams-images.scdn.co/",
+    )
     if not url or not any(url.startswith(a) for a in allowed):
+        logger.warning(f"img-proxy: izinsiz domain — {url[:60]}")
         return "", 400
 
     try:
-        r = _req.get(url, timeout=6, headers={"User-Agent": "MusicPlus/1.0"})
+        r = _req.get(url, timeout=8, headers={
+            "User-Agent": "Mozilla/5.0",
+            "Referer":    "https://open.spotify.com/",
+        })
+        if r.status_code != 200:
+            logger.warning(f"img-proxy: CDN {r.status_code} — {url[:60]}")
+            return "", r.status_code
         return Response(
             r.content,
             content_type=r.headers.get("content-type", "image/jpeg"),
-            headers={"Cache-Control": "public, max-age=86400"},
+            headers={
+                "Cache-Control": "public, max-age=86400",
+                "Access-Control-Allow-Origin": "*",
+            },
         )
     except Exception as e:
-        logger.warning(f"img-proxy hatası: {e}")
+        logger.warning(f"img-proxy hatası: {e} — {url[:60]}")
         return "", 502
 
