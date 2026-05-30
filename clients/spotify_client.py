@@ -131,6 +131,8 @@ class SpotifyClient:
         if not r_token:
             raise Exception("Oturum bulunamadi. Lutfen giris yapin.")
 
+        uid_hint = r_token[:8] + "..." if r_token else "?"  # log için kısa ipucu
+
         credentials = base64.b64encode(
             f"{self.client_id}:{self.client_secret}".encode()
         ).decode()
@@ -144,9 +146,19 @@ class SpotifyClient:
         })
 
         if resp.status_code != 200:
-            logger.error(f"Token yenileme hatasi: {resp.text}")
-            if in_req and "invalid_grant" in resp.text:
-                session.clear()
+            err_text = resp.text
+            logger.error(f"Token yenileme hatası ({uid_hint}): {err_text}")
+            if "invalid_grant" in err_text:
+                if in_req:
+                    # Request context: session'ı temizle → login sayfasına yönlendir
+                    session.clear()
+                    logger.warning("🔑 Session temizlendi — kullanıcı yeniden giriş yapmalı")
+                else:
+                    # Background context: hata fırlat, sync_job yakalar
+                    logger.warning(
+                        "🔑 Background sync: token revoked — "
+                        "sync_job finally bloğunda yeni token kaydedilecek"
+                    )
         resp.raise_for_status()
 
         d           = resp.json()
