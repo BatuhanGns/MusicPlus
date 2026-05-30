@@ -2622,29 +2622,47 @@ function renderWeek(hafta) {
 // ── Görsel önbelleği (sanatçı/şarkı adı → görsel URL) ──────────────────────
 const _imgCache = {};
 
+// DÜZELTME: null değerleri cache'leme — sadece başarılı URL'leri tut.
+// Önceki implementasyon null'u cache'leyip token düzeldikten sonra bile
+// görselleri yüklemiyordu.
+const _imgPending = {};   // devam eden fetch'leri takip et (race condition önlemi)
+
 async function _fetchSpotifyImg(type, name, sub) {
   const cacheKey = type + ':' + name;
-  if (_imgCache[cacheKey] !== undefined) return _imgCache[cacheKey];
-  _imgCache[cacheKey] = null;
-  try {
-    let url = '';
-    // FIX: query param kullan — path'e gömmek Türkçe/özel karakterleri bozuyor
-    if (type === 'artist') {
-      url = '/api/sanatci-gorsel?' + new URLSearchParams({ q: name });
-    } else if (type === 'track') {
-      url = '/api/sarki-gorsel?'  + new URLSearchParams({ q: name, sanatci: sub || '' });
-    } else if (type === 'album') {
-      url = '/api/album-gorsel?'  + new URLSearchParams({ q: name, sanatci: sub || '' });
-    }
-    if (!url) return null;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    _imgCache[cacheKey] = data.image_url || null;
-    return _imgCache[cacheKey];
-  } catch(e) {
-    return null;
+
+  // Başarılı cache var mı?
+  if (_imgCache[cacheKey]) return _imgCache[cacheKey];
+
+  // Aynı key için zaten fetch devam ediyorsa bekle
+  if (_imgPending[cacheKey]) return _imgPending[cacheKey];
+
+  let url = '';
+  if (type === 'artist') {
+    url = '/api/sanatci-gorsel?' + new URLSearchParams({ q: name });
+  } else if (type === 'track') {
+    url = '/api/sarki-gorsel?'  + new URLSearchParams({ q: name, sanatci: sub || '' });
+  } else if (type === 'album') {
+    url = '/api/album-gorsel?'  + new URLSearchParams({ q: name, sanatci: sub || '' });
   }
+  if (!url) return null;
+
+  const promise = (async () => {
+    try {
+      const res  = await fetch(url);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const imgUrl = data.image_url || null;
+      if (imgUrl) _imgCache[cacheKey] = imgUrl;   // sadece başarılıyı cache'le
+      return imgUrl;
+    } catch(e) {
+      return null;
+    } finally {
+      delete _imgPending[cacheKey];
+    }
+  })();
+
+  _imgPending[cacheKey] = promise;
+  return promise;
 }
 
 function _thumbId(listId, idx) {
