@@ -1546,20 +1546,6 @@
   </div>
 </div>
 
-    </div>
-
-    <div class="dna-actions">
-      <button class="btn-dna-close" onclick="closeDnaModal()">Kapat</button>
-      <button class="btn-dna-gen" id="dnaGenBtn" onclick="generateDna()">Oluştur</button>
-    </div>
-
-    <!-- Kart alanı -->
-    <div class="dna-card-wrap" id="dnaCardWrap">
-      <div class="dna-card" id="dnaCard"></div>
-      <button class="dna-dl-btn" onclick="downloadDna()">⬇ PNG Olarak İndir</button>
-    </div>
-  </div>
-</div>
 
 <!-- İÇERİ AKTARMA MODALI -->
 <div class="import-modal-overlay" id="importOverlay" onclick="if(event.target===this) closeImportModal()">
@@ -4511,7 +4497,7 @@ function _buildSlides(d) {
   // ── Slide 2: #1 Şarkı ────────────────────────────────────────────────
   if (_dnaOn('dnaEnSarki') && d.en_cok_sarki) {
     const s = d.en_cok_sarki;
-    const img = s.artwork ? `<img class="dna-cover" src="${s.artwork}" crossorigin="anonymous" onerror="this.style.display='none'">` : `<div class="dna-cover-placeholder">🎵</div>`;
+    const img = s.artwork ? `<img class="dna-cover" src="${_imgSrc(s.artwork)}" onerror="this.style.display='none'">` : `<div class="dna-cover-placeholder">🎵</div>`;
     _addSlide('dna-s1', `
       ${img}
       <div class="dna-sl-eyebrow">Senin şarkın</div>
@@ -4524,7 +4510,7 @@ function _buildSlides(d) {
   // ── Slide 3: #1 Sanatçı ──────────────────────────────────────────────
   if (_dnaOn('dnaEnSanatci') && d.en_cok_sanatci) {
     const a = d.en_cok_sanatci;
-    const img = a.artwork ? `<img class="dna-artist-img" src="${a.artwork}" crossorigin="anonymous" onerror="this.style.display='none'">` : `<div class="dna-cover-placeholder" style="border-radius:50%">🎤</div>`;
+    const img = a.artwork ? `<img class="dna-artist-img" src="${_imgSrc(a.artwork)}" onerror="this.style.display='none'">` : `<div class="dna-cover-placeholder" style="border-radius:50%">🎤</div>`;
     _addSlide('dna-s2', `
       ${img}
       <div class="dna-sl-eyebrow">Senin sanatçın</div>
@@ -4537,7 +4523,7 @@ function _buildSlides(d) {
   if (_dnaOn('dnaTop5Sarki') && d.top5_sarki && d.top5_sarki.length) {
     let rows = '';
     d.top5_sarki.forEach((s,i) => {
-      const img = s.artwork ? `<img class="dna-top5-cover" src="${s.artwork}" crossorigin="anonymous" onerror="this.style.display='none'">` : `<div class="dna-top5-cover-ph">🎵</div>`;
+      const img = s.artwork ? `<img class="dna-top5-cover" src="${_imgSrc(s.artwork)}" onerror="this.style.display='none'">` : `<div class="dna-top5-cover-ph">🎵</div>`;
       rows += `<div class="dna-top5-item">
         <span class="dna-top5-rank ${i===0?'dna-top5-rank-1':''}">${i+1}</span>
         ${img}
@@ -4555,7 +4541,7 @@ function _buildSlides(d) {
   if (_dnaOn('dnaTop5Sanatci') && d.top5_sanatci && d.top5_sanatci.length) {
     let rows = '';
     d.top5_sanatci.forEach((a,i) => {
-      const img = a.artwork ? `<img class="dna-top5-cover" src="${a.artwork}" crossorigin="anonymous" style="border-radius:50%" onerror="this.style.display='none'">` : `<div class="dna-top5-cover-ph">🎤</div>`;
+      const img = a.artwork ? `<img class="dna-top5-cover" src="${_imgSrc(a.artwork)}" style="border-radius:50%" onerror="this.style.display='none'">` : `<div class="dna-top5-cover-ph">🎤</div>`;
       rows += `<div class="dna-top5-item">
         <span class="dna-top5-rank ${i===0?'dna-top5-rank-1':''}">${i+1}</span>
         ${img}
@@ -4573,7 +4559,7 @@ function _buildSlides(d) {
   if (_dnaOn('dnaTop5Album') && d.top5_album && d.top5_album.length) {
     let rows = '';
     d.top5_album.forEach((al,i) => {
-      const img = al.artwork ? `<img class="dna-top5-cover" src="${al.artwork}" crossorigin="anonymous" onerror="this.style.display='none'">` : `<div class="dna-top5-cover-ph">💿</div>`;
+      const img = al.artwork ? `<img class="dna-top5-cover" src="${_imgSrc(al.artwork)}" onerror="this.style.display='none'">` : `<div class="dna-top5-cover-ph">💿</div>`;
       rows += `<div class="dna-top5-item">
         <span class="dna-top5-rank ${i===0?'dna-top5-rank-1':''}">${i+1}</span>
         ${img}
@@ -4733,6 +4719,11 @@ async function downloadDnaPdf() {
 function _esc(str) {
   if (!str) return '—';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _imgSrc(url) {
+  if (!url) return null;
+  return '/api/img-proxy?u=' + encodeURIComponent(url);
 }
 
 
