@@ -83,6 +83,11 @@ def callback():
         name = session["display_name"]
         token = spotify.refresh_token
 
+        # Refresh token'ı bellekte sakla (Sheets'e bağımlı değil, anında güncellenir)
+        if uid and token:
+            config._refresh_tokens[uid] = token
+
+        # Sheets: sadece şarkı verisi için kullanıcı sayfasını hazırla
         if uid:
             if not sheets._find_sheet(uid):
                 sheets._ensure_user_sheet(uid)
