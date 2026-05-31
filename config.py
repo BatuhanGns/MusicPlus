@@ -55,3 +55,9 @@ _cached_rows = []
 _cached_headers = []
 _last_sync = "Henüz sync yapılmadı"
 _gorsel_cache = {}
+
+# ── Refresh Token Belleği ─────────────────────────────────────────────────────
+# Sheets yerine bellekte tutulur. Kullanıcı giriş yaptıkça dolar.
+# Server restart'ta sıfırlanır — kullanıcı tekrar giriş yapınca yeniden dolar.
+# Spotify token rotasyonu olduğunda sync_job anında günceller → invalid_grant olmaz.
+_refresh_tokens: dict = {}  # { user_id: refresh_token }
