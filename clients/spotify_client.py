@@ -15,7 +15,7 @@ API_BASE  = "https://api.spotify.com/v1"
 
 
 class SpotifyClient:
-    def __init__(self, refresh_token: str = None):
+    def __init__(self, refresh_token: str = None, token_refresh_callback=None):
         self.client_id        = os.environ.get("SPOTIFY_CLIENT_ID", "")
         self.client_secret    = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
         # Eğer dışarıdan token verilmişse onu kullan (per-user sync için)
@@ -23,6 +23,9 @@ class SpotifyClient:
         self._access_token    = None
         self._token_expires_at = 0
         self._user_id         = None
+        # Spotify token rotasyonu olduğunda çağrılacak callback (scheduled sync için)
+        # İmza: callback(new_refresh_token: str) -> None
+        self._token_refresh_callback = token_refresh_callback
 
     # ------------------------------------------------------------------ #
     #  AUTH                                                                #
@@ -145,8 +148,13 @@ class SpotifyClient:
 
         if resp.status_code != 200:
             logger.error(f"Token yenileme hatasi: {resp.text}")
-            if in_req and "invalid_grant" in resp.text:
-                session.clear()
+            if "invalid_grant" in resp.text:
+                logger.error(
+                    "❌ Refresh token gecersiz veya iptal edilmis! "
+                    "Kullanicinin yeniden giris yaparak yeni token vermesi gerekiyor."
+                )
+                if in_req:
+                    session.clear()
         resp.raise_for_status()
 
         d           = resp.json()
@@ -164,6 +172,16 @@ class SpotifyClient:
             session["access_token"]    = new_token
             session["token_expires_at"] = new_expires
             session["refresh_token"]   = new_refresh
+
+        # Spotify yeni bir refresh token döndürdüyse (token rotasyonu):
+        # callback çağır — background sync sırasında Sheets'e aninda kaydeder
+        if new_refresh and new_refresh != r_token:
+            logger.info("🔄 Spotify yeni refresh token verdi (token rotasyonu algılandi).")
+            if self._token_refresh_callback:
+                try:
+                    self._token_refresh_callback(new_refresh)
+                except Exception as cb_err:
+                    logger.warning(f"⚠️ Token refresh callback hatasi: {cb_err}")
 
         return new_token
 
