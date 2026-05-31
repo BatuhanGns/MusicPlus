@@ -1,5 +1,6 @@
 """
 Flask application extensions ve shared client instance'ları.
+Circular import'u önlemek için app.py'den ayrı tutulur.
 """
 
 import logging
@@ -12,30 +13,39 @@ from clients.gemini_client import GeminiClient
 
 logger = logging.getLogger(__name__)
 
+# ── Client Instance'ları ─────────────────────────────────────────────────────
+# spotify: sadece HTTP request context'te (login, now-playing vs.) kullanılır.
+# Background sync'te per-user SpotifyClient instance oluşturulur — race condition yok.
 spotify = SpotifyClient()
-sheets  = SheetsClient()
-gemini  = GeminiClient()
+sheets = SheetsClient()
+gemini = GeminiClient()
 
 
-# ── Kullanıcı Veri Yönetimi ──────────────────────────────────────────────────
+# ── Kullanıcı Veri Yönetimi ─────────────────────────────────────────────────
 
 def get_current_user_id():
+    """Session'dan aktif kullanıcı ID'sini döndürür."""
     from flask import session
     return session.get("user_id")
 
+
 def get_current_user_name():
+    """Session'dan aktif kullanıcı adını döndürür."""
     from flask import session
     return session.get("display_name", "Kullanıcı")
+
 
 def load_user_data(user_id: str):
     headers, rows = sheets.get_user_data(user_id)
     config._user_cache[user_id] = {"headers": headers, "rows": rows}
     return headers, rows
 
+
 def get_cached_data(user_id: str):
     if user_id not in config._user_cache:
         return load_user_data(user_id)
     return config._user_cache[user_id]["headers"], config._user_cache[user_id]["rows"]
+
 
 def load_tumveri():
     uid = get_current_user_id()
@@ -44,9 +54,12 @@ def load_tumveri():
     return [], []
 
 
-# ── Sync ─────────────────────────────────────────────────────────────────────
+# ── Sync İşlemleri ───────────────────────────────────────────────────────────
 
 def _apply_sync_rewards(uid: str, new_tracks: list):
+    """
+    Sync'te gelen SADECE YENİ track'lerden coin/XP hesaplar.
+    """
     if not new_tracks:
         return
     try:
@@ -80,53 +93,63 @@ def _apply_sync_rewards(uid: str, new_tracks: list):
 
         _save_pet_data(uid, uname, data)
         logger.info(
-            f"💰 Sync rewards: uid={uid} +{earned_coin} coin +{earned_xp} XP "
-            f"tracks={len(new_tracks)}"
+            f"💰 Sync rewards: uid={uid} +{earned_coin} coin (x{coin_mult}) "
+            f"+{earned_xp} XP (x{xp_mult}) tracks={len(new_tracks)}"
         )
     except Exception as e:
-        logger.warning(f"⚠️ _apply_sync_rewards hatası: {e}")
+        logger.warning(f"⚠️ _apply_sync_rewards hatasi: {e}")
 
 
 def sync_job(user_id: str = None, refresh_token: str = None):
     """
-    DÜZELTMELER:
-    1. uid boş string kontrolü eklendi ("" → None).
-    2. finally bloğu: token rotasyonu gerçekleştiyse YENİ token
-       MUTLAKA Sheets'e kaydedilir. Bu sayede invalid_grant hatası
-       bir daha oluşmaz.
-    3. invalid_grant yakalandığında açık uyarı logu atılır.
+    DÜZELTİLDİ:
+    1. Her sync için ayrı SpotifyClient instance'ı oluşturulur.
+       Böylece singleton race condition ortadan kalkar.
+    2. Sheets'teki son played_at zamanı okunarak 'after' parametresiyle
+       sadece yeni şarkılar çekilir — kaçırılan periyotlar telafi edilir.
+    3. Aynı şarkıyı tekrar dinleme artık duplicate sayılmaz (played_at farklı).
     """
-    # Boş string kontrolü — Sheets'te bazen "" gelebiliyor
-    uid = (user_id or "").strip() or None
+    uid = user_id
     if not uid:
+        # Request context varsa session'dan al (manuel sync butonu)
         try:
             uid = get_current_user_id()
         except Exception:
             pass
     if not uid:
-        logger.warning("⚠️ Sync: user_id yok veya boş, atlanıyor")
+        logger.warning("⚠️ Sync: user_id yok, atlanıyor")
         return
 
-    token = (refresh_token or "").strip() or config.SPOTIFY_REFRESH_TOKEN
+    token = refresh_token or config.SPOTIFY_REFRESH_TOKEN
     if not token:
         logger.warning(f"⚠️ Sync: {uid} için refresh_token yok, atlanıyor")
         return
 
-    # Her sync için izole client — singleton race condition yok
-    client = SpotifyClient(refresh_token=token)
+    # Token rotasyonu olduğunda Sheets'e anında kaydeder
+    def _on_token_refresh(new_token: str):
+        try:
+            sheets.save_refresh_token(uid, new_token)
+            logger.info(f"✅ Yeni refresh token Sheets'e kaydedildi ({uid})")
+        except Exception as e:
+            logger.error(f"❌ Yeni refresh token kaydedilemedi ({uid}): {e}")
+
+    # Her kullanıcı için izole edilmiş yeni bir client — global state kirlenmez
+    client = SpotifyClient(refresh_token=token, token_refresh_callback=_on_token_refresh)
+
     logger.info(f"🎵 Sync başladı: {uid}")
-
     try:
+        # Son kaydedilen played_at zamanını al → Spotify 'after' parametresi için
         after_ms = sheets.get_last_played_at_ms(uid)
-        tracks   = client.get_recently_played(limit=50, after_ms=after_ms)
-
+        
+        tracks = client.get_recently_played(limit=50, after_ms=after_ms)
+        
         new_tracks = []
         if tracks:
             new_count, new_tracks = sheets.append_tracks(uid, tracks)
             logger.info(f"✅ {new_count} yeni kayıt eklendi ({uid})")
         else:
-            logger.info(f"Yeni dinleme yok ({uid})")
-
+            logger.info(f"Yeni dinleme yok ({uid}).")
+            
         sheets.update_last_sync(uid)
         config._last_sync = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M") + " UTC"
         load_user_data(uid)
@@ -135,26 +158,7 @@ def sync_job(user_id: str = None, refresh_token: str = None):
             _apply_sync_rewards(uid, new_tracks)
 
     except Exception as e:
-        err = str(e)
-        logger.error(f"❌ Sync hatası ({uid}): {err}")
-        if "invalid_grant" in err:
-            logger.warning(
-                f"🔑 {uid} için refresh token geçersiz (revoked). "
-                f"Kullanıcının yeniden giriş yapması gerekiyor."
-            )
-
-    finally:
-        # ─────────────────────────────────────────────────────────────────
-        # KRİTİK: Spotify PKCE token rotasyonu — her token yenilemede
-        # yeni refresh token üretilir. Bu token MUTLAKA Sheets'e
-        # kaydedilmeli, aksi hâlde bir sonraki sync'te invalid_grant alınır.
-        # ─────────────────────────────────────────────────────────────────
-        if client.refresh_token and client.refresh_token != token:
-            try:
-                sheets.save_refresh_token(uid, client.refresh_token)
-                logger.info(f"🔑 Token rotasyonu kaydedildi ({uid})")
-            except Exception as save_err:
-                logger.error(f"❌ Token kaydetme hatası ({uid}): {save_err}")
+        logger.error(f"❌ Sync hatası ({uid}): {e}")
 
 
 def scheduled_sync_all():
@@ -164,11 +168,8 @@ def scheduled_sync_all():
             logger.info("⏰ Scheduled sync: kayıtlı kullanıcı yok")
             return
         for u in users:
-            uid   = (u.get("user_id") or "").strip()
-            token = (u.get("refresh_token") or "").strip()
-            if not uid:
-                logger.warning("⚠️ Scheduled sync: boş user_id atlanıyor")
-                continue
+            uid = u["user_id"]
+            token = u["refresh_token"]
             if not token:
                 logger.warning(f"⚠️ Scheduled sync: {uid} için token yok, atlanıyor")
                 continue
