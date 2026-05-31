@@ -15,7 +15,7 @@ API_BASE  = "https://api.spotify.com/v1"
 
 
 class SpotifyClient:
-    def __init__(self, refresh_token: str = None):
+    def __init__(self, refresh_token: str = None, token_refresh_callback=None):
         self.client_id        = os.environ.get("SPOTIFY_CLIENT_ID", "")
         self.client_secret    = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
         # Eğer dışarıdan token verilmişse onu kullan (per-user sync için)
@@ -23,6 +23,9 @@ class SpotifyClient:
         self._access_token    = None
         self._token_expires_at = 0
         self._user_id         = None
+        # Spotify token rotasyonu olduğunda çağrılacak callback (scheduled sync için)
+        # İmza: callback(new_refresh_token: str) -> None
+        self._token_refresh_callback = token_refresh_callback
 
     # ------------------------------------------------------------------ #
     #  AUTH                                                                #
@@ -131,8 +134,6 @@ class SpotifyClient:
         if not r_token:
             raise Exception("Oturum bulunamadi. Lutfen giris yapin.")
 
-        uid_hint = r_token[:8] + "..." if r_token else "?"  # log için kısa ipucu
-
         credentials = base64.b64encode(
             f"{self.client_id}:{self.client_secret}".encode()
         ).decode()
@@ -146,19 +147,14 @@ class SpotifyClient:
         })
 
         if resp.status_code != 200:
-            err_text = resp.text
-            logger.error(f"Token yenileme hatası ({uid_hint}): {err_text}")
-            if "invalid_grant" in err_text:
+            logger.error(f"Token yenileme hatasi: {resp.text}")
+            if "invalid_grant" in resp.text:
+                logger.error(
+                    "❌ Refresh token gecersiz veya iptal edilmis! "
+                    "Kullanicinin yeniden giris yaparak yeni token vermesi gerekiyor."
+                )
                 if in_req:
-                    # Request context: session'ı temizle → login sayfasına yönlendir
                     session.clear()
-                    logger.warning("🔑 Session temizlendi — kullanıcı yeniden giriş yapmalı")
-                else:
-                    # Background context: hata fırlat, sync_job yakalar
-                    logger.warning(
-                        "🔑 Background sync: token revoked — "
-                        "sync_job finally bloğunda yeni token kaydedilecek"
-                    )
         resp.raise_for_status()
 
         d           = resp.json()
@@ -176,6 +172,16 @@ class SpotifyClient:
             session["access_token"]    = new_token
             session["token_expires_at"] = new_expires
             session["refresh_token"]   = new_refresh
+
+        # Spotify yeni bir refresh token döndürdüyse (token rotasyonu):
+        # callback çağır — background sync sırasında Sheets'e aninda kaydeder
+        if new_refresh and new_refresh != r_token:
+            logger.info("🔄 Spotify yeni refresh token verdi (token rotasyonu algılandi).")
+            if self._token_refresh_callback:
+                try:
+                    self._token_refresh_callback(new_refresh)
+                except Exception as cb_err:
+                    logger.warning(f"⚠️ Token refresh callback hatasi: {cb_err}")
 
         return new_token
 
