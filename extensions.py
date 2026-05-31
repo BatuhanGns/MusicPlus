@@ -125,8 +125,18 @@ def sync_job(user_id: str = None, refresh_token: str = None):
         logger.warning(f"⚠️ Sync: {uid} için refresh_token yok, atlanıyor")
         return
 
+    # Token rotasyonu olduğunda bellekteki dict'i anında güncelle
+    def _on_token_refresh(new_token: str):
+        config._refresh_tokens[uid] = new_token
+        logger.info(f"✅ Yeni refresh token bellekte güncellendi ({uid})")
+        # Sheets'e de yaz (ikincil yedek olarak)
+        try:
+            sheets.save_refresh_token(uid, new_token)
+        except Exception:
+            pass  # Sheets hatası sync'i engellemez
+
     # Her kullanıcı için izole edilmiş yeni bir client — global state kirlenmez
-    client = SpotifyClient(refresh_token=token)
+    client = SpotifyClient(refresh_token=token, token_refresh_callback=_on_token_refresh)
 
     logger.info(f"🎵 Sync başladı: {uid}")
     try:
@@ -154,17 +164,32 @@ def sync_job(user_id: str = None, refresh_token: str = None):
 
 
 def scheduled_sync_all():
+    """
+    config._refresh_tokens dict'indeki tüm kullanıcıları sync eder.
+    Sheets'e bağımlı değil — bellekteki token'lar kullanılır.
+    Server restart'ta dict sıfırlanır; kullanıcılar tekrar giriş yapınca dolar.
+    """
     try:
-        users = sheets.get_all_users_with_tokens()
-        if not users:
-            logger.info("⏰ Scheduled sync: kayıtlı kullanıcı yok")
+        tokens = dict(config._refresh_tokens)  # snapshot al (döngü sırasında değişmesin)
+        if not tokens:
+            logger.info("⏰ Scheduled sync: bellekte kayıtlı kullanıcı yok")
+            # Fallback: Sheets'ten yükle (server restart sonrası ilk çalışma için)
+            try:
+                users = sheets.get_all_users_with_tokens()
+                for u in users:
+                    uid_s = u["user_id"]
+                    tok_s = u["refresh_token"]
+                    if uid_s and tok_s:
+                        config._refresh_tokens[uid_s] = tok_s
+                        logger.info(f"📥 Sheets fallback: {uid_s} token'ı belleğe yüklendi")
+                tokens = dict(config._refresh_tokens)
+            except Exception as fb_err:
+                logger.warning(f"⚠️ Sheets fallback hatası: {fb_err}")
+
+        if not tokens:
             return
-        for u in users:
-            uid = u["user_id"]
-            token = u["refresh_token"]
-            if not token:
-                logger.warning(f"⚠️ Scheduled sync: {uid} için token yok, atlanıyor")
-                continue
+
+        for uid, token in tokens.items():
             try:
                 sync_job(uid, refresh_token=token)
             except Exception as e:
