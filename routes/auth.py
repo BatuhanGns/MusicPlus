@@ -93,8 +93,8 @@ def callback():
         session["display_name"] = name
         session["refresh_token"] = r_token   # tek güvenilir kalıcı token
 
-        # Access token'ı bellek cache'ine taşı
-        spotify.set_user_id_for_cache(uid)
+        # Access token'ı bellek cache'ine ve Sheets'e taşı
+        spotify.set_user_id_for_cache(uid, sheets_client=sheets)
 
         # Bellekteki refresh token sözlüğünü güncelle
         if uid and r_token:
