@@ -73,8 +73,8 @@ class SheetsClient:
             return None
         ws = self._find_sheet("Settings")
         if not ws:
-            ws = self.sh.add_worksheet(title="Settings", rows=100, cols=8)
-            ws.append_row(["user_id", "display_name", "stats_permission", "last_sync", "refresh_token", "coins", "xp"], value_input_option="RAW")
+            ws = self.sh.add_worksheet(title="Settings", rows=100, cols=10)
+            ws.append_row(["user_id", "display_name", "stats_permission", "last_sync", "refresh_token", "coins", "xp", "access_token", "expires_at"], value_input_option="RAW")
             logger.info("✅ Settings sayfası oluşturuldu.")
         self._ensure_limits_sheet()
         return ws
@@ -271,7 +271,7 @@ class SheetsClient:
         ws.append_row([user_id, display_name, str(allowed), now_str, refresh_token], value_input_option="RAW")
 
     def save_refresh_token(self, user_id: str, refresh_token: str):
-        """Kullanıcının refresh token'ını günceller"""
+        """Kullanıcının refresh token'ını günceller (E sütunu)"""
         ws = self._find_sheet("Settings")
         if not ws:
             return
@@ -281,6 +281,38 @@ class SheetsClient:
                 ws.update(f"E{i}", [[refresh_token]])
                 return
 
+    def save_access_token(self, user_id: str, access_token: str, expires_at: float):
+        """Access token ve sona erme zamanını kaydeder (H ve I sütunları)."""
+        ws = self._find_sheet("Settings")
+        if not ws:
+            return
+        records = ws.get_all_values()
+        for i, row in enumerate(records[1:], start=2):
+            if row and row[0] == user_id:
+                ws.update(f"H{i}:I{i}", [[access_token, str(expires_at)]])
+                return
+
+    def get_access_token(self, user_id: str) -> dict:
+        """Kaydedilmiş access token ve expires_at değerini döndürür.
+        Döndürür: {"access_token": str, "expires_at": float} veya {}
+        """
+        ws = self._find_sheet("Settings")
+        if not ws:
+            return {}
+        try:
+            for row in ws.get_all_values()[1:]:
+                if row and row[0] == user_id:
+                    token   = row[7] if len(row) > 7 else ""
+                    exp_str = row[8] if len(row) > 8 else ""
+                    if token and exp_str:
+                        try:
+                            return {"access_token": token, "expires_at": float(exp_str)}
+                        except ValueError:
+                            return {}
+        except Exception as e:
+            logger.warning(f"get_access_token hatası ({user_id}): {e}")
+        return {}
+
     def get_all_users_with_tokens(self) -> list:
         """Tüm kullanıcıları token'larıyla döndürür — scheduled sync için"""
         ws = self._find_sheet("Settings")
@@ -289,9 +321,16 @@ class SheetsClient:
         users = []
         for row in ws.get_all_values()[1:]:
             if row and row[0]:
+                exp_str = row[8] if len(row) > 8 else ""
+                try:
+                    expires_at = float(exp_str) if exp_str else 0.0
+                except ValueError:
+                    expires_at = 0.0
                 users.append({
-                    "user_id": row[0],
-                    "refresh_token": row[4] if len(row) > 4 else ""
+                    "user_id":       row[0],
+                    "refresh_token": row[4] if len(row) > 4 else "",
+                    "access_token":  row[7] if len(row) > 7 else "",
+                    "expires_at":    expires_at,
                 })
         return users
 
