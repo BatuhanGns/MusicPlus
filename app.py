@@ -22,19 +22,40 @@ def create_app():
 
 def _refresh_all_access_tokens():
     """
-    Bellekteki tüm kullanıcıların access token'larını yeniler (45dk'da bir).
-    Access token Spotify'da 60dk geçerli; 45dk'da yenileyince hiç süresi dolmaz.
-    Bu fonksiyon HTTP request context'i olmadan çalışır (background thread).
+    50 dakikada bir tüm kullanıcıların access token'larını yeniler.
+    - Sheets'teki expires_at okunur; süresi dolmak üzereyse yenilenir.
+    - Yeni token hem bellek cache'ine hem Sheets H/I sütunlarına yazılır.
+    - Refresh token iptal olmuşsa o kullanıcı atlanır, diğerleri etkilenmez.
     """
-    from clients.spotify_client import SpotifyClient, _access_token_cache
-    tokens = dict(config._refresh_tokens)  # snapshot
+    from clients.spotify_client import SpotifyClient
+    import time as _time
+
+    # Sheets'ten tüm kullanıcıları yükle (server restart sonrası kurtarma)
+    try:
+        users = sheets.get_all_users_with_tokens()
+        for u in users:
+            uid_s = u["user_id"]
+            tok_s = u["refresh_token"]
+            if uid_s and tok_s and uid_s not in config._refresh_tokens:
+                config._refresh_tokens[uid_s] = tok_s
+                logger.info(f"📥 Token yenileme: {uid_s} Sheets'ten belleğe yüklendi")
+    except Exception as e:
+        logger.warning(f"⚠️ Sheets kullanıcı yükleme hatası: {e}")
+
+    tokens = dict(config._refresh_tokens)
     if not tokens:
-        logger.info("⏰ Token yenileme: bellekte kullanıcı yok, atlanıyor")
+        logger.info("⏰ Token yenileme: bellekte kullanıcı yok")
         return
 
     logger.info(f"⏰ Access token yenileme başladı ({len(tokens)} kullanıcı)")
     for uid, r_token in tokens.items():
         try:
+            # Sheets'teki expires_at kontrol et; hâlâ geçerliyse atla
+            saved = sheets.get_access_token(uid)
+            if saved and _time.time() < saved.get("expires_at", 0) - 60:
+                logger.info(f"⏭️ Token hâlâ geçerli, atlanıyor: {uid}")
+                continue
+
             def _on_rotate(new_rt, _uid=uid):
                 config._refresh_tokens[_uid] = new_rt
                 try:
@@ -43,11 +64,10 @@ def _refresh_all_access_tokens():
                     pass
 
             client = SpotifyClient(refresh_token=r_token, token_refresh_callback=_on_rotate)
-            # _do_refresh doğrudan çağır → cache'e yazar, session'a dokunmaz
-            client._do_refresh(r_token, uid=uid, in_req=False)
-            logger.info(f"✅ Access token yenilendi: {uid}")
+            client._do_refresh(r_token, uid=uid, in_req=False, sheets_client=sheets)
+            logger.info(f"✅ Access token yenilendi ve Sheets'e yazıldı: {uid}")
         except Exception as e:
-            logger.warning(f"⚠️ Access token yenileme hatası ({uid}): {e}")
+            logger.warning(f"⚠️ Token yenileme hatası ({uid}): {e}")
 
 
 def _start_scheduler():
@@ -74,11 +94,11 @@ def _start_scheduler():
             replace_existing=True,
         )
 
-        # Access token yenileme — 45dk
+        # Access token yenileme — 50dk
         scheduler.add_job(
             _refresh_all_access_tokens,
             "interval",
-            minutes=45,
+            minutes=50,
             id="token_refresh",
             replace_existing=True,
         )
@@ -115,13 +135,13 @@ def _start_fallback_thread():
             time.sleep(900)  # 15 dakika
 
     def token_loop():
-        time.sleep(120)  # ilk yenilemeden önce biraz bekle
+        time.sleep(120)
         while True:
             try:
                 _refresh_all_access_tokens()
             except Exception as ex:
                 logger.error(f"Fallback token yenileme hatası: {ex}")
-            time.sleep(2700)  # 45 dakika
+            time.sleep(3000)  # 50 dakika
 
     t1 = threading.Thread(target=sync_loop,  daemon=True, name="sync-fallback")
     t2 = threading.Thread(target=token_loop, daemon=True, name="token-refresh-fallback")

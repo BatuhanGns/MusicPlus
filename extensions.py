@@ -139,24 +139,24 @@ def sync_job(user_id: str = None, refresh_token: str = None):
         logger.warning(f"⚠️ Sync: {uid} için refresh_token yok, atlanıyor")
         return
 
-    # Token rotasyonu olduğunda bellekteki dict'i anında güncelle
+    # Token rotasyonu olduğunda bellekteki dict'i ve Sheets'i anında güncelle
     def _on_token_refresh(new_token: str):
         config._refresh_tokens[uid] = new_token
         logger.info(f"✅ Yeni refresh token bellekte güncellendi ({uid})")
-        # Sheets'e de yaz (ikincil yedek olarak)
         try:
             sheets.save_refresh_token(uid, new_token)
         except Exception:
-            pass  # Sheets hatası sync'i engellemez
+            pass
 
     # Her kullanıcı için izole edilmiş yeni bir client — global state kirlenmez
     client = SpotifyClient(refresh_token=token, token_refresh_callback=_on_token_refresh)
+    # sheets_client'ı client'a bağla → access token Sheets'e yazılsın
+    client._sheets_client = sheets
 
     logger.info(f"🎵 Sync başladı: {uid}")
     try:
-        # Son kaydedilen played_at zamanını al → Spotify 'after' parametresi için
         after_ms = sheets.get_last_played_at_ms(uid)
-        
+        # sheets_client'ı geç → access token yenilenince Sheets'e yazılır
         tracks = client.get_recently_played(limit=50, after_ms=after_ms)
         
         new_tracks = []
