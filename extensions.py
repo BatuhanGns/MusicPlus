@@ -102,16 +102,16 @@ def _apply_sync_rewards(uid: str, new_tracks: list):
 
 def sync_job(user_id: str = None, refresh_token: str = None):
     """
-    DÜZELTİLDİ:
-    1. Her sync için ayrı SpotifyClient instance'ı oluşturulur.
-       Böylece singleton race condition ortadan kalkar.
-    2. Sheets'teki son played_at zamanı okunarak 'after' parametresiyle
-       sadece yeni şarkılar çekilir — kaçırılan periyotlar telafi edilir.
-    3. Aynı şarkıyı tekrar dinleme artık duplicate sayılmaz (played_at farklı).
+    Her sync için ayrı SpotifyClient instance'ı oluşturulur.
+    Refresh token öncelik sırası:
+      1. Parametre olarak verilen token
+      2. Bellek cache'i (config._refresh_tokens)
+      3. Flask session (request context varsa)
+      4. Sheets (son çare)
+      5. Env değişkeni
     """
     uid = user_id
     if not uid:
-        # Request context varsa session'dan al (manuel sync butonu)
         try:
             uid = get_current_user_id()
         except Exception:
@@ -120,7 +120,21 @@ def sync_job(user_id: str = None, refresh_token: str = None):
         logger.warning("⚠️ Sync: user_id yok, atlanıyor")
         return
 
-    token = refresh_token or config.SPOTIFY_REFRESH_TOKEN
+    # Refresh token'ı doğru sırayla bul
+    token = refresh_token
+    if not token:
+        token = config._refresh_tokens.get(uid)
+    if not token:
+        # Session'dan al (request context varsa)
+        try:
+            from flask import session, has_request_context
+            if has_request_context():
+                token = session.get("refresh_token")
+        except Exception:
+            pass
+    if not token:
+        token = config.SPOTIFY_REFRESH_TOKEN
+
     if not token:
         logger.warning(f"⚠️ Sync: {uid} için refresh_token yok, atlanıyor")
         return
