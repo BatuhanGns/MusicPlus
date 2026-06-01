@@ -13,18 +13,19 @@ logger = logging.getLogger(__name__)
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 API_BASE  = "https://api.spotify.com/v1"
 
+# Access token'ı Flask session yerine bellekte (per-user) tutmak için
+# { user_id: {"access_token": str, "expires_at": float} }
+_access_token_cache: dict = {}
+
 
 class SpotifyClient:
     def __init__(self, refresh_token: str = None, token_refresh_callback=None):
         self.client_id        = os.environ.get("SPOTIFY_CLIENT_ID", "")
         self.client_secret    = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
-        # Eğer dışarıdan token verilmişse onu kullan (per-user sync için)
         self.refresh_token    = refresh_token or os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
         self._access_token    = None
         self._token_expires_at = 0
         self._user_id         = None
-        # Spotify token rotasyonu olduğunda çağrılacak callback (scheduled sync için)
-        # İmza: callback(new_refresh_token: str) -> None
         self._token_refresh_callback = token_refresh_callback
 
     # ------------------------------------------------------------------ #
@@ -99,12 +100,9 @@ class SpotifyClient:
         new_expires = time.time() + d["expires_in"]
         new_refresh = d.get("refresh_token")
 
-        if has_request_context():
-            session["access_token"]    = new_token
-            session["token_expires_at"] = new_expires
-            if new_refresh:
-                session["refresh_token"] = new_refresh
-
+        # Access token'ı SADECE bellekte tut (session değil)
+        # user_id henüz bilinmiyor, geçici olarak instance'a yaz;
+        # callback'te user_id alındıktan sonra cache'e taşınır
         self._access_token     = new_token
         self._token_expires_at = new_expires
         if new_refresh:
@@ -112,28 +110,48 @@ class SpotifyClient:
             logger.info("✅ Yeni refresh token alindi.")
         return True
 
-    def _get_access_token(self):
+    def set_user_id_for_cache(self, user_id: str):
+        """Kullanıcı ID'si öğrenilince access token'ı kalıcı cache'e taşır."""
+        if self._access_token and self._token_expires_at:
+            _access_token_cache[user_id] = {
+                "access_token": self._access_token,
+                "expires_at":   self._token_expires_at,
+            }
+            logger.info(f"✅ Access token bellek cache'ine alindi: {user_id}")
+
+    def _get_access_token(self, user_id: str = None):
         in_req = has_request_context()
 
-        if in_req:
-            access_token = session.get("access_token")
-            expires_at   = session.get("token_expires_at", 0)
-            r_token      = (session.get("refresh_token")
-                            or self.refresh_token
-                            or os.environ.get("SPOTIFY_REFRESH_TOKEN", ""))
-        else:
-            # Background sync — sadece instance'a ait token'ı kullan
-            # (global state kirliliğini önlemek için session'a yazma)
-            access_token = self._access_token
-            expires_at   = self._token_expires_at
-            r_token      = self.refresh_token or os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
+        # Hangi user_id'yi kullanacağız?
+        uid = user_id
+        if not uid and in_req:
+            uid = session.get("user_id")
 
-        if access_token and time.time() < expires_at - 60:
-            return access_token
+        # 1) Bellek cache'inden oku (birincil kaynak)
+        if uid and uid in _access_token_cache:
+            cached = _access_token_cache[uid]
+            if time.time() < cached["expires_at"] - 60:
+                return cached["access_token"]
+
+        # 2) Instance değişkeninden oku (background sync veya henüz cache'e alınmamış)
+        if self._access_token and time.time() < self._token_expires_at - 60:
+            return self._access_token
+
+        # 3) Token yenile
+        # Refresh token kaynağı: instance → session → env
+        r_token = self.refresh_token
+        if not r_token and in_req:
+            r_token = session.get("refresh_token")
+        if not r_token:
+            r_token = os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
 
         if not r_token:
             raise Exception("Oturum bulunamadi. Lutfen giris yapin.")
 
+        return self._do_refresh(r_token, uid, in_req)
+
+    def _do_refresh(self, r_token: str, uid: str = None, in_req: bool = False):
+        """Refresh token ile yeni access token alır, her yere yazar."""
         credentials = base64.b64encode(
             f"{self.client_id}:{self.client_secret}".encode()
         ).decode()
@@ -155,6 +173,9 @@ class SpotifyClient:
                 )
                 if in_req:
                     session.clear()
+                # Cache'den de temizle
+                if uid and uid in _access_token_cache:
+                    del _access_token_cache[uid]
         resp.raise_for_status()
 
         d           = resp.json()
@@ -162,19 +183,25 @@ class SpotifyClient:
         new_expires = time.time() + d["expires_in"]
         new_refresh = d.get("refresh_token", r_token)
 
-        # Her zaman instance'a yaz
+        # Instance'a yaz
         self._access_token     = new_token
         self._token_expires_at = new_expires
         self.refresh_token     = new_refresh
 
-        # Sadece request context varsa session'a da yaz
-        if in_req:
-            session["access_token"]    = new_token
-            session["token_expires_at"] = new_expires
-            session["refresh_token"]   = new_refresh
+        # Bellek cache'ine yaz (user_id varsa)
+        if uid:
+            _access_token_cache[uid] = {
+                "access_token": new_token,
+                "expires_at":   new_expires,
+            }
+            logger.info(f"✅ Access token yenilendi ve cache'e yazildi: {uid}")
 
-        # Spotify yeni bir refresh token döndürdüyse (token rotasyonu):
-        # callback çağır — background sync sırasında Sheets'e aninda kaydeder
+        # Session'a SADECE refresh token değiştiyse refresh_token yaz
+        # Access token'ı session'a YAZMA — bellek cache yeterli
+        if in_req and new_refresh and new_refresh != r_token:
+            session["refresh_token"] = new_refresh
+
+        # Token rotasyonu callback'i
         if new_refresh and new_refresh != r_token:
             logger.info("🔄 Spotify yeni refresh token verdi (token rotasyonu algılandi).")
             if self._token_refresh_callback:
@@ -250,7 +277,6 @@ class SpotifyClient:
             "progress_pct": round(progress_ms / duration_ms * 100, 1) if duration_ms else 0,
         }
 
-    # ── Playback Kontrolü ──────────────────────────────────────────────────
     def play(self):
         return self._req("PUT", "/me/player/play")
 
@@ -263,7 +289,6 @@ class SpotifyClient:
     def previous_track(self):
         return self._req("POST", "/me/player/previous")
 
-    # ── Beğenilen Şarkılar ─────────────────────────────────────────────────
     def get_liked_songs(self, limit=50):
         items = []
         url = f"/me/tracks?limit=50"
@@ -300,18 +325,6 @@ class SpotifyClient:
         return items
 
     def get_recently_played(self, limit=50, after_ms: int = None):
-        """
-        Son dinlenen şarkıları getirir.
-        
-        - limit: max 50 (Spotify API kısıtı)
-        - after_ms: Unix timestamp (ms). Verilirse bu zamandan sonrasını getirir.
-          Bu sayede kaçırılan sync periyotları telafi edilebilir.
-          
-        DÜZELTİLDİ: Aynı şarkı birden fazla dinlenince Spotify aynı track_id
-        ama farklı played_at döndürür — bunlar artık doğru işleniyor.
-        Milisaniye hassasiyeti saniyeye yuvarlanarak normalize edildi
-        (Spotify bazen .000Z, bazen .123Z döndürür; aynı dinlemeyi kaçırmamak için).
-        """
         params = {"limit": min(limit, 50)}
         if after_ms:
             params["after"] = after_ms
@@ -324,8 +337,6 @@ class SpotifyClient:
                 continue
             
             raw_played_at = item["played_at"]
-            # Normalize: milisaniyeyi sıfırla → "2025-05-28T14:23:45.000Z"
-            # Bu sayede Spotify'ın .123Z / .000Z tutarsızlığı duplicate'e yol açmaz
             try:
                 from datetime import datetime, timezone
                 dt = datetime.strptime(raw_played_at, "%Y-%m-%dT%H:%M:%S.%fZ").replace(
@@ -481,9 +492,7 @@ class SpotifyClient:
         liked = set()
         for i in range(0, len(track_ids), 40):
             chunk = track_ids[i:i + 40]
-            uris  = ",".join(f"spotify:track:{tid}" for tid in chunk)
             try:
-                # GET /me/library/contains — uris query param, virgülle ayrılmış, max 40
                 uris = [f"spotify:track:{tid}" for tid in chunk]
                 data = self._req("GET", "/me/library/contains",
                                  params={"uris": ",".join(uris)})
@@ -498,7 +507,6 @@ class SpotifyClient:
     def like_all_tracks_in_playlist(self, playlist_id):
         tracks = self._get_playlist_tracks(playlist_id)
         uris   = [f"spotify:track:{t['id']}" for t in tracks if t.get("id")]
-        # PUT /me/library — uris query param olarak, virgülle ayrılmış, max 40
         for i in range(0, len(uris), 40):
             chunk = ",".join(uris[i:i + 40])
             self._req("PUT", "/me/library", params={"uris": chunk})
@@ -507,7 +515,6 @@ class SpotifyClient:
     def unlike_all_tracks_in_playlist(self, playlist_id):
         tracks = self._get_playlist_tracks(playlist_id)
         uris   = [f"spotify:track:{t['id']}" for t in tracks if t.get("id")]
-        # DELETE /me/library — uris query param olarak, virgülle ayrılmış, max 40
         for i in range(0, len(uris), 40):
             chunk = ",".join(uris[i:i + 40])
             self._req("DELETE", "/me/library", params={"uris": chunk})
@@ -538,7 +545,6 @@ class SpotifyClient:
             for a in t.get("artists", [])
             if a.get("id")
         })
-        # PUT /me/library — sanatçı URI'ları, query param, max 40
         uris = [f"spotify:artist:{aid}" for aid in artist_ids]
         for i in range(0, len(uris), 40):
             chunk = ",".join(uris[i:i + 40])
@@ -553,7 +559,6 @@ class SpotifyClient:
             for a in t.get("artists", [])
             if a.get("id")
         })
-        # DELETE /me/library — sanatçı URI'ları, query param, max 40
         uris = [f"spotify:artist:{aid}" for aid in artist_ids]
         for i in range(0, len(uris), 40):
             chunk = ",".join(uris[i:i + 40])
