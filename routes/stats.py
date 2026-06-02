@@ -158,3 +158,96 @@ def api_gamification():
     except Exception as e:
         logger.error(f"Gamification API hatasi: {e}")
         return jsonify({"error": str(e)}), 500
+
+@bp.route("/api/genres")
+def api_genres():
+    """
+    Kullanıcının dinleme geçmişindeki sanatçıların türlerini döndürür.
+    Önce GenreCache sayfasına bakar; eksik sanatçılar için Spotify API'sine gider.
+    aralik parametresi desteklenir → filtered artist listesi.
+    Döndürür: {top_genres: [{genre, count}, ...], artist_genre_map: {artist: [genres]}}
+    """
+    try:
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify({"error": "Giriş yapılmamış"}), 401
+
+        headers, rows = get_cached_data(uid)
+        if not rows:
+            load_user_data(uid)
+            headers, rows = get_cached_data(uid)
+
+        aralik    = request.args.get("aralik", "buyil")
+        baslangic = request.args.get("baslangic", None)
+        bitis     = request.args.get("bitis", None)
+        filtered  = _filter_rows_by_aralik(headers, rows, aralik, baslangic, bitis)
+
+        # Filtrelenmiş veri içindeki sanatçı adı → ID eşleşmesini topla
+        try:
+            idx_sanatci = headers.index("Sanatçı")
+            idx_aid     = headers.index("Sanatçı ID")
+        except ValueError:
+            return jsonify({"error": "Sanatçı ID sütunu bulunamadı. Lütfen yeni bir sync yapın."}), 400
+
+        # Satırdan sanatçı adı+ID çek
+        artist_id_map = {}   # artist_name → artist_id
+        artist_count  = {}   # artist_name → dinlenme sayısı (filtrelenmiş)
+        for row in filtered:
+            if len(row) <= max(idx_sanatci, idx_aid):
+                continue
+            raw_name = row[idx_sanatci].strip()
+            raw_id   = row[idx_aid].strip() if len(row) > idx_aid else ""
+            if not raw_name:
+                continue
+            # "Sanatçı A, Sanatçı B" formatındaki işbirliklerini ayır
+            for name in [n.strip() for n in raw_name.split(",") if n.strip()]:
+                artist_count[name] = artist_count.get(name, 0) + 1
+                if name not in artist_id_map and raw_id:
+                    # İlk sanatçının ID'si (çoğu durumda doğru)
+                    parts = [p.strip() for p in raw_id.split(",") if p.strip()]
+                    artist_id_map[name] = parts[0] if parts else ""
+
+        if not artist_count:
+            return jsonify({"top_genres": [], "artist_genre_map": {}})
+
+        # GenreCache'ten mevcut genre'leri oku
+        cached_genres = sheets.get_cached_genres()   # {artist_id: [genres]}
+
+        # Hangi artist_id'ler eksik?
+        all_artist_ids = list({aid for aid in artist_id_map.values() if aid})
+        missing_ids    = [aid for aid in all_artist_ids if aid not in cached_genres]
+
+        # Eksikleri Spotify API'den çek
+        if missing_ids:
+            from extensions import spotify as sp_client
+            new_genres = sp_client.get_artists_genres(missing_ids)
+            if new_genres:
+                sheets.save_genres_batch(new_genres)
+                cached_genres.update(new_genres)
+
+        # artist_name → genres eşleşmesi yap
+        artist_genre_map = {}
+        genre_weighted   = {}   # genre → toplam dinlenme sayısı
+
+        for artist_name, count in artist_count.items():
+            aid    = artist_id_map.get(artist_name, "")
+            genres = cached_genres.get(aid, []) if aid else []
+            artist_genre_map[artist_name] = genres
+            for g in genres:
+                genre_weighted[g] = genre_weighted.get(g, 0) + count
+
+        top_genres = sorted(
+            [{"genre": g, "count": c} for g, c in genre_weighted.items()],
+            key=lambda x: -x["count"]
+        )[:30]
+
+        return jsonify({
+            "top_genres":       top_genres,
+            "artist_genre_map": artist_genre_map,
+            "aralik":           aralik,
+        })
+
+    except Exception as e:
+        logger.error(f"Genres API hatasi: {e}")
+        return jsonify({"error": str(e)}), 500
+
