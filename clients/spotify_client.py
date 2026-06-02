@@ -370,11 +370,14 @@ class SpotifyClient:
             except Exception:
                 normalized_played_at = raw_played_at
 
+            artists     = track.get("artists", [])
+            artist_ids  = [a["id"] for a in artists if a.get("id")]
             tracks.append({
                 "played_at":    normalized_played_at,
                 "track_id":     track.get("id", ""),
                 "track_name":   track.get("name", ""),
-                "artist_name":  ", ".join(a["name"] for a in track.get("artists", [])),
+                "artist_name":  ", ".join(a["name"] for a in artists),
+                "artist_ids":   ",".join(artist_ids),
                 "album_name":   track.get("album", {}).get("name", ""),
                 "duration_ms":  track.get("duration_ms", 0),
                 "duration_sec": round(track.get("duration_ms", 0) / 1000),
@@ -553,3 +556,29 @@ class SpotifyClient:
         for i in range(0, len(uris), 40):
             self._req("DELETE", "/me/library", params={"uris": ",".join(uris[i:i + 40])})
         return len(artist_ids)
+
+    def get_artists_genres(self, artist_ids: list) -> dict:
+        """
+        Verilen Spotify artist ID'leri için türleri döndürür.
+        GET /v1/artists?ids=... — max 50 ID/istek
+        Döndürür: {artist_id: [genre, ...], ...}
+        Boş genres array dönen sanatçılar için [] tutulur.
+        """
+        result = {}
+        # 50'li batch'ler halinde iste
+        for i in range(0, len(artist_ids), 50):
+            chunk = artist_ids[i:i + 50]
+            if not chunk:
+                continue
+            try:
+                data = self._req("GET", "/artists", params={"ids": ",".join(chunk)})
+                for artist in data.get("artists") or []:
+                    if not artist:
+                        continue
+                    aid = artist.get("id")
+                    if aid:
+                        result[aid] = artist.get("genres", [])
+            except Exception as e:
+                logger.warning(f"get_artists_genres batch hatasi (offset={i}): {e}")
+        return result
+

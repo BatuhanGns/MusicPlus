@@ -15,7 +15,7 @@ SCOPES = [
 
 HAM_HEADERS = [
     "Dinlenme Tarihi", "Şarkı ID", "Şarkı Adı", "Sanatçı",
-    "Albüm", "Süre (ms)", "Süre (sn)", "_played_at_iso"
+    "Sanatçı ID", "Albüm", "Süre (ms)", "Süre (sn)", "_played_at_iso"
 ]
 
 TR_AYLAR = {
@@ -401,7 +401,7 @@ class SheetsClient:
         ws = self._find_sheet(user_id)
         if not ws:
             return set()
-        col = ws.col_values(8)  # _played_at_iso sütunu
+        col = ws.col_values(9)  # _played_at_iso sütunu (9. sütun: Sanatçı ID eklendi)
         return set(col[1:])
 
     def append_tracks(self, user_id: str, tracks: list):
@@ -421,6 +421,7 @@ class SheetsClient:
                     t["track_id"],
                     t["track_name"],
                     t["artist_name"],
+                    t.get("artist_ids", ""),
                     t["album_name"],
                     t["duration_ms"],
                     t["duration_sec"],
@@ -453,7 +454,7 @@ class SheetsClient:
         if not ws:
             return None
         try:
-            col = ws.col_values(8)  # _played_at_iso sütunu
+            col = ws.col_values(9)  # _played_at_iso sütunu (9. sütun: Sanatçı ID eklendi)
             values = [v.strip() for v in col[1:] if v.strip() and v.strip() != "—"]
             if not values:
                 return None
@@ -481,3 +482,78 @@ class SheetsClient:
             _, rows = self.get_user_data(uid)
             all_rows.extend(rows)
         return HAM_HEADERS, all_rows
+
+    # ─── GenreCache sayfası ──────────────────────────────────────────────────────
+    # Yapı: artist_id | genres_json
+    # Her artist_id için Spotify'dan çekilen türleri saklar.
+    # Yoksa yeniden API çağrısı yapılmaz — rate limit koruması.
+
+    def _ensure_genre_cache_sheet(self):
+        if not self.sh:
+            return None
+        ws = self._find_sheet("GenreCache")
+        if not ws:
+            ws = self.sh.add_worksheet(title="GenreCache", rows=5000, cols=2)
+            ws.append_row(["artist_id", "genres_json"], value_input_option="RAW")
+            logger.info("✅ GenreCache sayfası oluşturuldu.")
+        return ws
+
+    def get_cached_genres(self) -> dict:
+        """GenreCache sayfasındaki tüm sanatçı→genre eşleşmelerini döndürür.
+        Döndürür: {artist_id: [genre, ...]}
+        """
+        ws = self._find_sheet("GenreCache")
+        if not ws:
+            return {}
+        rows = ws.get_all_values()
+        cache = {}
+        for row in rows[1:]:  # başlık satırını atla
+            if len(row) >= 2 and row[0].strip():
+                try:
+                    cache[row[0].strip()] = json.loads(row[1]) if row[1].strip() else []
+                except Exception:
+                    cache[row[0].strip()] = []
+        return cache
+
+    def save_genres_batch(self, genre_map: dict):
+        """Yeni artist_id→genres eşleşmelerini GenreCache sayfasına ekler.
+        genre_map: {artist_id: [genre, ...]}
+        Zaten var olan artist_id'ler güncellenmez (append-only, hız için).
+        """
+        if not genre_map:
+            return
+        ws = self._ensure_genre_cache_sheet()
+        if not ws:
+            return
+        new_rows = [[aid, json.dumps(genres, ensure_ascii=False)] for aid, genres in genre_map.items()]
+        if new_rows:
+            ws.append_rows(new_rows, value_input_option="RAW")
+            logger.info(f"✅ GenreCache: {len(new_rows)} sanatçı yazıldı.")
+
+    def get_artist_ids_from_user_sheet(self, user_id: str) -> dict:
+        """Kullanıcı sayfasından Sanatçı → Sanatçı ID eşleşmelerini çeker.
+        Sanatçı ID'si olmayan eski kayıtlar için boş string döner.
+        Döndürür: {artist_name: artist_id_or_empty}
+        """
+        ws = self._find_sheet(user_id)
+        if not ws:
+            return {}
+        all_values = ws.get_all_values()
+        if len(all_values) < 2:
+            return {}
+        headers = all_values[0]
+        try:
+            idx_sanatci = headers.index("Sanatçı")
+            idx_id      = headers.index("Sanatçı ID")
+        except ValueError:
+            return {}
+        result = {}
+        for row in all_values[1:]:
+            if len(row) <= max(idx_sanatci, idx_id):
+                continue
+            name = row[idx_sanatci].strip()
+            aid  = row[idx_id].strip() if row[idx_id].strip() else ""
+            if name and name not in result:
+                result[name] = aid
+        return result
+
