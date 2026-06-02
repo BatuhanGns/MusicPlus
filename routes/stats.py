@@ -19,11 +19,12 @@ logger = logging.getLogger(__name__)
 bp = Blueprint("stats", __name__)
 
 
-def _filter_rows_by_aralik(headers, rows, aralik):
+def _filter_rows_by_aralik(headers, rows, aralik, baslangic=None, bitis=None):
     """
     Satırları seçilen zaman aralığına göre filtreler.
-    aralik: '1hafta' | '1ay' | '1yil' | 'tumzamanlar'
+    aralik: 'buhafta' | 'buay' | 'buyil' | 'ozel' | 'tumzamanlar'
     Filtreleme _played_at_iso sütununa göre yapılır.
+    ozel modunda baslangic ve bitis (YYYY-MM-DD) parametreleri kullanılır.
     """
     if aralik == "tumzamanlar" or not aralik:
         return rows
@@ -34,23 +35,42 @@ def _filter_rows_by_aralik(headers, rows, aralik):
         return rows  # Sütun yoksa filtresiz dön
 
     now = datetime.now(timezone.utc)
-    if aralik == "1hafta":
-        since = now - timedelta(weeks=1)
-    elif aralik == "1ay":
-        since = now - timedelta(days=30)
-    elif aralik == "1yil":
-        since = now - timedelta(days=365)
+
+    if aralik == "buhafta":
+        # Pazartesi başlangıcı (haftanın ilk günü)
+        days_since_monday = now.weekday()  # 0=Pazartesi
+        since = (now - timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
+        until = None
+    elif aralik == "buay":
+        # Bu ayın 1'i
+        since = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        until = None
+    elif aralik == "buyil":
+        # Bu yılın 1 Ocak'ı
+        since = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        until = None
+    elif aralik == "ozel" and baslangic:
+        try:
+            since = datetime.strptime(baslangic, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            until = (datetime.strptime(bitis, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                     + timedelta(days=1)) if bitis else None
+        except Exception:
+            return rows
     else:
         return rows
 
     since_str = since.strftime("%Y-%m-%dT%H:%M")
+    until_str = until.strftime("%Y-%m-%dT%H:%M") if until else None
 
     filtered = []
     for row in rows:
         if len(row) <= idx_iso:
             continue
         iso = row[idx_iso].strip()
-        if iso and iso != "—" and iso[:16] >= since_str:
+        if not iso or iso == "—":
+            continue
+        iso16 = iso[:16]
+        if iso16 >= since_str and (until_str is None or iso16 < until_str):
             filtered.append(row)
 
     return filtered
@@ -68,8 +88,10 @@ def api_dashboard():
             load_user_data(uid)
             headers, rows = get_cached_data(uid)
 
-        aralik        = request.args.get("aralik", "tumzamanlar")
-        filtered_rows = _filter_rows_by_aralik(headers, rows, aralik)
+        aralik     = request.args.get("aralik", "buyil")
+        baslangic  = request.args.get("baslangic", None)
+        bitis      = request.args.get("bitis", None)
+        filtered_rows = _filter_rows_by_aralik(headers, rows, aralik, baslangic, bitis)
 
         stats = compute_stats(headers, filtered_rows)
         if not stats:

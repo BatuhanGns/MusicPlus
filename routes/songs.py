@@ -394,6 +394,13 @@ def api_tum_sanatcilar():
         if not rows:
             return jsonify({"error": "Veri yok"})
 
+        # Aralik filtresi uygula
+        aralik    = request.args.get("aralik", "buyil")
+        baslangic = request.args.get("baslangic", None)
+        bitis     = request.args.get("bitis", None)
+        from routes.stats import _filter_rows_by_aralik
+        rows = _filter_rows_by_aralik(headers, rows, aralik, baslangic, bitis)
+
         idx_sanatci = headers.index("Sanatçı")
         idx_sure = headers.index("Süre (sn)")
 
