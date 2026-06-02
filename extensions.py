@@ -169,6 +169,7 @@ def sync_job(user_id: str = None, refresh_token: str = None):
             
         sheets.update_last_sync(uid)
         config._last_sync = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M") + " UTC"
+        # Her sync sonrası cache'i her zaman sıfırla → arayüz taze veri görir
         load_user_data(uid)
 
         if new_tracks:
