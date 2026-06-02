@@ -36,6 +36,7 @@ class SpotifyClient:
         scopes = " ".join([
             "user-read-recently-played",
             "user-read-currently-playing",
+            "user-modify-playback-state",
             "playlist-read-private",
             "playlist-modify-public",
             "playlist-modify-private",
