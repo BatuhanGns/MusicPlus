@@ -1004,14 +1004,15 @@
       <!-- ARALIK SEÇİCİ -->
       <div class="aralik-wrap" id="aralilkWrap">
         <button class="aralik-btn" id="aralilkBtn" onclick="toggleAralikMenu(event)">
-          <span id="aralilkLabel">Tüm Zamanlar</span>
+          <span id="aralilkLabel">Bu Yıl</span>
           <span class="aralik-arrow">▼</span>
         </button>
         <div class="aralik-dropdown" id="aralilkDropdown">
-          <div class="aralik-option" data-val="1hafta"  onclick="setAralik('1hafta','1 Hafta',this)">1 Hafta</div>
-          <div class="aralik-option" data-val="1ay"     onclick="setAralik('1ay','1 Ay',this)">1 Ay</div>
-          <div class="aralik-option" data-val="1yil"    onclick="setAralik('1yil','1 Yıl',this)">1 Yıl</div>
-          <div class="aralik-option active" data-val="tumzamanlar" onclick="setAralik('tumzamanlar','Tüm Zamanlar',this)">Tüm Zamanlar</div>
+          <div class="aralik-option" data-val="buhafta"     onclick="setAralik('buhafta','Bu Hafta',this)">Bu Hafta</div>
+          <div class="aralik-option" data-val="buay"        onclick="setAralik('buay','Bu Ay',this)">Bu Ay</div>
+          <div class="aralik-option active" data-val="buyil" onclick="setAralik('buyil','Bu Yıl',this)">Bu Yıl</div>
+          <div class="aralik-option" data-val="ozel"        onclick="setAralik('ozel','Özel Aralık',this)">Özel Aralık</div>
+          <div class="aralik-option" data-val="tumzamanlar" onclick="setAralik('tumzamanlar','Tüm Zamanlar',this)">Tüm Zamanlar</div>
         </div>
       </div>
       <button onclick="manualSync()" id="syncBtn" title="Şimdi Sync Yap" class="hamburger-btn">⟳</button>
@@ -1642,7 +1643,9 @@ function toggleMenu() {
 }
 
 // ===================== ARALIK SEÇİCİ =====================
-let _currentAralik = 'tumzamanlar';
+let _currentAralik = 'buyil';
+let _ozelBaslangic = null;
+let _ozelBitis = null;
 
 function toggleAralikMenu(e) {
   e.stopPropagation();
@@ -1653,7 +1656,17 @@ function toggleAralikMenu(e) {
 }
 
 function setAralik(val, label, el) {
+  // Özel aralık seçildiyse date picker aç, seçimi bekle
+  if (val === 'ozel') {
+    document.getElementById('aralilkBtn').classList.remove('open');
+    document.getElementById('aralilkDropdown').classList.remove('open');
+    openOzelAralik();
+    return;
+  }
+
   _currentAralik = val;
+  _ozelBaslangic = null;
+  _ozelBitis = null;
   document.getElementById('aralilkLabel').textContent = label;
   document.getElementById('aralilkBtn').classList.remove('open');
   document.getElementById('aralilkDropdown').classList.remove('open');
@@ -1661,6 +1674,44 @@ function setAralik(val, label, el) {
   el.classList.add('active');
 
   // Aralik değişince sadece istatistikler ve topluluk sayfaları için yeniden yükle
+  const activeView = document.querySelector('.view-section.active');
+  if (!activeView) return;
+  const vid = activeView.id.replace('view-', '');
+  if (vid === 'istatistikler') reloadStats();
+  if (vid === 'topluluk') loadTopluluk(_currentAralik);
+}
+
+function openOzelAralik() {
+  document.getElementById('ozelAralikModal').style.display = 'flex';
+  // Varsayılan: bu yılın başı - bugün
+  const today = new Date().toISOString().slice(0, 10);
+  const yearStart = new Date().getFullYear() + '-01-01';
+  const bas = document.getElementById('ozelBaslangic');
+  const bit = document.getElementById('ozelBitis');
+  if (!bas.value) bas.value = yearStart;
+  if (!bit.value) bit.value = today;
+}
+
+function closeOzelAralik() {
+  document.getElementById('ozelAralikModal').style.display = 'none';
+}
+
+function applyOzelAralik() {
+  const bas = document.getElementById('ozelBaslangic').value;
+  const bit = document.getElementById('ozelBitis').value;
+  if (!bas || !bit) { alert('Lütfen başlangıç ve bitiş tarihini seçin.'); return; }
+  if (bas > bit) { alert('Başlangıç tarihi bitiş tarihinden sonra olamaz.'); return; }
+
+  _currentAralik = 'ozel';
+  _ozelBaslangic = bas;
+  _ozelBitis = bit;
+
+  const label = bas.slice(0,10) + ' → ' + bit.slice(0,10);
+  document.getElementById('aralilkLabel').textContent = label;
+  document.querySelectorAll('.aralik-option').forEach(o => o.classList.remove('active'));
+  document.querySelector('.aralik-option[data-val="ozel"]')?.classList.add('active');
+  closeOzelAralik();
+
   const activeView = document.querySelector('.view-section.active');
   if (!activeView) return;
   const vid = activeView.id.replace('view-', '');
@@ -1810,7 +1861,7 @@ let _toplulukLoaded = false;
 let _toplulukAralik = null;
 
 async function loadTopluluk(aralik) {
-  const a = aralik || _currentAralik || 'tumzamanlar';
+  const a = aralik || _currentAralik || 'buyil';
   // Aralik değişmişse cache'i sıfırla
   if (a !== _toplulukAralik) {
     _toplulukLoaded = false;
@@ -1821,7 +1872,11 @@ async function loadTopluluk(aralik) {
   content.innerHTML = '<div class="loading">Topluluk verileri yükleniyor...</div>';
 
   try {
-    const res  = await fetch('/api/istatistikler?aralik=' + a);
+    let toplulukUrl = '/api/istatistikler?aralik=' + a;
+    if (a === 'ozel' && _ozelBaslangic && _ozelBitis) {
+      toplulukUrl += '&baslangic=' + _ozelBaslangic + '&bitis=' + _ozelBitis;
+    }
+    const res  = await fetch(toplulukUrl);
     const data = await res.json();
 
     if (data.error === 'Henüz kimse izin vermemiş') {
@@ -2568,8 +2623,12 @@ function _normalizeArtistData(rawList) {
 }
 
 async function fetchData(aralik) {
-  const param = aralik || _currentAralik || 'tumzamanlar';
-  const res = await fetch('/api/dashboard?aralik=' + param);
+  const param = aralik || _currentAralik || 'buyil';
+  let url = '/api/dashboard?aralik=' + param;
+  if (param === 'ozel' && _ozelBaslangic && _ozelBitis) {
+    url += '&baslangic=' + _ozelBaslangic + '&bitis=' + _ozelBitis;
+  }
+  const res = await fetch(url);
   return res.ok ? res.json() : null;
 }
 
@@ -2761,7 +2820,11 @@ async function openTumSanatcilarModal() {
   document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
   openModal();
 
-  const res  = await fetch('/api/tum-sanatcilar');
+  let tsUrl = '/api/tum-sanatcilar?aralik=' + (_currentAralik || 'buyil');
+  if (_currentAralik === 'ozel' && _ozelBaslangic && _ozelBitis) {
+    tsUrl += '&baslangic=' + _ozelBaslangic + '&bitis=' + _ozelBitis;
+  }
+  const res  = await fetch(tsUrl);
   const data = await res.json();
   const max  = data.sanatcilar[0]?.count || 1;
 
@@ -3109,7 +3172,7 @@ async function init() {
   const aralilkWrap = document.getElementById('aralilkWrap');
   if (aralilkWrap) aralilkWrap.style.display = 'inline-block';
 
-  const data = await fetchData('tumzamanlar');
+  const data = await fetchData('buyil');
   if (!data) return;
   renderStats(data);
   renderWeek(data.hafta);
@@ -4977,5 +5040,32 @@ async function doAutoFusion() {
 }
 </script>
 
+
+<!-- ÖZEL ARALIK DATE PICKER MODALI -->
+<div id="ozelAralikModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border);padding:32px;min-width:320px;font-family:'DM Mono',monospace;">
+    <div style="font-size:13px;color:var(--text);margin-bottom:20px;letter-spacing:.5px;">📅 Özel Aralık Seç</div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Başlangıç</div>
+      <input type="date" id="ozelBaslangic"
+             style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;font-family:'DM Mono',monospace;font-size:12px;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:24px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Bitiş</div>
+      <input type="date" id="ozelBitis"
+             style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;font-family:'DM Mono',monospace;font-size:12px;box-sizing:border-box;">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeOzelAralik()"
+              style="background:transparent;border:1px solid var(--border);color:var(--muted);padding:8px 18px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;">
+        İptal
+      </button>
+      <button onclick="applyOzelAralik()"
+              style="background:var(--green);border:none;color:#000;padding:8px 18px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;font-weight:700;">
+        Uygula
+      </button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
