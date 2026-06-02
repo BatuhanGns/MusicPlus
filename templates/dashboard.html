@@ -2653,7 +2653,8 @@ async function fetchData(aralik) {
 }
 
 // ===================== GENRE WIDGET =====================
-let _genreCache = null;  // {aralik_key: data}
+let _genreCache   = null;  // {aralik_key: data}
+let _lastGenreMap = {};   // son yüklenen artist→genre map
 
 async function loadGenres(aralik) {
   const a = aralik || _currentAralik || 'buyil';
@@ -2680,7 +2681,7 @@ async function loadGenres(aralik) {
 
     const genres = data.top_genres || [];
     if (!genres.length) {
-      wrap.innerHTML = '<div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;padding:8px 0;">Bu aralıkta tür verisi bulunamadı.</div>';
+      wrap.innerHTML = `<div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;padding:8px 0;">Bu aralıkta tür verisi bulunamadı.</div>`;
       if (hint) hint.textContent = '';
       return;
     }
@@ -2689,21 +2690,30 @@ async function loadGenres(aralik) {
     const top15 = genres.slice(0, 15);
     if (hint) hint.textContent = `${genres.length} tür bulundu`;
 
-    wrap.innerHTML = top15.map(g => `
-      <div class="genre-row" onclick="openGenreModal('${g.genre.replace(/'/g,"\'")}', ${JSON.stringify(data.artist_genre_map || {})})">
-        <span class="genre-label" title="${g.genre}">${g.genre}</span>
+    // genre map'i global değişkende tut, onclick'e gömmekten kaçın
+    _lastGenreMap = data.artist_genre_map || {};
+    wrap.innerHTML = top15.map(g => {
+      const escaped = g.genre.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+      return `<div class="genre-row" data-genre="${escaped}">
+        <span class="genre-label" title="${escaped}">${g.genre}</span>
         <div class="genre-bar-wrap"><div class="genre-bar-fill" style="width:${Math.round(g.count/max*100)}%"></div></div>
         <span class="genre-count">${g.count}</span>
-      </div>`).join('');
+      </div>`;
+    }).join('');
+    // Event delegation — escape problemi yok
+    wrap.querySelectorAll('.genre-row').forEach(el => {
+      el.addEventListener('click', () => openGenreModal(el.dataset.genre));
+    });
 
   } catch(e) {
-    wrap.innerHTML = '<div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;">Tür verisi yüklenemedi.</div>';
+    wrap.innerHTML = `<div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;">Tür verisi yüklenemedi.</div>`;
     if (hint) hint.textContent = '';
   }
 }
 
-async function openGenreModal(genre, artistGenreMap) {
-  // Bu türe sahip sanatçıları listele
+async function openGenreModal(genre) {
+  // Bu türe sahip sanatçıları listele — _lastGenreMap global değişkeninden al
+  const artistGenreMap = _lastGenreMap || {};
   const artists = Object.entries(artistGenreMap)
     .filter(([_, genres]) => genres.includes(genre))
     .sort((a, b) => b[1].length - a[1].length);  // daha fazla türü olan önce
