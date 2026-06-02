@@ -1014,6 +1014,7 @@
           <div class="aralik-option active" data-val="tumzamanlar" onclick="setAralik('tumzamanlar','Tüm Zamanlar',this)">Tüm Zamanlar</div>
         </div>
       </div>
+      <button onclick="manualSync()" id="syncBtn" title="Şimdi Sync Yap" class="hamburger-btn">⟳</button>
       <button onclick="downloadPNG()" id="dlBtn" title="Görüntüyü İndir" class="hamburger-btn">↓</button>
       <button onclick="toggleMenu()" class="hamburger-btn">☰</button>
     </div>
@@ -2570,6 +2571,34 @@ async function fetchData(aralik) {
   const param = aralik || _currentAralik || 'tumzamanlar';
   const res = await fetch('/api/dashboard?aralik=' + param);
   return res.ok ? res.json() : null;
+}
+
+async function manualSync() {
+  const btn = document.getElementById('syncBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.textContent = '⟳';
+  }
+  document.getElementById('syncInfo').innerHTML = '<span class="dot"></span> Sync yapılıyor...';
+  try {
+    const res = await fetch('/api/sync', { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      // Cache sunucuda temizlendi, şimdi UI'ı yenile
+      await reloadStats();
+    } else {
+      document.getElementById('syncInfo').innerHTML = '<span class="dot" style="background:red"></span> Sync hatası';
+    }
+  } catch(e) {
+    document.getElementById('syncInfo').innerHTML = '<span class="dot" style="background:red"></span> Bağlantı hatası';
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.textContent = '⟳';
+    }
+  }
 }
 
 async function reloadStats() {
