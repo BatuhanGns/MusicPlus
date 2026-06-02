@@ -88,11 +88,14 @@ def export_csv():
     )
 
 
-@bp.route("/api/sync")
-@bp.route("/sync")
+@bp.route("/api/sync", methods=["GET", "POST"])
+@bp.route("/sync", methods=["GET", "POST"])
 def manual_sync():
-    sync_job()
-    return jsonify({"status": "ok", "message": "Manuel sync tamamlandı", "son_sync": config._last_sync})
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"status": "error", "message": "Giriş yapılmamış"}), 401
+    sync_job(uid)
+    return jsonify({"status": "ok", "message": "Manuel sync tamamlandı", "son_sync": config._last_sync, "refreshed": True})
 
 
 @bp.route("/api/health")
