@@ -80,6 +80,15 @@
   .stat-card .label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
   .stat-card .value{font-family:'Syne',sans-serif;font-size:clamp(22px,3vw,32px);font-weight:800;color:var(--green);line-height:1;}
   .stat-card .sub{font-size:11px;color:var(--muted);margin-top:6px;}
+  /* Genre widget */
+  .genre-section{margin-top:0;}
+  .genre-chart-wrap{display:flex;flex-direction:column;gap:6px;}
+  .genre-row{display:flex;align-items:center;gap:10px;cursor:pointer;padding:4px 0;}
+  .genre-row:hover .genre-label{color:var(--text);}
+  .genre-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);width:160px;min-width:100px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .15s;}
+  .genre-bar-wrap{flex:1;height:6px;background:var(--surface2);border-radius:0;}
+  .genre-bar-fill{height:100%;background:var(--green);border-radius:0;transition:width .4s ease;}
+  .genre-count{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);width:32px;text-align:right;flex-shrink:0;}
 
   .section{margin-bottom:40px;}
   .section-title{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:12px;}
@@ -1065,6 +1074,17 @@
       <div class="stat-card"><div class="label">Toplam Süre</div><div class="value" id="statHours">—</div><div class="sub">saat</div></div>
     </div>
 
+    <!-- GENRE SECTION -->
+    <div class="section genre-section" id="genreSection">
+      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>🎸 Tür Dağılımı</span>
+        <span id="genreLoadingHint" style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;">Yükleniyor...</span>
+      </div>
+      <div class="genre-chart-wrap" id="genreChartWrap">
+        <div class="loading">Yükleniyor...</div>
+      </div>
+    </div>
+
     <div class="section">
       <div class="section-title">Son 7 Gün</div>
       <div class="week-grid" id="weekGrid"><div class="loading">Yükleniyor...</div></div>
@@ -1677,7 +1697,7 @@ function setAralik(val, label, el) {
   const activeView = document.querySelector('.view-section.active');
   if (!activeView) return;
   const vid = activeView.id.replace('view-', '');
-  if (vid === 'istatistikler') reloadStats();
+  if (vid === 'istatistikler') { reloadStats(); loadGenres(_currentAralik); }
   if (vid === 'topluluk') loadTopluluk(_currentAralik);
 }
 
@@ -1715,7 +1735,7 @@ function applyOzelAralik() {
   const activeView = document.querySelector('.view-section.active');
   if (!activeView) return;
   const vid = activeView.id.replace('view-', '');
-  if (vid === 'istatistikler') reloadStats();
+  if (vid === 'istatistikler') { reloadStats(); loadGenres(_currentAralik); }
   if (vid === 'topluluk') loadTopluluk(_currentAralik);
 }
 
@@ -2632,6 +2652,75 @@ async function fetchData(aralik) {
   return res.ok ? res.json() : null;
 }
 
+// ===================== GENRE WIDGET =====================
+let _genreCache = null;  // {aralik_key: data}
+
+async function loadGenres(aralik) {
+  const a = aralik || _currentAralik || 'buyil';
+  const wrap    = document.getElementById('genreChartWrap');
+  const hint    = document.getElementById('genreLoadingHint');
+  if (!wrap) return;
+
+  wrap.innerHTML = '<div class="loading">Türler yükleniyor...</div>';
+  if (hint) hint.textContent = 'Yükleniyor...';
+
+  try {
+    let url = '/api/genres?aralik=' + a;
+    if (a === 'ozel' && _ozelBaslangic && _ozelBitis) {
+      url += '&baslangic=' + _ozelBaslangic + '&bitis=' + _ozelBitis;
+    }
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if (data.error) {
+      wrap.innerHTML = `<div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;padding:8px 0;">${data.error}</div>`;
+      if (hint) hint.textContent = '';
+      return;
+    }
+
+    const genres = data.top_genres || [];
+    if (!genres.length) {
+      wrap.innerHTML = '<div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;padding:8px 0;">Bu aralıkta tür verisi bulunamadı.</div>';
+      if (hint) hint.textContent = '';
+      return;
+    }
+
+    const max   = genres[0].count || 1;
+    const top15 = genres.slice(0, 15);
+    if (hint) hint.textContent = `${genres.length} tür bulundu`;
+
+    wrap.innerHTML = top15.map(g => `
+      <div class="genre-row" onclick="openGenreModal('${g.genre.replace(/'/g,"\'")}', ${JSON.stringify(data.artist_genre_map || {})})">
+        <span class="genre-label" title="${g.genre}">${g.genre}</span>
+        <div class="genre-bar-wrap"><div class="genre-bar-fill" style="width:${Math.round(g.count/max*100)}%"></div></div>
+        <span class="genre-count">${g.count}</span>
+      </div>`).join('');
+
+  } catch(e) {
+    wrap.innerHTML = '<div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;">Tür verisi yüklenemedi.</div>';
+    if (hint) hint.textContent = '';
+  }
+}
+
+async function openGenreModal(genre, artistGenreMap) {
+  // Bu türe sahip sanatçıları listele
+  const artists = Object.entries(artistGenreMap)
+    .filter(([_, genres]) => genres.includes(genre))
+    .sort((a, b) => b[1].length - a[1].length);  // daha fazla türü olan önce
+
+  document.getElementById('modalTitle').textContent = '🎸 ' + genre;
+  document.getElementById('modalSub').textContent   = `${artists.length} sanatçı bu türde`;
+  document.getElementById('modalBody').innerHTML    = artists.length
+    ? `<div class="modal-track-list">${artists.map(([name], i) =>
+        `<div class="modal-track" style="cursor:pointer"
+              data-fn="openSanatciModal" data-name="${name.replace(/"/g,'&quot;')}" data-sub="">
+           <span class="mtn">${String(i+1).padStart(2,'0')}</span>
+           <span><div class="mname">${name}</div></span>
+         </div>`).join('')}</div>`
+    : '<div style="color:var(--muted);font-size:12px;">Sanatçı bulunamadı.</div>';
+  openModal();
+}
+
 async function manualSync() {
   const btn = document.getElementById('syncBtn');
   if (btn) {
@@ -2692,6 +2781,8 @@ function renderStats(d) {
   if (albumEl) albumEl.textContent = (d.farkli_album||0).toLocaleString('tr');
   document.getElementById('statHours').textContent   = Math.floor((d.toplam_sure_sn||0)/3600).toLocaleString('tr');
   document.getElementById('syncInfo').innerHTML      = `<span class="dot"></span> Aktif &nbsp;|&nbsp; Son sync: ${d.son_sync||'—'}`;
+  // Genre widget güncelle
+  loadGenres(_currentAralik);
   
   if(d.ilk_kayit_tarihi) {
     document.getElementById('profilKatilimTarihi').textContent = d.ilk_kayit_tarihi;
@@ -3190,6 +3281,9 @@ async function init() {
   
   renderMonths(data.aylar);
   document.getElementById('footerTime').textContent = new Date().toLocaleString('tr-TR');
+
+  // Genre widget — init'te de yükle (async, beklemeden)
+  loadGenres('buyil');
 }
 
 init();
