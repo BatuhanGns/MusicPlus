@@ -15,8 +15,18 @@ SCOPES = [
 
 HAM_HEADERS = [
     "Dinlenme Tarihi", "Şarkı ID", "Şarkı Adı", "Sanatçı",
-    "Sanatçı ID", "Albüm", "Süre (ms)", "Süre (sn)", "_played_at_iso"
+    "Sanatçı ID", "Albüm", "Süre (ms)", "_played_at_iso", "Tür"
 ]
+# Sütun indexleri (0-based)
+COL_TARIH      = 0
+COL_SARKI_ID   = 1
+COL_SARKI_ADI  = 2
+COL_SANATCI    = 3
+COL_SANATCI_ID = 4
+COL_ALBUM      = 5
+COL_SURE_MS    = 6
+COL_ISO        = 7
+COL_TUR        = 8
 
 TR_AYLAR = {
     1: "Ocak", 2: "Şubat", 3: "Mart", 4: "Nisan",
@@ -401,7 +411,7 @@ class SheetsClient:
         ws = self._find_sheet(user_id)
         if not ws:
             return set()
-        col = ws.col_values(9)  # _played_at_iso sütunu (9. sütun: Sanatçı ID eklendi)
+        col = ws.col_values(8)  # _played_at_iso sütunu (col H = 8. sütun)
         return set(col[1:])
 
     def append_tracks(self, user_id: str, tracks: list):
@@ -424,8 +434,8 @@ class SheetsClient:
                     t.get("artist_ids", ""),
                     t["album_name"],
                     t["duration_ms"],
-                    t["duration_sec"],
                     iso,
+                    t.get("genre", ""),   # Tür (Spotify API'den, boş olabilir)
                 ])
                 new_tracks.append({
                     "track_name":   t["track_name"],
@@ -454,7 +464,7 @@ class SheetsClient:
         if not ws:
             return None
         try:
-            col = ws.col_values(9)  # _played_at_iso sütunu (9. sütun: Sanatçı ID eklendi)
+            col = ws.col_values(8)  # _played_at_iso sütunu (col H = 8. sütun)
             values = [v.strip() for v in col[1:] if v.strip() and v.strip() != "—"]
             if not values:
                 return None
@@ -482,6 +492,112 @@ class SheetsClient:
             _, rows = self.get_user_data(uid)
             all_rows.extend(rows)
         return HAM_HEADERS, all_rows
+
+
+    # ─── Schema Migration ─────────────────────────────────────────────────────────
+
+    def migrate_user_sheet(self, user_id: str, genre_map: dict = None) -> dict:
+        """
+        Kullanıcının sayfasını yeni formata getirir (arkaplanda çalışabilir).
+        Eski format: [Tarih, ŞarkıID, ŞarkıAdı, Sanatçı, SanatçıID, Albüm, Süre(ms), Süre(sn), ISO]
+        Yeni format: [Tarih, ŞarkıID, ŞarkıAdı, Sanatçı, SanatçıID, Albüm, Süre(ms), ISO, Tür]
+
+        genre_map: {artist_id: [genre, ...]} — isteğe bağlı, varsa Tür sütunu doldurulur.
+        Döndürür: {"migrated": int, "skipped": int, "already_ok": bool}
+        """
+        ws = self._find_sheet(user_id)
+        if not ws:
+            return {"error": "Sayfa bulunamadı"}
+
+        try:
+            all_values = ws.get_all_values()
+        except Exception as e:
+            return {"error": str(e)}
+
+        if not all_values:
+            return {"migrated": 0, "skipped": 0, "already_ok": True}
+
+        headers = all_values[0]
+
+        # Mevcut format tespiti
+        has_sure_sn  = "Süre (sn)" in headers
+        has_tur      = "Tür" in headers
+        has_sanatci_id = "Sanatçı ID" in headers
+
+        # Zaten yeni formattaysa işlem yapma
+        if not has_sure_sn and has_tur:
+            return {"migrated": 0, "skipped": 0, "already_ok": True}
+
+        rows = all_values[1:]
+        if not rows:
+            # Sadece başlığı güncelle
+            ws.update("A1:I1", [list(HAM_HEADERS)], value_input_option="RAW")
+            return {"migrated": 0, "skipped": 0, "already_ok": False}
+
+        # Eski sütun indexlerini dinamik bul
+        def idx(col_name, fallback=-1):
+            try:
+                return headers.index(col_name)
+            except ValueError:
+                return fallback
+
+        old_tarih      = idx("Dinlenme Tarihi", 0)
+        old_sarki_id   = idx("Şarkı ID",        1)
+        old_sarki_adi  = idx("Şarkı Adı",       2)
+        old_sanatci    = idx("Sanatçı",          3)
+        old_sanatci_id = idx("Sanatçı ID",       4) if has_sanatci_id else -1
+        old_album      = idx("Albüm",            5)
+        old_sure_ms    = idx("Süre (ms)",        6)
+        old_iso        = idx("_played_at_iso",   7 if has_sanatci_id else 6)
+        old_tur        = idx("Tür",              -1)
+
+        new_rows = [list(HAM_HEADERS)]  # başlık satırı
+
+        migrated = 0
+        skipped  = 0
+
+        for row in rows:
+            # Eksik sütunlar için güvenli erişim
+            def get(i, default=""):
+                return row[i].strip() if i >= 0 and i < len(row) else default
+
+            artist_id = get(old_sanatci_id)
+
+            # Tür: önce eski sütundan, yoksa genre_map'ten
+            tur = ""
+            if old_tur >= 0:
+                tur = get(old_tur)
+            if not tur and genre_map and artist_id:
+                # artist_id virgülle ayrılmış olabilir (işbirlikleri)
+                for aid in [a.strip() for a in artist_id.split(",") if a.strip()]:
+                    genres = genre_map.get(aid, [])
+                    if genres:
+                        tur = ", ".join(genres[:3])  # max 3 tür
+                        break
+
+            new_row = [
+                get(old_tarih),
+                get(old_sarki_id),
+                get(old_sarki_adi),
+                get(old_sanatci),
+                artist_id,
+                get(old_album),
+                get(old_sure_ms),
+                get(old_iso),
+                tur,
+            ]
+            new_rows.append(new_row)
+            migrated += 1
+
+        # Sayfayı komple yeniden yaz
+        try:
+            ws.clear()
+            ws.update(f"A1:I{len(new_rows)}", new_rows, value_input_option="RAW")
+            logger.info(f"✅ Migration tamamlandı ({user_id}): {migrated} satır")
+            return {"migrated": migrated, "skipped": skipped, "already_ok": False}
+        except Exception as e:
+            logger.error(f"❌ Migration yazma hatası ({user_id}): {e}")
+            return {"error": str(e)}
 
     # ─── GenreCache sayfası ──────────────────────────────────────────────────────
     # Yapı: artist_id | genres_json
