@@ -132,7 +132,7 @@ def api_sarki_detay(sarki_adi):
 
         idx_sarki = headers.index("Şarkı Adı")
         idx_sanatci = headers.index("Sanatçı")
-        idx_sure = headers.index("Süre (sn)")
+        idx_sure = headers.index("Süre (ms)")
         idx_iso = headers.index("_played_at_iso")
 
         saat_counts = defaultdict(int)
@@ -151,7 +151,7 @@ def api_sarki_detay(sarki_adi):
             toplam_count += 1
             sanatci = row[idx_sanatci].strip()
             try:
-                sure = int(row[idx_sure])
+                sure = int(row[idx_sure]) // 1000
                 toplam_sure += sure
             except Exception:
                 pass
@@ -208,7 +208,7 @@ def api_sanatci_detay(sanatci_adi):
 
         idx_sarki = headers.index("Şarkı Adı")
         idx_sanatci = headers.index("Sanatçı")
-        idx_sure = headers.index("Süre (sn)")
+        idx_sure = headers.index("Süre (ms)")
         idx_iso = headers.index("_played_at_iso")
 
         sarki_counts = defaultdict(lambda: {"count": 0, "sure": 0})
@@ -228,7 +228,7 @@ def api_sanatci_detay(sanatci_adi):
             toplam_count += 1
             sarki = row[idx_sarki].strip()
             try:
-                sure = int(row[idx_sure])
+                sure = int(row[idx_sure]) // 1000
                 toplam_sure += sure
             except Exception:
                 sure = 0
@@ -301,7 +301,7 @@ def api_album(album_adi):
         idx_sarki = headers.index("Şarkı Adı")
         idx_sanatci = headers.index("Sanatçı")
         idx_album = next((i for i, h in enumerate(headers) if h.strip() in ("Albüm", "Album", "albüm", "album")), -1)
-        idx_sure = headers.index("Süre (sn)")
+        idx_sure = headers.index("Süre (ms)")
 
         sarki_counts = defaultdict(lambda: {"count": 0, "sanatci": "", "sure": 0})
         toplam_count = 0
@@ -315,7 +315,7 @@ def api_album(album_adi):
             sarki = row[idx_sarki].strip() if len(row) > idx_sarki else ""
             sanatci = row[idx_sanatci].strip() if len(row) > idx_sanatci else ""
             try:
-                sure = int(row[idx_sure])
+                sure = int(row[idx_sure]) // 1000
             except Exception:
                 sure = 0
             sarki_counts[sarki]["count"] += 1
@@ -359,7 +359,7 @@ def api_tum_sarkilar():
 
         idx_sarki = headers.index("Şarkı Adı")
         idx_sanatci = headers.index("Sanatçı")
-        idx_sure = headers.index("Süre (sn)")
+        idx_sure = headers.index("Süre (ms)")
 
         track_counts = defaultdict(lambda: {"count": 0, "sure": 0, "sanatci": ""})
         for row in rows:
@@ -371,7 +371,7 @@ def api_tum_sarkilar():
             track_counts[sarki]["count"] += 1
             track_counts[sarki]["sanatci"] = row[idx_sanatci].strip()
             try:
-                track_counts[sarki]["sure"] += int(row[idx_sure])
+                track_counts[sarki]["sure"] += int(row[idx_sure]) // 1000
             except Exception:
                 pass
 
@@ -402,7 +402,7 @@ def api_tum_sanatcilar():
         rows = _filter_rows_by_aralik(headers, rows, aralik, baslangic, bitis)
 
         idx_sanatci = headers.index("Sanatçı")
-        idx_sure = headers.index("Süre (sn)")
+        idx_sure = headers.index("Süre (ms)")
 
         artist_counts = defaultdict(lambda: {"count": 0, "sure": 0})
         for row in rows:
@@ -412,7 +412,7 @@ def api_tum_sanatcilar():
             if not sanatci:
                 continue
             try:
-                sure = int(row[idx_sure])
+                sure = int(row[idx_sure]) // 1000
             except Exception:
                 sure = 0
             # "X, Y" işbirliklerini bireysel olarak say
@@ -478,7 +478,7 @@ def api_ay_detay(ay_label):
 
         idx_sarki = headers.index("Şarkı Adı")
         idx_sanatci = headers.index("Sanatçı")
-        idx_sure = headers.index("Süre (sn)")
+        idx_sure = headers.index("Süre (ms)")
         idx_tarih = headers.index("Dinlenme Tarihi")
 
         TR_AYLAR_REV = {v: str(k).zfill(2) for k, v in config.TR_AYLAR.items()}
@@ -511,7 +511,7 @@ def api_ay_detay(ay_label):
             sarki = row[idx_sarki].strip()
             sanatci = row[idx_sanatci].strip()
             try:
-                sure = int(row[idx_sure])
+                sure = int(row[idx_sure]) // 1000
             except Exception:
                 sure = 0
 
