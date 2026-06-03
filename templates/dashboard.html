@@ -2733,7 +2733,13 @@ async function loadGenres(aralik) {
 
     const max   = genres[0].count || 1;
     const top15 = genres.slice(0, 15);
-    if (hint) hint.textContent = `${genres.length} tür bulundu`;
+    if (hint) {
+      hint.textContent = `${genres.length} tür bulundu`;
+      if (data.warning) {
+        hint.style.color = '#ffaa00';
+        hint.textContent = '⚠ ' + data.warning;
+      }
+    }
 
     // genre map'i global değişkende tut, onclick'e gömmekten kaçın
     _lastGenreMap = data.artist_genre_map || {};
