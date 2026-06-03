@@ -1352,6 +1352,42 @@
 
   <!-- KULLANIM VE LİMİTLER EKRANI — Sadece AI Limiti -->
   <div id="view-kullanim" class="view-section">
+
+    <!-- VERİ YÖNETİMİ -->
+    <div class="section-title" style="margin-bottom:12px;">Veri Yönetimi</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:32px;">
+
+      <!-- Mevcut sisteme göre sync yap -->
+      <div style="background:var(--surface);border:1px solid var(--border);padding:16px 20px;">
+        <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text);margin-bottom:4px;">Schema Migration</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
+          Mevcut tablodaki eski format kayıtları yeni formata getirir
+          <span style="color:var(--muted);font-family:'DM Mono',monospace;">(A–H sütunları + I=Tür)</span>.
+          Arkaplanda çalışır, sayfayı kapatabilirsiniz.
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button onclick="startMigration(false)"
+            style="background:var(--surface2);border:1px solid var(--border);color:var(--text);
+                   padding:8px 16px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;">
+            Sadece format dönüştür
+          </button>
+          <button onclick="startMigration(true)"
+            style="background:var(--green);border:none;color:#000;
+                   padding:8px 16px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;font-weight:700;">
+            Format dönüştür + Tür verisini çek
+          </button>
+        </div>
+        <div id="migrationStatus" style="margin-top:10px;font-size:11px;font-family:'DM Mono',monospace;color:var(--muted);display:none;"></div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+          <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:4px;">Doğrudan URL ile de çalıştırabilirsiniz:</div>
+          <code style="font-size:10px;color:var(--green);background:var(--surface2);padding:4px 8px;display:inline-block;">/api/migrate-schema</code>
+          <span style="font-size:10px;color:var(--muted);margin:0 6px;">veya tür verisiyle:</span>
+          <code style="font-size:10px;color:var(--green);background:var(--surface2);padding:4px 8px;display:inline-block;">/api/migrate-schema?fetch_genres=true</code>
+        </div>
+      </div>
+
+    </div>
+
     <div class="section-title">AI Kullanım Limiti</div>
     <div class="ai-limit-card">
       <div class="ai-limit-top">
@@ -1603,10 +1639,19 @@
         <div class="desc">Her şarkı için Spotify'a ayrı istek atılarak albüm adı öğrenilir ve kaydedilir</div>
         <div class="warn">⚠️ Bu işlem yalnızca yükleme sırasında yapılabilir. Sonradan tekrar erişilemez. Yapmazsanız albüm adı "—" olarak kaydedilir.</div>
       </div>
-      <div class="import-toggle" id="toggleFetchAlbums" onclick="toggleImportOpt(this)"><div class="knob"></div></div>
+      <div class="import-toggle" id="toggleFetchAlbums" onclick="toggleImportOpt(this);updateGenreToggleState()"><div class="knob"></div></div>
     </div>
 
-    <!-- Progress (albüm arama sırasında görünür) -->
+    <div class="import-setting" id="settingFetchGenres">
+      <div class="import-setting-info">
+        <div class="name">Tür (genre) verisini API'den al</div>
+        <div class="desc">Her sanatçı için Spotify'dan tür bilgisi çekilir ve I sütununa yazılır. Albüm araması açık olmalıdır.</div>
+        <div class="warn" id="genreToggleWarn" style="display:none;">⚠️ Albüm araması kapalıyken tür verisi çekilemez. Önce albüm aramasını açın.</div>
+      </div>
+      <div class="import-toggle" id="toggleFetchGenres" onclick="toggleImportOpt(this)"><div class="knob"></div></div>
+    </div>
+
+    <!-- Progress (albüm/tür arama sırasında görünür) -->
     <div class="import-progress" id="importProgress">
       <div class="imp-prog-label" id="importProgLabel">Albüm adları aranıyor...</div>
       <div class="imp-prog-bar-track"><div class="imp-prog-bar-fill" id="importProgFill"></div></div>
@@ -2729,6 +2774,67 @@ async function openGenreModal(genre) {
          </div>`).join('')}</div>`
     : '<div style="color:var(--muted);font-size:12px;">Sanatçı bulunamadı.</div>';
   openModal();
+}
+
+async function startMigration(fetchGenres) {
+  const btn1 = document.querySelector('[onclick="startMigration(false)"]');
+  const btn2 = document.querySelector('[onclick="startMigration(true)"]');
+  const statusEl = document.getElementById('migrationStatus');
+
+  if (btn1) btn1.disabled = true;
+  if (btn2) btn2.disabled = true;
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = 'var(--muted)';
+    statusEl.textContent = '⏳ Migration başlatılıyor...';
+  }
+
+  try {
+    const url = '/api/migrate-schema' + (fetchGenres ? '?fetch_genres=true' : '');
+    const res  = await fetch(url, { method: 'POST' });
+    const data = await res.json();
+
+    if (data.status === 'started') {
+      if (statusEl) {
+        statusEl.style.color = 'var(--green)';
+        statusEl.textContent = '✅ ' + data.message;
+      }
+    } else if (data.already_ok) {
+      if (statusEl) {
+        statusEl.textContent = '✓ Tablo zaten yeni formatta, işlem yapılmadı.';
+      }
+    } else {
+      if (statusEl) {
+        statusEl.style.color = '#ff6b6b';
+        statusEl.textContent = '❌ Hata: ' + (data.error || 'Bilinmeyen hata');
+      }
+    }
+  } catch(e) {
+    if (statusEl) {
+      statusEl.style.color = '#ff6b6b';
+      statusEl.textContent = '❌ Bağlantı hatası: ' + e.message;
+    }
+  } finally {
+    if (btn1) btn1.disabled = false;
+    if (btn2) btn2.disabled = false;
+  }
+}
+
+function updateGenreToggleState() {
+  const albumsOn  = document.getElementById('toggleFetchAlbums').classList.contains('on');
+  const genreWarn = document.getElementById('genreToggleWarn');
+  const genreToggle = document.getElementById('toggleFetchGenres');
+  if (!albumsOn) {
+    // Albüm kapalıysa genre toggle'ı da kapat ve disable et
+    genreToggle.classList.remove('on');
+    genreToggle.style.opacity = '0.4';
+    genreToggle.style.pointerEvents = 'none';
+    if (genreWarn) genreWarn.style.display = 'block';
+  } else {
+    genreToggle.style.opacity = '1';
+    genreToggle.style.pointerEvents = '';
+    if (genreWarn) genreWarn.style.display = 'none';
+  }
 }
 
 async function manualSync() {
@@ -4974,7 +5080,7 @@ function _resetImportModal() {
   document.getElementById('importProgCurrent').textContent = '0 / 0';
   document.getElementById('importProgPct').textContent = '0%';
   document.getElementById('importProgEta').textContent = '';
-  document.getElementById('importProgLabel').textContent = 'Albüm adları aranıyor...';
+  document.getElementById('importProgLabel').textContent = fetchGenres ? 'Albüm ve tür bilgileri aranıyor...' : 'Albüm adları aranıyor...';
   document.getElementById('importStartBtn').textContent = 'İçeri Aktar';
   document.getElementById('importStartBtn').disabled = true;
 }
@@ -5005,6 +5111,7 @@ async function startImport() {
 
   const skipShort   = document.getElementById('toggleSkipShort').classList.contains('on');
   const fetchAlbums = document.getElementById('toggleFetchAlbums').classList.contains('on');
+  const fetchGenres = document.getElementById('toggleFetchGenres').classList.contains('on');
 
   // JSON oku
   let tracks;
@@ -5026,7 +5133,7 @@ async function startImport() {
     const res  = await fetch('/api/import-history', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({tracks, skip_short: skipShort, fetch_albums: fetchAlbums})
+      body: JSON.stringify({tracks, skip_short: skipShort, fetch_albums: fetchAlbums, fetch_genres: fetchGenres})
     });
     const data = await res.json();
 
@@ -5084,8 +5191,9 @@ async function _pollProgress() {
       document.getElementById('importProgEta').textContent = '⏱ Tahminen ' + eta + ' saniye kaldı';
     }
 
+    const phaseLabel = data.phase_label || 'İşleniyor';
     document.getElementById('importProgLabel').textContent =
-      'Albüm adları aranıyor — ' + current + ' işlendi, ' + (total - current) + ' kaldı';
+      phaseLabel + ' — ' + current + ' işlendi, ' + (total - current) + ' kaldı';
 
     if (data.status === 'done' || data.cancelled) {
       clearInterval(_importPollTimer);
