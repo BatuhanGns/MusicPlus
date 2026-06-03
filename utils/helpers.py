@@ -62,7 +62,7 @@ def compute_stats(headers, rows):
 
     idx_sarki = headers.index("Şarkı Adı")
     idx_sanatci = headers.index("Sanatçı")
-    idx_sure = headers.index("Süre (sn)")
+    idx_sure = headers.index("Süre (ms)")
     idx_tarih = headers.index("Dinlenme Tarihi")
     idx_iso = headers.index("_played_at_iso") if "_played_at_iso" in headers else -1
     idx_album = next(
@@ -89,7 +89,7 @@ def compute_stats(headers, rows):
         tarih = row[idx_tarih].strip()
         album = row[idx_album].strip() if idx_album != -1 and len(row) > idx_album else ""
         try:
-            sure = int(row[idx_sure])
+            sure = int(row[idx_sure]) // 1000
         except Exception:
             sure = 0
 

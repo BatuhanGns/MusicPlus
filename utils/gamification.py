@@ -165,7 +165,7 @@ def compute_gamification(headers, rows) -> dict:
     try:
         idx_sarki   = headers.index("Şarkı Adı")
         idx_sanatci = headers.index("Sanatçı")
-        idx_sure    = headers.index("Süre (sn)")
+        idx_sure    = headers.index("Süre (ms)")
         idx_iso     = headers.index("_played_at_iso") if "_played_at_iso" in headers else -1
         idx_album   = next(
             (i for i, h in enumerate(headers) if h.strip() in ("Albüm", "Album", "albüm", "album")),
@@ -190,7 +190,7 @@ def compute_gamification(headers, rows) -> dict:
         iso     = row[idx_iso].strip()   if idx_iso   != -1 and len(row) > idx_iso   else ""
 
         try:
-            sure = int(row[idx_sure])
+            sure = int(row[idx_sure]) // 1000
         except Exception:
             sure = 0
 
