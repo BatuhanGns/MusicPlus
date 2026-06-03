@@ -218,12 +218,19 @@ def api_genres():
         missing_ids    = [aid for aid in all_artist_ids if aid not in cached_genres]
 
         # Eksikleri Spotify API'den çek
+        scope_warning = None
         if missing_ids:
             from extensions import spotify as sp_client
             new_genres = sp_client.get_artists_genres(missing_ids)
             if new_genres:
                 sheets.save_genres_batch(new_genres)
                 cached_genres.update(new_genres)
+            elif missing_ids:
+                # Hiç sonuç dönmediyse büyük ihtimalle 403 (scope eksik)
+                scope_warning = (
+                    "Tür verisi çekilemedi. Token'da 'user-read-private' scope'u eksik — "
+                    "çıkış yapıp tekrar giriş yapın."
+                )
 
         # artist_name → genres eşleşmesi yap
         artist_genre_map = {}
@@ -241,11 +248,14 @@ def api_genres():
             key=lambda x: -x["count"]
         )[:30]
 
-        return jsonify({
+        response = {
             "top_genres":       top_genres,
             "artist_genre_map": artist_genre_map,
             "aralik":           aralik,
-        })
+        }
+        if scope_warning:
+            response["warning"] = scope_warning
+        return jsonify(response)
 
     except Exception as e:
         logger.error(f"Genres API hatasi: {e}")
