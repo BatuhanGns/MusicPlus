@@ -36,6 +36,7 @@ class SpotifyClient:
         scopes = " ".join([
             "user-read-recently-played",
             "user-read-currently-playing",
+            "user-read-private",          # /v1/artists genre verisi için gerekli
             "user-modify-playback-state",
             "playlist-read-private",
             "playlist-modify-public",
@@ -563,9 +564,13 @@ class SpotifyClient:
         GET /v1/artists?ids=... — max 50 ID/istek
         Döndürür: {artist_id: [genre, ...], ...}
         Boş genres array dönen sanatçılar için [] tutulur.
+
+        NOT: Bu endpoint user-read-private scope'u gerektirir.
+        403 alınırsa token yenilenmeli — kullanıcı yeniden login olmalı.
         """
         result = {}
-        # 50'li batch'ler halinde iste
+        scope_error = False
+
         for i in range(0, len(artist_ids), 50):
             chunk = artist_ids[i:i + 50]
             if not chunk:
@@ -579,6 +584,18 @@ class SpotifyClient:
                     if aid:
                         result[aid] = artist.get("genres", [])
             except Exception as e:
-                logger.warning(f"get_artists_genres batch hatasi (offset={i}): {e}")
+                err_str = str(e)
+                if "403" in err_str:
+                    if not scope_error:
+                        logger.error(
+                            "get_artists_genres: 403 Forbidden — token'da 'user-read-private' "
+                            "scope'u eksik. Kullanıcının yeniden giriş yapması gerekiyor."
+                        )
+                        scope_error = True
+                    # 403'te diğer batch'leri deneme, hepsi başarısız olur
+                    break
+                else:
+                    logger.warning(f"get_artists_genres batch hatasi (offset={i}): {e}")
+
         return result
 
