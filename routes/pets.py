@@ -27,6 +27,17 @@ bp = Blueprint("pets", __name__)
 # In-memory pet cache — Sheets gecikme sorununu onler
 _pet_cache: dict = {}
 
+def _hydrate_pet_data(data: dict) -> dict:
+    """
+    Sheets'ten yüklenen slim veriyi runtime için zenginleştirir.
+    level_info'yu xp'den hesaplar.
+    """
+    from utils.pets import calc_pet_level
+    for pet in data.get("inventory", []):
+        pet["level_info"] = calc_pet_level(pet.get("xp", 0))
+    return data
+
+
 def _load_pet_data(uid: str) -> dict:
     """Once memory cache, sonra Sheets'ten pet verisini yukler."""
     if uid in _pet_cache:
@@ -41,6 +52,7 @@ def _load_pet_data(uid: str) -> dict:
                 raw = row[2] if len(row) > 2 else "{}"
                 try:
                     data = json.loads(raw)
+                    data = _hydrate_pet_data(data)   # level_info'yu hesapla
                     _pet_cache[uid] = json.loads(json.dumps(data))
                     return data
                 except Exception:
@@ -50,17 +62,44 @@ def _load_pet_data(uid: str) -> dict:
     return _default_pet_data()
 
 
+def _strip_for_storage(data: dict) -> dict:
+    """
+    Sheets'e yazılacak veriyi küçültür.
+    level_info (hesaplanabilir), level_info nested dict'leri kaldırır.
+    Sadece xp, rarity, egg_type, coin_mult, xp_mult, active saklanır.
+    """
+    import copy
+    slim = copy.deepcopy(data)
+    for pet in slim.get("inventory", []):
+        pet.pop("level_info", None)   # runtime'da hesaplanır, saklamaya gerek yok
+    return slim
+
+
 def _save_pet_data(uid: str, display_name: str, data: dict):
     """Pet verisini once memory cache'e, sonra Sheets'e kaydeder."""
-    # Once cache'i guncelle — anlik yanit icin
+    # Cache'e tam veri yaz (level_info dahil — runtime için gerekli)
     _pet_cache[uid] = json.loads(json.dumps(data))
     try:
         ws = _ensure_pets_sheet()
         if not ws:
             return
-        raw      = json.dumps(data, ensure_ascii=False)
-        summary  = _pet_summary(data)
-        rows     = ws.get_all_values()
+        slim    = _strip_for_storage(data)          # level_info olmadan, küçük JSON
+        raw     = json.dumps(slim, ensure_ascii=False, separators=(',', ':'))  # compact
+        summary = _pet_summary(data)
+
+        # 50.000 karakter Sheets limiti kontrolü
+        if len(raw) > 49_000:
+            logger.warning(f"Pet data {len(raw)} karakter — limit aşılıyor, inventory budanıyor")
+            # En düşük tier'lı pasif petleri kırp
+            inv = slim.get("inventory", [])
+            inv.sort(key=lambda p: (p.get("active", False), p.get("xp", 0)), reverse=True)
+            while len(json.dumps(slim, separators=(',', ':'))) > 49_000 and len(inv) > 1:
+                inv.pop()
+            slim["inventory"] = inv
+            raw = json.dumps(slim, ensure_ascii=False, separators=(',', ':'))
+            logger.info(f"Pet data budandı: {len(inv)} pet kaldı, {len(raw)} karakter")
+
+        rows = ws.get_all_values()
         for i, row in enumerate(rows[1:], start=2):
             if row and row[0] == uid:
                 ws.update(f"A{i}:D{i}", [[uid, display_name, raw, summary]])

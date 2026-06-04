@@ -151,6 +151,15 @@ def migrate_schema():
     })
 
 
+@bp.route("/api/sync-status")
+def sync_status():
+    """Hafif endpoint — frontend polling için. Son sync zamanını döndürür."""
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify({"son_sync": config._last_sync})
+
+
 @bp.route("/api/health")
 @bp.route("/health")
 def health():
