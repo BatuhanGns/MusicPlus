@@ -260,7 +260,7 @@ def api_create_playlist():
         idx_sarki    = headers.index("Sarki Adi") if "Sarki Adi" in headers else headers.index("Şarkı Adı")
         idx_sarki_id = headers.index("Sarki ID")  if "Sarki ID"  in headers else headers.index("Şarkı ID")
         idx_sanatci  = next((i for i,h in enumerate(headers) if h.strip() in ("Sanatci","Sanatçı")), -1)
-        idx_sure     = next((i for i,h in enumerate(headers) if h.strip() in ("Sure (sn)","Süre (sn)")), -1)
+        idx_sure     = next((i for i,h in enumerate(headers) if h.strip() in ("Süre (ms)","Sure (ms)","Sure (sn)","Süre (sn)")), -1)
 
         sarki_counts   = Counter()
         sarki_id_map   = {}
@@ -273,7 +273,7 @@ def api_create_playlist():
                 continue
             sarki  = row[idx_sarki].strip()
             sid    = row[idx_sarki_id].strip()
-            sure   = int(row[idx_sure]) * 1000 if idx_sure != -1 and len(row) > idx_sure and row[idx_sure].isdigit() else 0
+            sure   = int(row[idx_sure]) if idx_sure != -1 and len(row) > idx_sure and row[idx_sure].isdigit() else 0
             san    = row[idx_sanatci].strip() if idx_sanatci != -1 and len(row) > idx_sanatci else ""
             if sarki and sid:
                 sarki_counts[sarki] += 1

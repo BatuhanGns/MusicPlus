@@ -41,7 +41,7 @@ VAKIT = {
 }
 HAM_HEADERS = [
     "Dinlenme Tarihi", "Şarkı ID", "Şarkı Adı", "Sanatçı",
-    "Albüm", "Süre (ms)", "Süre (sn)", "_played_at_iso",
+    "Albüm", "Süre (ms)", "_played_at_iso", "Tür",
 ]
 
 # ── Global State (uygulama ömrü boyunca bellekte) ────────────────────────────

@@ -102,16 +102,16 @@ def _apply_sync_rewards(uid: str, new_tracks: list):
 
 def sync_job(user_id: str = None, refresh_token: str = None):
     """
-    DÜZELTİLDİ:
-    1. Her sync için ayrı SpotifyClient instance'ı oluşturulur.
-       Böylece singleton race condition ortadan kalkar.
-    2. Sheets'teki son played_at zamanı okunarak 'after' parametresiyle
-       sadece yeni şarkılar çekilir — kaçırılan periyotlar telafi edilir.
-    3. Aynı şarkıyı tekrar dinleme artık duplicate sayılmaz (played_at farklı).
+    Her sync için ayrı SpotifyClient instance'ı oluşturulur.
+    Refresh token öncelik sırası:
+      1. Parametre olarak verilen token
+      2. Bellek cache'i (config._refresh_tokens)
+      3. Flask session (request context varsa)
+      4. Sheets (son çare)
+      5. Env değişkeni
     """
     uid = user_id
     if not uid:
-        # Request context varsa session'dan al (manuel sync butonu)
         try:
             uid = get_current_user_id()
         except Exception:
@@ -120,29 +120,44 @@ def sync_job(user_id: str = None, refresh_token: str = None):
         logger.warning("⚠️ Sync: user_id yok, atlanıyor")
         return
 
-    token = refresh_token or config.SPOTIFY_REFRESH_TOKEN
+    # Refresh token'ı doğru sırayla bul
+    token = refresh_token
+    if not token:
+        token = config._refresh_tokens.get(uid)
+    if not token:
+        # Session'dan al (request context varsa)
+        try:
+            from flask import session, has_request_context
+            if has_request_context():
+                token = session.get("refresh_token")
+        except Exception:
+            pass
+    if not token:
+        token = config.SPOTIFY_REFRESH_TOKEN
+
     if not token:
         logger.warning(f"⚠️ Sync: {uid} için refresh_token yok, atlanıyor")
         return
 
-    # Token rotasyonu olduğunda bellekteki dict'i anında güncelle
+    # Token rotasyonu olduğunda bellekteki dict'i ve Sheets'i anında güncelle
     def _on_token_refresh(new_token: str):
         config._refresh_tokens[uid] = new_token
         logger.info(f"✅ Yeni refresh token bellekte güncellendi ({uid})")
-        # Sheets'e de yaz (ikincil yedek olarak)
         try:
             sheets.save_refresh_token(uid, new_token)
-        except Exception:
-            pass  # Sheets hatası sync'i engellemez
+            logger.info(f"✅ Yeni refresh token Sheets'e yazıldı ({uid})")
+        except Exception as e:
+            logger.error(f"❌ Refresh token Sheets yazma HATASI ({uid}): {e}")
 
     # Her kullanıcı için izole edilmiş yeni bir client — global state kirlenmez
     client = SpotifyClient(refresh_token=token, token_refresh_callback=_on_token_refresh)
+    # sheets_client'ı client'a bağla → access token Sheets'e yazılsın
+    client._sheets_client = sheets
 
     logger.info(f"🎵 Sync başladı: {uid}")
     try:
-        # Son kaydedilen played_at zamanını al → Spotify 'after' parametresi için
         after_ms = sheets.get_last_played_at_ms(uid)
-        
+        # sheets_client'ı geç → access token yenilenince Sheets'e yazılır
         tracks = client.get_recently_played(limit=50, after_ms=after_ms)
         
         new_tracks = []
@@ -154,6 +169,7 @@ def sync_job(user_id: str = None, refresh_token: str = None):
             
         sheets.update_last_sync(uid)
         config._last_sync = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M") + " UTC"
+        # Her sync sonrası cache'i her zaman sıfırla → arayüz taze veri görir
         load_user_data(uid)
 
         if new_tracks:
@@ -165,31 +181,22 @@ def sync_job(user_id: str = None, refresh_token: str = None):
 
 def scheduled_sync_all():
     """
-    config._refresh_tokens dict'indeki tüm kullanıcıları sync eder.
-    Sheets'e bağımlı değil — bellekteki token'lar kullanılır.
-    Server restart'ta dict sıfırlanır; kullanıcılar tekrar giriş yapınca dolar.
+    Her sync'te refresh token'ı Sheets'ten okur — tek doğru kaynak Sheets'tir.
+    Bellek sadece cache; token rotasyonu sonrası Sheets güncelse hep doğru token kullanılır.
     """
     try:
-        tokens = dict(config._refresh_tokens)  # snapshot al (döngü sırasında değişmesin)
-        if not tokens:
-            logger.info("⏰ Scheduled sync: bellekte kayıtlı kullanıcı yok")
-            # Fallback: Sheets'ten yükle (server restart sonrası ilk çalışma için)
-            try:
-                users = sheets.get_all_users_with_tokens()
-                for u in users:
-                    uid_s = u["user_id"]
-                    tok_s = u["refresh_token"]
-                    if uid_s and tok_s:
-                        config._refresh_tokens[uid_s] = tok_s
-                        logger.info(f"📥 Sheets fallback: {uid_s} token'ı belleğe yüklendi")
-                tokens = dict(config._refresh_tokens)
-            except Exception as fb_err:
-                logger.warning(f"⚠️ Sheets fallback hatası: {fb_err}")
-
-        if not tokens:
+        users = sheets.get_all_users_with_tokens()
+        if not users:
+            logger.info("⏰ Scheduled sync: Sheets'te kullanıcı yok")
             return
 
-        for uid, token in tokens.items():
+        for u in users:
+            uid   = u["user_id"]
+            token = u["refresh_token"]
+            if not uid or not token:
+                continue
+            # Bellek cache'ini de güncelle
+            config._refresh_tokens[uid] = token
             try:
                 sync_job(uid, refresh_token=token)
             except Exception as e:

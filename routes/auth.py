@@ -58,6 +58,13 @@ def _get_redirect_uri():
 
 @bp.route("/login")
 def login_page():
+    # Zaten giriş yapmış kullanıcıyı tekrar login'e yönlendirme
+    uid = session.get("user_id")
+    r_token = session.get("refresh_token")
+    if uid and r_token:
+        logger.info(f"✅ Zaten giriş yapılmış, dashboard'a yönlendiriliyor: {uid}")
+        return redirect("/")
+
     redirect_uri = _get_redirect_uri()
     auth_url = spotify.get_auth_url(redirect_uri)
     return LOGIN_HTML_TEMPLATE.format(auth_url=auth_url)
@@ -73,28 +80,35 @@ def callback():
     redirect_uri = _get_redirect_uri()
     try:
         spotify.exchange_code(code, redirect_uri)
-        session.permanent = True
+
+        # Kullanıcı bilgilerini al
         me = spotify._req("GET", "/me")
-        session["user_id"] = me.get("id", "")
-        session["display_name"] = me.get("display_name", me.get("id", "Kullanıcı"))
-        session["refresh_token"] = spotify.refresh_token
+        uid  = me.get("id", "")
+        name = me.get("display_name", me.get("id", "Kullanıcı"))
+        r_token = spotify.refresh_token
 
-        uid = session["user_id"]
-        name = session["display_name"]
-        token = spotify.refresh_token
+        # Session'a sadece kimlik ve refresh token yaz (access token değil)
+        session.permanent = True
+        session["user_id"]      = uid
+        session["display_name"] = name
+        session["refresh_token"] = r_token   # tek güvenilir kalıcı token
 
-        # Refresh token'ı bellekte sakla (Sheets'e bağımlı değil, anında güncellenir)
-        if uid and token:
-            config._refresh_tokens[uid] = token
+        # Access token'ı bellek cache'ine ve Sheets'e taşı
+        spotify.set_user_id_for_cache(uid, sheets_client=sheets)
 
-        # Sheets: sadece şarkı verisi için kullanıcı sayfasını hazırla
+        # Bellekteki refresh token sözlüğünü güncelle
+        if uid and r_token:
+            config._refresh_tokens[uid] = r_token
+
+        # Sheets: kullanıcı sayfası hazırla ve refresh token'ı E sütununa yaz
         if uid:
             if not sheets._find_sheet(uid):
                 sheets._ensure_user_sheet(uid)
-                sheets.set_user_permission(uid, name, False, token)
+                sheets.set_user_permission(uid, name, False, r_token)
             else:
-                sheets.save_refresh_token(uid, token)
+                sheets.save_refresh_token(uid, r_token)
 
+        logger.info(f"✅ Giriş başarılı: {uid} ({name})")
         return redirect("/")
     except Exception as e:
         logger.error(f"❌ OAuth callback hatası: {e}")
@@ -104,5 +118,14 @@ def callback():
 @bp.route("/api/logout")
 @bp.route("/logout")
 def logout():
+    uid = session.get("user_id")
+
+    # Bellek cache'inden access token'ı temizle
+    if uid:
+        from clients.spotify_client import _access_token_cache
+        if uid in _access_token_cache:
+            del _access_token_cache[uid]
+            logger.info(f"🗑️ Access token cache temizlendi: {uid}")
+
     session.clear()
     return redirect("/login")

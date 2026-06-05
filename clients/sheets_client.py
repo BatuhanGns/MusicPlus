@@ -15,8 +15,18 @@ SCOPES = [
 
 HAM_HEADERS = [
     "Dinlenme Tarihi", "Şarkı ID", "Şarkı Adı", "Sanatçı",
-    "Albüm", "Süre (ms)", "Süre (sn)", "_played_at_iso"
+    "Sanatçı ID", "Albüm", "Süre (ms)", "_played_at_iso", "Tür"
 ]
+# Sütun indexleri (0-based)
+COL_TARIH      = 0
+COL_SARKI_ID   = 1
+COL_SARKI_ADI  = 2
+COL_SANATCI    = 3
+COL_SANATCI_ID = 4
+COL_ALBUM      = 5
+COL_SURE_MS    = 6
+COL_ISO        = 7
+COL_TUR        = 8
 
 TR_AYLAR = {
     1: "Ocak", 2: "Şubat", 3: "Mart", 4: "Nisan",
@@ -73,8 +83,8 @@ class SheetsClient:
             return None
         ws = self._find_sheet("Settings")
         if not ws:
-            ws = self.sh.add_worksheet(title="Settings", rows=100, cols=8)
-            ws.append_row(["user_id", "display_name", "stats_permission", "last_sync", "refresh_token", "coins", "xp"], value_input_option="RAW")
+            ws = self.sh.add_worksheet(title="Settings", rows=100, cols=10)
+            ws.append_row(["user_id", "display_name", "stats_permission", "last_sync", "refresh_token", "coins", "xp", "access_token", "expires_at"], value_input_option="RAW")
             logger.info("✅ Settings sayfası oluşturuldu.")
         self._ensure_limits_sheet()
         return ws
@@ -271,7 +281,7 @@ class SheetsClient:
         ws.append_row([user_id, display_name, str(allowed), now_str, refresh_token], value_input_option="RAW")
 
     def save_refresh_token(self, user_id: str, refresh_token: str):
-        """Kullanıcının refresh token'ını günceller"""
+        """Kullanıcının refresh token'ını günceller (E sütunu)"""
         ws = self._find_sheet("Settings")
         if not ws:
             return
@@ -281,6 +291,38 @@ class SheetsClient:
                 ws.update(f"E{i}", [[refresh_token]])
                 return
 
+    def save_access_token(self, user_id: str, access_token: str, expires_at: float):
+        """Access token ve sona erme zamanını kaydeder (H ve I sütunları)."""
+        ws = self._find_sheet("Settings")
+        if not ws:
+            return
+        records = ws.get_all_values()
+        for i, row in enumerate(records[1:], start=2):
+            if row and row[0] == user_id:
+                ws.update(f"H{i}:I{i}", [[access_token, str(expires_at)]])
+                return
+
+    def get_access_token(self, user_id: str) -> dict:
+        """Kaydedilmiş access token ve expires_at değerini döndürür.
+        Döndürür: {"access_token": str, "expires_at": float} veya {}
+        """
+        ws = self._find_sheet("Settings")
+        if not ws:
+            return {}
+        try:
+            for row in ws.get_all_values()[1:]:
+                if row and row[0] == user_id:
+                    token   = row[7] if len(row) > 7 else ""
+                    exp_str = row[8] if len(row) > 8 else ""
+                    if token and exp_str:
+                        try:
+                            return {"access_token": token, "expires_at": float(exp_str)}
+                        except ValueError:
+                            return {}
+        except Exception as e:
+            logger.warning(f"get_access_token hatası ({user_id}): {e}")
+        return {}
+
     def get_all_users_with_tokens(self) -> list:
         """Tüm kullanıcıları token'larıyla döndürür — scheduled sync için"""
         ws = self._find_sheet("Settings")
@@ -289,9 +331,16 @@ class SheetsClient:
         users = []
         for row in ws.get_all_values()[1:]:
             if row and row[0]:
+                exp_str = row[8] if len(row) > 8 else ""
+                try:
+                    expires_at = float(exp_str) if exp_str else 0.0
+                except ValueError:
+                    expires_at = 0.0
                 users.append({
-                    "user_id": row[0],
-                    "refresh_token": row[4] if len(row) > 4 else ""
+                    "user_id":       row[0],
+                    "refresh_token": row[4] if len(row) > 4 else "",
+                    "access_token":  row[7] if len(row) > 7 else "",
+                    "expires_at":    expires_at,
                 })
         return users
 
@@ -362,7 +411,7 @@ class SheetsClient:
         ws = self._find_sheet(user_id)
         if not ws:
             return set()
-        col = ws.col_values(8)  # _played_at_iso sütunu
+        col = ws.col_values(8)  # _played_at_iso sütunu (col H = 8. sütun)
         return set(col[1:])
 
     def append_tracks(self, user_id: str, tracks: list):
@@ -382,10 +431,11 @@ class SheetsClient:
                     t["track_id"],
                     t["track_name"],
                     t["artist_name"],
+                    t.get("artist_ids", ""),
                     t["album_name"],
                     t["duration_ms"],
-                    t["duration_sec"],
                     iso,
+                    t.get("genre", ""),   # Tür (Spotify API'den, boş olabilir)
                 ])
                 new_tracks.append({
                     "track_name":   t["track_name"],
@@ -414,7 +464,7 @@ class SheetsClient:
         if not ws:
             return None
         try:
-            col = ws.col_values(8)  # _played_at_iso sütunu
+            col = ws.col_values(8)  # _played_at_iso sütunu (col H = 8. sütun)
             values = [v.strip() for v in col[1:] if v.strip() and v.strip() != "—"]
             if not values:
                 return None
@@ -442,3 +492,184 @@ class SheetsClient:
             _, rows = self.get_user_data(uid)
             all_rows.extend(rows)
         return HAM_HEADERS, all_rows
+
+
+    # ─── Schema Migration ─────────────────────────────────────────────────────────
+
+    def migrate_user_sheet(self, user_id: str, genre_map: dict = None) -> dict:
+        """
+        Kullanıcının sayfasını yeni formata getirir (arkaplanda çalışabilir).
+        Eski format: [Tarih, ŞarkıID, ŞarkıAdı, Sanatçı, SanatçıID, Albüm, Süre(ms), Süre(sn), ISO]
+        Yeni format: [Tarih, ŞarkıID, ŞarkıAdı, Sanatçı, SanatçıID, Albüm, Süre(ms), ISO, Tür]
+
+        genre_map: {artist_id: [genre, ...]} — isteğe bağlı, varsa Tür sütunu doldurulur.
+        Döndürür: {"migrated": int, "skipped": int, "already_ok": bool}
+        """
+        ws = self._find_sheet(user_id)
+        if not ws:
+            return {"error": "Sayfa bulunamadı"}
+
+        try:
+            all_values = ws.get_all_values()
+        except Exception as e:
+            return {"error": str(e)}
+
+        if not all_values:
+            return {"migrated": 0, "skipped": 0, "already_ok": True}
+
+        headers = all_values[0]
+
+        # Mevcut format tespiti
+        has_sure_sn  = "Süre (sn)" in headers
+        has_tur      = "Tür" in headers
+        has_sanatci_id = "Sanatçı ID" in headers
+
+        # Zaten yeni formattaysa işlem yapma
+        if not has_sure_sn and has_tur:
+            return {"migrated": 0, "skipped": 0, "already_ok": True}
+
+        rows = all_values[1:]
+        if not rows:
+            # Sadece başlığı güncelle
+            ws.update("A1:I1", [list(HAM_HEADERS)], value_input_option="RAW")
+            return {"migrated": 0, "skipped": 0, "already_ok": False}
+
+        # Eski sütun indexlerini dinamik bul
+        def idx(col_name, fallback=-1):
+            try:
+                return headers.index(col_name)
+            except ValueError:
+                return fallback
+
+        old_tarih      = idx("Dinlenme Tarihi", 0)
+        old_sarki_id   = idx("Şarkı ID",        1)
+        old_sarki_adi  = idx("Şarkı Adı",       2)
+        old_sanatci    = idx("Sanatçı",          3)
+        old_sanatci_id = idx("Sanatçı ID",       4) if has_sanatci_id else -1
+        old_album      = idx("Albüm",            5)
+        old_sure_ms    = idx("Süre (ms)",        6)
+        old_iso        = idx("_played_at_iso",   7 if has_sanatci_id else 6)
+        old_tur        = idx("Tür",              -1)
+
+        new_rows = [list(HAM_HEADERS)]  # başlık satırı
+
+        migrated = 0
+        skipped  = 0
+
+        for row in rows:
+            # Eksik sütunlar için güvenli erişim
+            def get(i, default=""):
+                return row[i].strip() if i >= 0 and i < len(row) else default
+
+            artist_id = get(old_sanatci_id)
+
+            # Tür: önce eski sütundan, yoksa genre_map'ten
+            tur = ""
+            if old_tur >= 0:
+                tur = get(old_tur)
+            if not tur and genre_map and artist_id:
+                # artist_id virgülle ayrılmış olabilir (işbirlikleri)
+                for aid in [a.strip() for a in artist_id.split(",") if a.strip()]:
+                    genres = genre_map.get(aid, [])
+                    if genres:
+                        tur = ", ".join(genres[:3])  # max 3 tür
+                        break
+
+            new_row = [
+                get(old_tarih),
+                get(old_sarki_id),
+                get(old_sarki_adi),
+                get(old_sanatci),
+                artist_id,
+                get(old_album),
+                get(old_sure_ms),
+                get(old_iso),
+                tur,
+            ]
+            new_rows.append(new_row)
+            migrated += 1
+
+        # Sayfayı komple yeniden yaz
+        try:
+            ws.clear()
+            ws.update(f"A1:I{len(new_rows)}", new_rows, value_input_option="RAW")
+            logger.info(f"✅ Migration tamamlandı ({user_id}): {migrated} satır")
+            return {"migrated": migrated, "skipped": skipped, "already_ok": False}
+        except Exception as e:
+            logger.error(f"❌ Migration yazma hatası ({user_id}): {e}")
+            return {"error": str(e)}
+
+    # ─── GenreCache sayfası ──────────────────────────────────────────────────────
+    # Yapı: artist_id | genres_json
+    # Her artist_id için Spotify'dan çekilen türleri saklar.
+    # Yoksa yeniden API çağrısı yapılmaz — rate limit koruması.
+
+    def _ensure_genre_cache_sheet(self):
+        if not self.sh:
+            return None
+        ws = self._find_sheet("GenreCache")
+        if not ws:
+            ws = self.sh.add_worksheet(title="GenreCache", rows=5000, cols=2)
+            ws.append_row(["artist_id", "genres_json"], value_input_option="RAW")
+            logger.info("✅ GenreCache sayfası oluşturuldu.")
+        return ws
+
+    def get_cached_genres(self) -> dict:
+        """GenreCache sayfasındaki tüm sanatçı→genre eşleşmelerini döndürür.
+        Döndürür: {artist_id: [genre, ...]}
+        """
+        ws = self._find_sheet("GenreCache")
+        if not ws:
+            return {}
+        rows = ws.get_all_values()
+        cache = {}
+        for row in rows[1:]:  # başlık satırını atla
+            if len(row) >= 2 and row[0].strip():
+                try:
+                    cache[row[0].strip()] = json.loads(row[1]) if row[1].strip() else []
+                except Exception:
+                    cache[row[0].strip()] = []
+        return cache
+
+    def save_genres_batch(self, genre_map: dict):
+        """Yeni artist_id→genres eşleşmelerini GenreCache sayfasına ekler.
+        genre_map: {artist_id: [genre, ...]}
+        Zaten var olan artist_id'ler güncellenmez (append-only, hız için).
+        """
+        if not genre_map:
+            return
+        ws = self._ensure_genre_cache_sheet()
+        if not ws:
+            return
+        new_rows = [[aid, json.dumps(genres, ensure_ascii=False)] for aid, genres in genre_map.items()]
+        if new_rows:
+            ws.append_rows(new_rows, value_input_option="RAW")
+            logger.info(f"✅ GenreCache: {len(new_rows)} sanatçı yazıldı.")
+
+    def get_artist_ids_from_user_sheet(self, user_id: str) -> dict:
+        """Kullanıcı sayfasından Sanatçı → Sanatçı ID eşleşmelerini çeker.
+        Sanatçı ID'si olmayan eski kayıtlar için boş string döner.
+        Döndürür: {artist_name: artist_id_or_empty}
+        """
+        ws = self._find_sheet(user_id)
+        if not ws:
+            return {}
+        all_values = ws.get_all_values()
+        if len(all_values) < 2:
+            return {}
+        headers = all_values[0]
+        try:
+            idx_sanatci = headers.index("Sanatçı")
+            idx_id      = headers.index("Sanatçı ID")
+        except ValueError:
+            return {}
+        result = {}
+        for row in all_values[1:]:
+            if len(row) <= max(idx_sanatci, idx_id):
+                continue
+            name = row[idx_sanatci].strip()
+            aid  = row[idx_id].strip() if row[idx_id].strip() else ""
+            if name and name not in result:
+                result[name] = aid
+        return result
+

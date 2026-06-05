@@ -13,6 +13,7 @@ from routes.system         import bp as system_bp
 from routes.topluluk       import bp as topluluk_bp
 from routes.pets           import bp as pets_bp
 from routes.import_history import bp as import_history_bp
+from routes.music_dna      import bp as music_dna_bp
 
 
 def register_blueprints(app):
@@ -26,3 +27,4 @@ def register_blueprints(app):
     app.register_blueprint(topluluk_bp)
     app.register_blueprint(pets_bp)
     app.register_blueprint(import_history_bp)
+    app.register_blueprint(music_dna_bp)

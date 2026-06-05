@@ -81,6 +81,7 @@
   .stat-card .value{font-family:'Syne',sans-serif;font-size:clamp(22px,3vw,32px);font-weight:800;color:var(--green);line-height:1;}
   .stat-card .sub{font-size:11px;color:var(--muted);margin-top:6px;}
 
+
   .section{margin-bottom:40px;}
   .section-title{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:12px;}
   .section-title::after{content:'';flex:1;height:1px;background:var(--border);}
@@ -898,6 +899,80 @@
   .import-result.show{display:block;}
   .import-result.err{background:rgba(224,82,82,.08);border-color:rgba(224,82,82,.2);color:#e05252;}
 
+
+  /* ═══════════════ MusicDNA ═══════════════ */
+  /* Ayar Overlay */
+  .dna-overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;}
+  .dna-overlay.open{opacity:1;pointer-events:all;}
+  .dna-settings{background:var(--surface);border:1px solid var(--border);width:min(460px,95vw);max-height:92vh;overflow-y:auto;padding:26px;}
+  .dna-settings h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;margin:0 0 3px;}
+  .dna-settings .sub{font-size:11px;color:var(--muted);margin-bottom:20px;}
+  .dna-opt{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border);}
+  .dna-opt:last-of-type{border-bottom:none;}
+  .dna-opt-label{font-size:13px;font-weight:600;}
+  .dna-toggle{width:40px;height:22px;background:var(--border);border-radius:11px;position:relative;cursor:pointer;flex-shrink:0;transition:background .2s;}
+  .dna-toggle.on{background:var(--green);}
+  .dna-toggle .k{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;}
+  .dna-toggle.on .k{transform:translateX(18px);}
+  .dna-set-actions{display:flex;gap:8px;margin-top:20px;}
+  .dna-set-actions button{flex:1;padding:11px;font-size:13px;font-weight:700;border:none;cursor:pointer;}
+  .btn-dna-gen{background:var(--green);color:#000;}
+  .btn-dna-gen:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-dna-cls{background:var(--surface);border:1px solid var(--border) !important;color:var(--text);}
+  /* Wrapped Viewer */
+  .dna-viewer{position:fixed;inset:0;background:#000;z-index:1200;display:none;flex-direction:column;align-items:center;justify-content:center;}
+  .dna-viewer.open{display:flex;}
+  .dna-slides-wrap{position:relative;width:min(360px,90vw);height:min(640px,80vh);overflow:hidden;}
+  .dna-slide{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 24px;box-sizing:border-box;opacity:0;transition:opacity .35s;pointer-events:none;}
+  .dna-slide.active{opacity:1;pointer-events:all;}
+  /* slide gradyanları */
+  .dna-s0{background:linear-gradient(160deg,#0a0f1a,#0d1f0f);}
+  .dna-s1{background:linear-gradient(160deg,#1a0a0a,#2d1400);}
+  .dna-s2{background:linear-gradient(160deg,#0a0a1a,#14002d);}
+  .dna-s3{background:linear-gradient(160deg,#001a12,#001a2d);}
+  .dna-s4{background:linear-gradient(160deg,#1a1400,#1a0a00);}
+  .dna-s5{background:linear-gradient(160deg,#0a0f1a,#001a12);}
+  .dna-s6{background:linear-gradient(160deg,#1a0012,#0a000f);}
+  .dna-s7{background:linear-gradient(160deg,#001014,#000a14);}
+  .dna-s8{background:linear-gradient(160deg,#14001a,#0a0a0a);}
+  /* slide içerikleri */
+  .dna-cover{width:180px;height:180px;object-fit:cover;border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,.6);margin-bottom:20px;background:#1a1a1a;}
+  .dna-cover-placeholder{width:180px;height:180px;border-radius:4px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;font-size:48px;margin-bottom:20px;}
+  .dna-artist-img{width:160px;height:160px;border-radius:50%;object-fit:cover;box-shadow:0 8px 40px rgba(0,0,0,.6);margin-bottom:20px;background:#1a1a1a;}
+  .dna-sl-eyebrow{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:14px;}
+  .dna-sl-title{font-family:'Syne',sans-serif;font-size:26px;font-weight:900;color:#fff;line-height:1.15;margin-bottom:6px;}
+  .dna-sl-sub{font-size:13px;color:rgba(255,255,255,.55);margin-bottom:10px;}
+  .dna-sl-badge{display:inline-block;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;margin-top:8px;}
+  .dna-sl-green{background:rgba(29,185,84,.2);color:#1db954;border:1px solid rgba(29,185,84,.3);}
+  .dna-big-stat{font-family:'Syne',sans-serif;font-size:72px;font-weight:900;color:#1db954;line-height:1;}
+  .dna-big-unit{font-size:16px;color:rgba(255,255,255,.5);margin-top:8px;letter-spacing:2px;}
+  /* Top 5 liste slide */
+  .dna-top5-list{width:100%;text-align:left;}
+  .dna-top5-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);}
+  .dna-top5-item:last-child{border-bottom:none;}
+  .dna-top5-cover{width:40px;height:40px;border-radius:3px;object-fit:cover;background:#1a1a1a;flex-shrink:0;}
+  .dna-top5-cover-ph{width:40px;height:40px;border-radius:3px;background:rgba(255,255,255,.06);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;}
+  .dna-top5-rank{font-size:11px;color:rgba(255,255,255,.3);width:14px;flex-shrink:0;text-align:right;}
+  .dna-top5-rank-1{color:#f5c518 !important;}
+  .dna-top5-info{flex:1;min-width:0;}
+  .dna-top5-name{font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .dna-top5-meta{font-size:10px;color:rgba(255,255,255,.4);margin-top:1px;}
+  .dna-top5-cnt{font-size:11px;color:#1db954;font-weight:700;flex-shrink:0;}
+  /* Nav + toolbar */
+  .dna-nav{display:flex;align-items:center;gap:16px;margin-top:18px;}
+  .dna-nav button{background:rgba(255,255,255,.1);border:none;color:#fff;width:40px;height:40px;border-radius:50%;font-size:16px;cursor:pointer;transition:background .2s;}
+  .dna-nav button:hover{background:rgba(255,255,255,.2);}
+  .dna-nav button:disabled{opacity:.25;cursor:default;}
+  .dna-dot-row{display:flex;gap:6px;align-items:center;}
+  .dna-dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.25);transition:all .25s;}
+  .dna-dot.on{background:#1db954;width:14px;border-radius:3px;}
+  .dna-toolbar{position:absolute;top:14px;right:14px;display:flex;gap:8px;}
+  .dna-tb-btn{background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.15);color:#fff;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;border-radius:2px;letter-spacing:.5px;}
+  .dna-tb-btn:hover{background:rgba(255,255,255,.1);}
+  .dna-progress-bar{position:absolute;top:0;left:0;height:2px;background:#1db954;transition:width .3s;}
+  .dna-sl-logo{font-size:9px;letter-spacing:3px;color:rgba(255,255,255,.2);text-transform:uppercase;position:absolute;bottom:16px;left:0;right:0;text-align:center;}
+
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -930,16 +1005,18 @@
       <!-- ARALIK SEÇİCİ -->
       <div class="aralik-wrap" id="aralilkWrap">
         <button class="aralik-btn" id="aralilkBtn" onclick="toggleAralikMenu(event)">
-          <span id="aralilkLabel">Tüm Zamanlar</span>
+          <span id="aralilkLabel">Bu Yıl</span>
           <span class="aralik-arrow">▼</span>
         </button>
         <div class="aralik-dropdown" id="aralilkDropdown">
-          <div class="aralik-option" data-val="1hafta"  onclick="setAralik('1hafta','1 Hafta',this)">1 Hafta</div>
-          <div class="aralik-option" data-val="1ay"     onclick="setAralik('1ay','1 Ay',this)">1 Ay</div>
-          <div class="aralik-option" data-val="1yil"    onclick="setAralik('1yil','1 Yıl',this)">1 Yıl</div>
-          <div class="aralik-option active" data-val="tumzamanlar" onclick="setAralik('tumzamanlar','Tüm Zamanlar',this)">Tüm Zamanlar</div>
+          <div class="aralik-option" data-val="buhafta"     onclick="setAralik('buhafta','Bu Hafta',this)">Bu Hafta</div>
+          <div class="aralik-option" data-val="buay"        onclick="setAralik('buay','Bu Ay',this)">Bu Ay</div>
+          <div class="aralik-option active" data-val="buyil" onclick="setAralik('buyil','Bu Yıl',this)">Bu Yıl</div>
+          <div class="aralik-option" data-val="ozel"        onclick="setAralik('ozel','Özel Aralık',this)">Özel Aralık</div>
+          <div class="aralik-option" data-val="tumzamanlar" onclick="setAralik('tumzamanlar','Tüm Zamanlar',this)">Tüm Zamanlar</div>
         </div>
       </div>
+      <button onclick="manualSync()" id="syncBtn" title="Şimdi Sync Yap" class="hamburger-btn">⟳</button>
       <button onclick="downloadPNG()" id="dlBtn" title="Görüntüyü İndir" class="hamburger-btn">↓</button>
       <button onclick="toggleMenu()" class="hamburger-btn">☰</button>
     </div>
@@ -1256,6 +1333,7 @@
 
   <!-- KULLANIM VE LİMİTLER EKRANI — Sadece AI Limiti -->
   <div id="view-kullanim" class="view-section">
+
     <div class="section-title">AI Kullanım Limiti</div>
     <div class="ai-limit-card">
       <div class="ai-limit-top">
@@ -1422,6 +1500,7 @@
     </div>
 
     <div class="section-title" style="margin-top:40px">Veri ve Yönetim</div>
+    <button class="action-btn" onclick="openDnaModal()" style="margin-bottom:8px">🧬 MusicDNA'nı Oluştur</button>
     <button class="action-btn" onclick="openImportModal()" style="margin-bottom:8px">📥 Dinleme Geçmişini İçeri Aktar</button>
     <button class="action-btn" onclick="window.location.href='/api/export-csv'" style="margin-bottom:8px">⬇ Tüm Verilerini İndir (.csv)</button>
     <button class="action-btn danger" onclick="if(confirm('Çıkış yapmak istediğine emin misin?')) window.location.href='/logout'">↪ Sistemden Çıkış Yap</button>
@@ -1431,6 +1510,44 @@
     <span>Music+ — Bu Bir Spotify Ürünü Değildir</span>
     <span id="footerTime"></span>
   </footer>
+</div>
+
+
+
+<!-- MusicDNA AYAR MODALI -->
+<div class="dna-overlay" id="dnaOverlay" onclick="if(event.target===this)closeDnaSettings()">
+  <div class="dna-settings">
+    <h2>🧬 MusicDNA'nı Oluştur</h2>
+    <div class="sub">Spotify Wrapped gibi kişisel müzik kimliğini oluştur ve indir</div>
+    <div class="dna-opt"><div class="dna-opt-label">🎵 Top 5 Şarkıyı dahil et</div><div class="dna-toggle on" id="dnaTop5Sarki" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">🎤 Top 5 Sanatçıyı dahil et</div><div class="dna-toggle on" id="dnaTop5Sanatci" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">💿 Top 5 Albümü dahil et</div><div class="dna-toggle on" id="dnaTop5Album" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">🤖 AI kullanımını dahil et</div><div class="dna-toggle on" id="dnaAI" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">⏰ En çok dinlenen zamanı dahil et</div><div class="dna-toggle on" id="dnaVakit" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">📅 En çok dinlenen Ay'ı dahil et</div><div class="dna-toggle on" id="dnaAy" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">👑 En çok dinlenen sanatçıyı dahil et</div><div class="dna-toggle on" id="dnaEnSanatci" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-opt"><div class="dna-opt-label">🏆 En çok dinlenen şarkıyı dahil et</div><div class="dna-toggle on" id="dnaEnSarki" onclick="this.classList.toggle('on')"><div class="k"></div></div></div>
+    <div class="dna-set-actions">
+      <button class="btn-dna-cls" onclick="closeDnaSettings()">Kapat</button>
+      <button class="btn-dna-gen" id="dnaGenBtn" onclick="startDnaGenerate()">Oluştur</button>
+    </div>
+  </div>
+</div>
+
+<!-- MusicDNA WRAPPED VİEWER -->
+<div class="dna-viewer" id="dnaViewer">
+  <div class="dna-toolbar">
+    <button class="dna-tb-btn" onclick="downloadDnaPdf()">⬇ PDF İndir</button>
+    <button class="dna-tb-btn" onclick="closeDnaViewer()">✕ Kapat</button>
+  </div>
+  <div class="dna-slides-wrap" id="dnaSlidesWrap">
+    <div class="dna-progress-bar" id="dnaProgressBar"></div>
+  </div>
+  <div class="dna-nav">
+    <button id="dnaPrev" onclick="dnaGo(-1)">‹</button>
+    <div class="dna-dot-row" id="dnaDots"></div>
+    <button id="dnaNext" onclick="dnaGo(1)">›</button>
+  </div>
 </div>
 
 
@@ -1528,7 +1645,9 @@ function toggleMenu() {
 }
 
 // ===================== ARALIK SEÇİCİ =====================
-let _currentAralik = 'tumzamanlar';
+let _currentAralik = 'buyil';
+let _ozelBaslangic = null;
+let _ozelBitis = null;
 
 function toggleAralikMenu(e) {
   e.stopPropagation();
@@ -1539,7 +1658,17 @@ function toggleAralikMenu(e) {
 }
 
 function setAralik(val, label, el) {
+  // Özel aralık seçildiyse date picker aç, seçimi bekle
+  if (val === 'ozel') {
+    document.getElementById('aralilkBtn').classList.remove('open');
+    document.getElementById('aralilkDropdown').classList.remove('open');
+    openOzelAralik();
+    return;
+  }
+
   _currentAralik = val;
+  _ozelBaslangic = null;
+  _ozelBitis = null;
   document.getElementById('aralilkLabel').textContent = label;
   document.getElementById('aralilkBtn').classList.remove('open');
   document.getElementById('aralilkDropdown').classList.remove('open');
@@ -1547,6 +1676,44 @@ function setAralik(val, label, el) {
   el.classList.add('active');
 
   // Aralik değişince sadece istatistikler ve topluluk sayfaları için yeniden yükle
+  const activeView = document.querySelector('.view-section.active');
+  if (!activeView) return;
+  const vid = activeView.id.replace('view-', '');
+  if (vid === 'istatistikler') reloadStats();
+  if (vid === 'topluluk') loadTopluluk(_currentAralik);
+}
+
+function openOzelAralik() {
+  document.getElementById('ozelAralikModal').style.display = 'flex';
+  // Varsayılan: bu yılın başı - bugün
+  const today = new Date().toISOString().slice(0, 10);
+  const yearStart = new Date().getFullYear() + '-01-01';
+  const bas = document.getElementById('ozelBaslangic');
+  const bit = document.getElementById('ozelBitis');
+  if (!bas.value) bas.value = yearStart;
+  if (!bit.value) bit.value = today;
+}
+
+function closeOzelAralik() {
+  document.getElementById('ozelAralikModal').style.display = 'none';
+}
+
+function applyOzelAralik() {
+  const bas = document.getElementById('ozelBaslangic').value;
+  const bit = document.getElementById('ozelBitis').value;
+  if (!bas || !bit) { alert('Lütfen başlangıç ve bitiş tarihini seçin.'); return; }
+  if (bas > bit) { alert('Başlangıç tarihi bitiş tarihinden sonra olamaz.'); return; }
+
+  _currentAralik = 'ozel';
+  _ozelBaslangic = bas;
+  _ozelBitis = bit;
+
+  const label = bas.slice(0,10) + ' → ' + bit.slice(0,10);
+  document.getElementById('aralilkLabel').textContent = label;
+  document.querySelectorAll('.aralik-option').forEach(o => o.classList.remove('active'));
+  document.querySelector('.aralik-option[data-val="ozel"]')?.classList.add('active');
+  closeOzelAralik();
+
   const activeView = document.querySelector('.view-section.active');
   if (!activeView) return;
   const vid = activeView.id.replace('view-', '');
@@ -1696,7 +1863,7 @@ let _toplulukLoaded = false;
 let _toplulukAralik = null;
 
 async function loadTopluluk(aralik) {
-  const a = aralik || _currentAralik || 'tumzamanlar';
+  const a = aralik || _currentAralik || 'buyil';
   // Aralik değişmişse cache'i sıfırla
   if (a !== _toplulukAralik) {
     _toplulukLoaded = false;
@@ -1707,7 +1874,11 @@ async function loadTopluluk(aralik) {
   content.innerHTML = '<div class="loading">Topluluk verileri yükleniyor...</div>';
 
   try {
-    const res  = await fetch('/api/istatistikler?aralik=' + a);
+    let toplulukUrl = '/api/istatistikler?aralik=' + a;
+    if (a === 'ozel' && _ozelBaslangic && _ozelBitis) {
+      toplulukUrl += '&baslangic=' + _ozelBaslangic + '&bitis=' + _ozelBitis;
+    }
+    const res  = await fetch(toplulukUrl);
     const data = await res.json();
 
     if (data.error === 'Henüz kimse izin vermemiş') {
@@ -2454,9 +2625,74 @@ function _normalizeArtistData(rawList) {
 }
 
 async function fetchData(aralik) {
-  const param = aralik || _currentAralik || 'tumzamanlar';
-  const res = await fetch('/api/dashboard?aralik=' + param);
+  const param = aralik || _currentAralik || 'buyil';
+  let url = '/api/dashboard?aralik=' + param;
+  if (param === 'ozel' && _ozelBaslangic && _ozelBitis) {
+    url += '&baslangic=' + _ozelBaslangic + '&bitis=' + _ozelBitis;
+  }
+  const res = await fetch(url);
   return res.ok ? res.json() : null;
+}
+
+// ── Otomatik sync polling ──────────────────────────────────────────────────
+// Arka planda yapılan sync'i UI'a yansıtmak için son_sync değişince reloadStats çağırır
+let _lastKnownSync = null;
+
+async function _pollSyncStatus() {
+  try {
+    const res  = await fetch('/api/sync-status');
+    if (!res.ok) return;
+    const data = await res.json();
+    const ts   = data.son_sync;
+    if (_lastKnownSync === null) {
+      // İlk çalışmada sadece kaydet, yükleme yapmadan geç
+      _lastKnownSync = ts;
+      return;
+    }
+    if (ts && ts !== _lastKnownSync) {
+      _lastKnownSync = ts;
+      // Arka planda sync yapılmış — istatistikler sayfasındaysa yenile
+      const activeView = document.querySelector('.view-section.active');
+      if (activeView && activeView.id === 'view-istatistikler') {
+        await reloadStats();
+      } else {
+        // Diğer sayfalarda sadece syncInfo'yu güncelle
+        document.getElementById('syncInfo').innerHTML =
+          `<span class="dot"></span> Aktif &nbsp;|&nbsp; Son sync: ${ts}`;
+      }
+    }
+  } catch(e) { /* sessizce geç */ }
+}
+
+// Her 90 saniyede bir kontrol et
+setInterval(_pollSyncStatus, 90_000);
+
+async function manualSync() {
+  const btn = document.getElementById('syncBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.textContent = '⟳';
+  }
+  document.getElementById('syncInfo').innerHTML = '<span class="dot"></span> Sync yapılıyor...';
+  try {
+    const res = await fetch('/api/sync', { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      _lastKnownSync = data.son_sync;  // polling çakışmasını önle
+      await reloadStats();
+    } else {
+      document.getElementById('syncInfo').innerHTML = '<span class="dot" style="background:red"></span> Sync hatası';
+    }
+  } catch(e) {
+    document.getElementById('syncInfo').innerHTML = '<span class="dot" style="background:red"></span> Bağlantı hatası';
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.textContent = '⟳';
+    }
+  }
 }
 
 async function reloadStats() {
@@ -2509,29 +2745,47 @@ function renderWeek(hafta) {
 // ── Görsel önbelleği (sanatçı/şarkı adı → görsel URL) ──────────────────────
 const _imgCache = {};
 
+// DÜZELTME: null değerleri cache'leme — sadece başarılı URL'leri tut.
+// Önceki implementasyon null'u cache'leyip token düzeldikten sonra bile
+// görselleri yüklemiyordu.
+const _imgPending = {};   // devam eden fetch'leri takip et (race condition önlemi)
+
 async function _fetchSpotifyImg(type, name, sub) {
   const cacheKey = type + ':' + name;
-  if (_imgCache[cacheKey] !== undefined) return _imgCache[cacheKey];
-  _imgCache[cacheKey] = null;
-  try {
-    let url = '';
-    // FIX: query param kullan — path'e gömmek Türkçe/özel karakterleri bozuyor
-    if (type === 'artist') {
-      url = '/api/sanatci-gorsel?' + new URLSearchParams({ q: name });
-    } else if (type === 'track') {
-      url = '/api/sarki-gorsel?'  + new URLSearchParams({ q: name, sanatci: sub || '' });
-    } else if (type === 'album') {
-      url = '/api/album-gorsel?'  + new URLSearchParams({ q: name, sanatci: sub || '' });
-    }
-    if (!url) return null;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    _imgCache[cacheKey] = data.image_url || null;
-    return _imgCache[cacheKey];
-  } catch(e) {
-    return null;
+
+  // Başarılı cache var mı?
+  if (_imgCache[cacheKey]) return _imgCache[cacheKey];
+
+  // Aynı key için zaten fetch devam ediyorsa bekle
+  if (_imgPending[cacheKey]) return _imgPending[cacheKey];
+
+  let url = '';
+  if (type === 'artist') {
+    url = '/api/sanatci-gorsel?' + new URLSearchParams({ q: name });
+  } else if (type === 'track') {
+    url = '/api/sarki-gorsel?'  + new URLSearchParams({ q: name, sanatci: sub || '' });
+  } else if (type === 'album') {
+    url = '/api/album-gorsel?'  + new URLSearchParams({ q: name, sanatci: sub || '' });
   }
+  if (!url) return null;
+
+  const promise = (async () => {
+    try {
+      const res  = await fetch(url);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const imgUrl = data.image_url || null;
+      if (imgUrl) _imgCache[cacheKey] = imgUrl;   // sadece başarılıyı cache'le
+      return imgUrl;
+    } catch(e) {
+      return null;
+    } finally {
+      delete _imgPending[cacheKey];
+    }
+  })();
+
+  _imgPending[cacheKey] = promise;
+  return promise;
 }
 
 function _thumbId(listId, idx) {
@@ -2601,7 +2855,11 @@ async function openTumSanatcilarModal() {
   document.getElementById('modalBody').innerHTML = '<div class="loading">Yükleniyor...</div>';
   openModal();
 
-  const res  = await fetch('/api/tum-sanatcilar');
+  let tsUrl = '/api/tum-sanatcilar?aralik=' + (_currentAralik || 'buyil');
+  if (_currentAralik === 'ozel' && _ozelBaslangic && _ozelBitis) {
+    tsUrl += '&baslangic=' + _ozelBaslangic + '&bitis=' + _ozelBitis;
+  }
+  const res  = await fetch(tsUrl);
   const data = await res.json();
   const max  = data.sanatcilar[0]?.count || 1;
 
@@ -2949,7 +3207,7 @@ async function init() {
   const aralilkWrap = document.getElementById('aralilkWrap');
   if (aralilkWrap) aralilkWrap.style.display = 'inline-block';
 
-  const data = await fetchData('tumzamanlar');
+  const data = await fetchData('buyil');
   if (!data) return;
   renderStats(data);
   renderWeek(data.hafta);
@@ -4318,6 +4576,302 @@ function sectionView(containerId, type, btn) {
 })();
 
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ========================= MusicDNA ========================================
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _dnaSlides   = [];
+let _dnaIndex    = 0;
+let _dnaData     = null;
+
+function openDnaModal()     { document.getElementById('dnaOverlay').classList.add('open'); }
+function closeDnaSettings() { document.getElementById('dnaOverlay').classList.remove('open'); }
+function closeDnaViewer()   { document.getElementById('dnaViewer').classList.remove('open'); }
+function _dnaOn(id)         { return document.getElementById(id).classList.contains('on'); }
+
+async function startDnaGenerate() {
+  const btn = document.getElementById('dnaGenBtn');
+  btn.disabled = true; btn.textContent = 'Yükleniyor...';
+  try {
+    const res = await fetch('/api/music-dna');
+    const d   = await res.json();
+    if (!res.ok) { alert(d.error || 'Hata'); btn.disabled=false; btn.textContent='Oluştur'; return; }
+    _dnaData = d;
+    closeDnaSettings();
+    _buildSlides(d);
+    document.getElementById('dnaViewer').classList.add('open');
+  } catch(e) {
+    alert('Hata: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Oluştur';
+  }
+}
+
+function _buildSlides(d) {
+  const wrap = document.getElementById('dnaSlidesWrap');
+  // progress bar'ı koru, geri kalanı temizle
+  const pb = document.getElementById('dnaProgressBar');
+  wrap.innerHTML = '';
+  wrap.appendChild(pb);
+  _dnaSlides = [];
+  _dnaIndex  = 0;
+
+  const secs = d.toplam_sure_sn || 0;
+  const days = Math.floor(secs / 86400);
+  const hrs  = Math.floor(secs / 3600);
+  const dayStr = days > 0 ? days + '+ gün' : hrs + '+ saat';
+
+  // ── Slide 0: Giriş ────────────────────────────────────────────────────
+  _addSlide('dna-s0', `
+    <div class="dna-sl-eyebrow">Music+ • ${d.generated_at}</div>
+    <div class="dna-sl-title" style="font-size:34px">${_esc(d.display_name)}'in<br>MusicDNA'sı</div>
+    <div class="dna-sl-sub" style="margin-top:12px">${d.toplam_kayit} dinleme kaydından<br>oluşturuldu</div>
+    <div class="dna-sl-badge dna-sl-green" style="margin-top:20px">İlk kayıt: ${d.ilk_kayit}</div>
+  `);
+
+  // ── Slide 1: Toplam dinleme süresi ────────────────────────────────────
+  _addSlide('dna-s3', `
+    <div class="dna-sl-eyebrow">Bu kadar müzik dinledin</div>
+    <div class="dna-big-stat">${dayStr.split('+')[0]}+</div>
+    <div class="dna-big-unit">${days > 0 ? 'GÜN' : 'SAAT'}</div>
+    <div class="dna-sl-sub" style="margin-top:20px">${d.toplam_sure}</div>
+    <div class="dna-sl-sub" style="font-size:11px">${d.farkli_sarki} farklı şarkı • ${d.farkli_sanatci} farklı sanatçı</div>
+  `);
+
+  // ── Slide 2: #1 Şarkı ────────────────────────────────────────────────
+  if (_dnaOn('dnaEnSarki') && d.en_cok_sarki) {
+    const s = d.en_cok_sarki;
+    const img = s.artwork ? `<img class="dna-cover" src="${_imgSrc(s.artwork)}" onerror="this.style.display='none'">` : `<div class="dna-cover-placeholder">🎵</div>`;
+    _addSlide('dna-s1', `
+      ${img}
+      <div class="dna-sl-eyebrow">Senin şarkın</div>
+      <div class="dna-sl-title">${_esc(s.sarki)}</div>
+      <div class="dna-sl-sub">${_esc(s.sanatci)}</div>
+      <div class="dna-sl-badge dna-sl-green">${s.count} kez dinlendi</div>
+    `);
+  }
+
+  // ── Slide 3: #1 Sanatçı ──────────────────────────────────────────────
+  if (_dnaOn('dnaEnSanatci') && d.en_cok_sanatci) {
+    const a = d.en_cok_sanatci;
+    const img = a.artwork ? `<img class="dna-artist-img" src="${_imgSrc(a.artwork)}" onerror="this.style.display='none'">` : `<div class="dna-cover-placeholder" style="border-radius:50%">🎤</div>`;
+    _addSlide('dna-s2', `
+      ${img}
+      <div class="dna-sl-eyebrow">Senin sanatçın</div>
+      <div class="dna-sl-title">${_esc(a.sanatci)}</div>
+      <div class="dna-sl-badge dna-sl-green">${a.count} kez dinlendi</div>
+    `);
+  }
+
+  // ── Slide 4: Top 5 Şarkı ─────────────────────────────────────────────
+  if (_dnaOn('dnaTop5Sarki') && d.top5_sarki && d.top5_sarki.length) {
+    let rows = '';
+    d.top5_sarki.forEach((s,i) => {
+      const img = s.artwork ? `<img class="dna-top5-cover" src="${_imgSrc(s.artwork)}" onerror="this.style.display='none'">` : `<div class="dna-top5-cover-ph">🎵</div>`;
+      rows += `<div class="dna-top5-item">
+        <span class="dna-top5-rank ${i===0?'dna-top5-rank-1':''}">${i+1}</span>
+        ${img}
+        <div class="dna-top5-info"><div class="dna-top5-name">${_esc(s.sarki)}</div><div class="dna-top5-meta">${_esc(s.sanatci)}</div></div>
+        <span class="dna-top5-cnt">${s.count}x</span>
+      </div>`;
+    });
+    _addSlide('dna-s4', `
+      <div class="dna-sl-eyebrow" style="margin-bottom:14px">Top 5 Şarkın</div>
+      <div class="dna-top5-list">${rows}</div>
+    `);
+  }
+
+  // ── Slide 5: Top 5 Sanatçı ───────────────────────────────────────────
+  if (_dnaOn('dnaTop5Sanatci') && d.top5_sanatci && d.top5_sanatci.length) {
+    let rows = '';
+    d.top5_sanatci.forEach((a,i) => {
+      const img = a.artwork ? `<img class="dna-top5-cover" src="${_imgSrc(a.artwork)}" style="border-radius:50%" onerror="this.style.display='none'">` : `<div class="dna-top5-cover-ph">🎤</div>`;
+      rows += `<div class="dna-top5-item">
+        <span class="dna-top5-rank ${i===0?'dna-top5-rank-1':''}">${i+1}</span>
+        ${img}
+        <div class="dna-top5-info"><div class="dna-top5-name">${_esc(a.sanatci)}</div><div class="dna-top5-meta">${a.count} dinleme</div></div>
+        <span class="dna-top5-cnt">${a.count}x</span>
+      </div>`;
+    });
+    _addSlide('dna-s5', `
+      <div class="dna-sl-eyebrow" style="margin-bottom:14px">Top 5 Sanatçın</div>
+      <div class="dna-top5-list">${rows}</div>
+    `);
+  }
+
+  // ── Slide 6: Top 5 Albüm ─────────────────────────────────────────────
+  if (_dnaOn('dnaTop5Album') && d.top5_album && d.top5_album.length) {
+    let rows = '';
+    d.top5_album.forEach((al,i) => {
+      const img = al.artwork ? `<img class="dna-top5-cover" src="${_imgSrc(al.artwork)}" onerror="this.style.display='none'">` : `<div class="dna-top5-cover-ph">💿</div>`;
+      rows += `<div class="dna-top5-item">
+        <span class="dna-top5-rank ${i===0?'dna-top5-rank-1':''}">${i+1}</span>
+        ${img}
+        <div class="dna-top5-info"><div class="dna-top5-name">${_esc(al.album)}</div><div class="dna-top5-meta">${_esc(al.sanatci)}</div></div>
+        <span class="dna-top5-cnt">${al.count}x</span>
+      </div>`;
+    });
+    _addSlide('dna-s6', `
+      <div class="dna-sl-eyebrow" style="margin-bottom:14px">Top 5 Albümün</div>
+      <div class="dna-top5-list">${rows}</div>
+    `);
+  }
+
+  // ── Slide 7: En çok dinlenen zaman ───────────────────────────────────
+  if (_dnaOn('dnaVakit') && d.en_cok_vakit) {
+    const icons = {'Sabah (06-12)':'🌅','Öğleden Sonra (12-18)':'☀️','Akşam (18-24)':'🌆','Gece (00-06)':'🌙'};
+    const icon  = icons[d.en_cok_vakit] || '⏰';
+    _addSlide('dna-s7', `
+      <div style="font-size:72px;margin-bottom:16px">${icon}</div>
+      <div class="dna-sl-eyebrow">En çok dinlediğin zaman</div>
+      <div class="dna-sl-title">${_esc(d.en_cok_vakit)}</div>
+    `);
+  }
+
+  // ── Slide 8: En çok dinlenen ay ──────────────────────────────────────
+  if (_dnaOn('dnaAy') && d.en_cok_ay) {
+    _addSlide('dna-s8', `
+      <div style="font-size:64px;margin-bottom:16px">📅</div>
+      <div class="dna-sl-eyebrow">En çok dinlediğin ay</div>
+      <div class="dna-sl-title">${_esc(d.en_cok_ay.ay)}</div>
+      <div class="dna-sl-badge dna-sl-green">${d.en_cok_ay.kayit_sayisi} dinleme</div>
+    `);
+  }
+
+  // ── Slide 9: AI ──────────────────────────────────────────────────────
+  if (_dnaOn('dnaAI')) {
+    _addSlide('dna-s0', `
+      <div style="font-size:64px;margin-bottom:16px">🤖</div>
+      <div class="dna-sl-eyebrow">AI kullanımın</div>
+      <div class="dna-big-stat" style="font-size:64px">${d.ai_total}</div>
+      <div class="dna-big-unit">AI ÖNERİSİ ALDIN</div>
+    `);
+  }
+
+  // ── Son slide ─────────────────────────────────────────────────────────
+  _addSlide('dna-s3', `
+    <div style="font-size:48px;margin-bottom:20px">🧬</div>
+    <div class="dna-sl-title">Bu senin<br>MusicDNA'n</div>
+    <div class="dna-sl-sub" style="margin-top:12px">${_esc(d.display_name)}</div>
+    <div class="dna-sl-logo" style="position:relative;bottom:auto;margin-top:24px;font-size:10px;color:rgba(255,255,255,.3);letter-spacing:3px;">MUSIC+</div>
+  `);
+
+  _buildDots();
+  _dnaShowSlide(0);
+}
+
+function _addSlide(gradClass, inner) {
+  const wrap = document.getElementById('dnaSlidesWrap');
+  const div  = document.createElement('div');
+  div.className = 'dna-slide ' + gradClass;
+  div.innerHTML = inner + '<div class="dna-sl-logo">MUSIC+</div>';
+  wrap.appendChild(div);
+  _dnaSlides.push(div);
+}
+
+function _buildDots() {
+  const row = document.getElementById('dnaDots');
+  row.innerHTML = '';
+  _dnaSlides.forEach((_,i) => {
+    const d = document.createElement('div');
+    d.className = 'dna-dot' + (i===0?' on':'');
+    d.onclick = () => _dnaShowSlide(i);
+    row.appendChild(d);
+  });
+}
+
+function _dnaShowSlide(idx) {
+  _dnaSlides.forEach((s,i) => s.classList.toggle('active', i===idx));
+  document.querySelectorAll('.dna-dot').forEach((d,i) => d.classList.toggle('on', i===idx));
+  document.getElementById('dnaPrev').disabled = idx === 0;
+  document.getElementById('dnaNext').disabled = idx === _dnaSlides.length - 1;
+  const pct = _dnaSlides.length > 1 ? ((idx+1)/(_dnaSlides.length))*100 : 100;
+  document.getElementById('dnaProgressBar').style.width = pct + '%';
+  _dnaIndex = idx;
+}
+
+function dnaGo(dir) {
+  const next = _dnaIndex + dir;
+  if (next >= 0 && next < _dnaSlides.length) _dnaShowSlide(next);
+}
+
+// Klavye navigasyon
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('dnaViewer').classList.contains('open')) return;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') dnaGo(1);
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   dnaGo(-1);
+  if (e.key === 'Escape') closeDnaViewer();
+});
+
+// Dokunmatik kaydırma
+(function() {
+  let startX = 0;
+  document.addEventListener('touchstart', e => { if (document.getElementById('dnaViewer').classList.contains('open')) startX = e.touches[0].clientX; });
+  document.addEventListener('touchend',   e => {
+    if (!document.getElementById('dnaViewer').classList.contains('open')) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 50) dnaGo(dx < 0 ? 1 : -1);
+  });
+})();
+
+async function downloadDnaPdf() {
+  const btn = document.querySelector('.dna-tb-btn');
+  btn.textContent = '⏳ Hazırlanıyor...';
+  btn.disabled    = true;
+
+  try {
+    // jsPDF'i dinamik yükle
+    if (!window.jsPDF) {
+      await new Promise((res,rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    const { jsPDF } = window.jspdf;
+    const prev = _dnaIndex;
+
+    // Slide başına 360x640 boyut (px → pt: 1pt = 1.333px)
+    const W = 360, H = 640;
+    const pdf = new jsPDF({ orientation:'portrait', unit:'px', format:[W,H] });
+
+    for (let i = 0; i < _dnaSlides.length; i++) {
+      _dnaShowSlide(i);
+      await new Promise(r => setTimeout(r, 120)); // animasyon bekle
+      const canvas = await html2canvas(_dnaSlides[i], {
+        backgroundColor: null,
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        width: W, height: H,
+      });
+      if (i > 0) pdf.addPage([W, H]);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H);
+    }
+    const name = (_dnaData?.display_name || 'MusicDNA').replace(/[^a-zA-Z0-9]/g,' ').trim();
+    pdf.save(name + '-MusicDNA.pdf');
+    _dnaShowSlide(prev);
+  } catch(e) {
+    alert('PDF hatası: ' + e.message);
+  } finally {
+    btn.textContent = '⬇ PDF İndir';
+    btn.disabled    = false;
+  }
+}
+
+function _esc(str) {
+  if (!str) return '—';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _imgSrc(url) {
+  if (!url) return null;
+  return '/api/img-proxy?u=' + encodeURIComponent(url);
+}
+
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ========================= IMPORT HISTORY ==================================
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4461,8 +5015,9 @@ async function _pollProgress() {
       document.getElementById('importProgEta').textContent = '⏱ Tahminen ' + eta + ' saniye kaldı';
     }
 
+    const phaseLabel = data.phase_label || 'İşleniyor';
     document.getElementById('importProgLabel').textContent =
-      'Albüm adları aranıyor — ' + current + ' işlendi, ' + (total - current) + ' kaldı';
+      phaseLabel + ' — ' + current + ' işlendi, ' + (total - current) + ' kaldı';
 
     if (data.status === 'done' || data.cancelled) {
       clearInterval(_importPollTimer);
@@ -4521,5 +5076,32 @@ async function doAutoFusion() {
 }
 </script>
 
+
+<!-- ÖZEL ARALIK DATE PICKER MODALI -->
+<div id="ozelAralikModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border);padding:32px;min-width:320px;font-family:'DM Mono',monospace;">
+    <div style="font-size:13px;color:var(--text);margin-bottom:20px;letter-spacing:.5px;">📅 Özel Aralık Seç</div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Başlangıç</div>
+      <input type="date" id="ozelBaslangic"
+             style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;font-family:'DM Mono',monospace;font-size:12px;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:24px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Bitiş</div>
+      <input type="date" id="ozelBitis"
+             style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;font-family:'DM Mono',monospace;font-size:12px;box-sizing:border-box;">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeOzelAralik()"
+              style="background:transparent;border:1px solid var(--border);color:var(--muted);padding:8px 18px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;">
+        İptal
+      </button>
+      <button onclick="applyOzelAralik()"
+              style="background:var(--green);border:none;color:#000;padding:8px 18px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;font-weight:700;">
+        Uygula
+      </button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

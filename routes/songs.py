@@ -27,44 +27,79 @@ bp = Blueprint("songs", __name__)
 
 
 # ── Görsel Cache ─────────────────────────────────────────────────────────────
-_gorsel_cache = {}
+# {cache_key: (url_or_none, timestamp)}  — 24 saatte bir yenilenir
+_gorsel_cache: dict = {}
+_GORSEL_TTL = 86400  # 24 saat
+
+
+def _gorsel_cache_get(key: str):
+    """Cache'ten URL döndürür. Süresi geçmişse veya hiç yoksa None."""
+    import time as _time
+    entry = _gorsel_cache.get(key)
+    if not entry:
+        return "MISS"   # cache'te hiç yok
+    url, ts = entry
+    if _time.time() - ts > _GORSEL_TTL:
+        del _gorsel_cache[key]
+        return "MISS"   # süresi dolmuş
+    return url          # None olabilir (bilinen bulunamayan)
+
+
+def _gorsel_cache_set(key: str, url):
+    import time as _time
+    # DÜZELTME: Sadece BAŞARILI sonuçları cache'le.
+    # None değerleri cache'leme — token geçersizdi ya da geçici hataydı.
+    # Böylece token düzeldikten sonra yeniden dener.
+    if url is not None:
+        _gorsel_cache[key] = (url, _time.time())
 
 
 def _spotify_search_image(q, item_type="artist"):
     """
     Spotify Search API kullanarak görsel URL döndürür.
-    SpotifyClient._ get_access_token() ile her zaman taze token alır.
-    market parametresi Kasim 2024'te deprecated oldugundan kullanilmiyor.
+    DÜZELTMELER:
+    - None değerler artık cache'lenmez (token geçici hataları kalıcı olmaz).
+    - 401 aldığında token'ı yenilemeye zorlar (force_refresh).
+    - 24 saatlik TTL ile başarılı sonuçlar cache'lenir.
     """
     cache_key = f"{item_type}:{q}"
-    if cache_key in _gorsel_cache:
-        return _gorsel_cache[cache_key]
+    cached = _gorsel_cache_get(cache_key)
+    if cached != "MISS":
+        return cached   # None da olsa bilinen sonuç (başarılı ama görsel yok)
+
+    def _do_search(token):
+        return requests.get(
+            "https://api.spotify.com/v1/search",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"q": q, "type": item_type, "limit": 1},
+            timeout=5,
+        )
+
     try:
         token = spotify._get_access_token()
         if not token:
             return None
 
-        # FIX: market parametresi kaldırıldı (Kasım 2024 deprecated)
-        params = {"q": q, "type": item_type, "limit": 1}
+        resp = _do_search(token)
 
-        resp = requests.get(
-            "https://api.spotify.com/v1/search",
-            headers={"Authorization": f"Bearer {token}"},
-            params=params,
-            timeout=4,
-        )
+        # Token süresi dolmuşsa bir kez yenile ve tekrar dene
+        if resp.status_code == 401:
+            logger.warning(f"Görsel: 401 alındı, token yenileniyor ({item_type}:{q[:30]})")
+            spotify._access_token    = None   # cache'i temizle → yenile
+            spotify._token_expires_at = 0
+            token = spotify._get_access_token()
+            resp  = _do_search(token)
 
         if resp.status_code != 200:
-            _gorsel_cache[cache_key] = None
-            return None
+            logger.warning(f"Görsel arama {resp.status_code} ({item_type}:{q[:40]})")
+            return None   # cache'leme — geçici hata olabilir
 
-        data = resp.json()
+        data    = resp.json()
         img_url = None
 
         if item_type == "artist":
             items = data.get("artists", {}).get("items", [])
             if items and items[0].get("images"):
-                # FIX: [0] → en büyük görsel ([-1] en küçüğü veriyordu)
                 img_url = items[0]["images"][0]["url"]
         elif item_type == "track":
             items = data.get("tracks", {}).get("items", [])
@@ -75,11 +110,12 @@ def _spotify_search_image(q, item_type="artist"):
             if items and items[0].get("images"):
                 img_url = items[0]["images"][0]["url"]
 
-        _gorsel_cache[cache_key] = img_url
+        _gorsel_cache_set(cache_key, img_url)
         return img_url
+
     except Exception as e:
-        logger.error(f"Görsel arama hatası: {e}")
-        return None
+        logger.error(f"Görsel arama hatası ({item_type}:{q[:40]}): {e}")
+        return None   # istisnalarda da cache'leme
 
 
 # ── Şarkı Detay ──────────────────────────────────────────────────────────────
@@ -96,7 +132,7 @@ def api_sarki_detay(sarki_adi):
 
         idx_sarki = headers.index("Şarkı Adı")
         idx_sanatci = headers.index("Sanatçı")
-        idx_sure = headers.index("Süre (sn)")
+        idx_sure = headers.index("Süre (ms)")
         idx_iso = headers.index("_played_at_iso")
 
         saat_counts = defaultdict(int)
@@ -115,7 +151,7 @@ def api_sarki_detay(sarki_adi):
             toplam_count += 1
             sanatci = row[idx_sanatci].strip()
             try:
-                sure = int(row[idx_sure])
+                sure = int(row[idx_sure]) // 1000
                 toplam_sure += sure
             except Exception:
                 pass
@@ -172,7 +208,7 @@ def api_sanatci_detay(sanatci_adi):
 
         idx_sarki = headers.index("Şarkı Adı")
         idx_sanatci = headers.index("Sanatçı")
-        idx_sure = headers.index("Süre (sn)")
+        idx_sure = headers.index("Süre (ms)")
         idx_iso = headers.index("_played_at_iso")
 
         sarki_counts = defaultdict(lambda: {"count": 0, "sure": 0})
@@ -192,7 +228,7 @@ def api_sanatci_detay(sanatci_adi):
             toplam_count += 1
             sarki = row[idx_sarki].strip()
             try:
-                sure = int(row[idx_sure])
+                sure = int(row[idx_sure]) // 1000
                 toplam_sure += sure
             except Exception:
                 sure = 0
@@ -265,7 +301,7 @@ def api_album(album_adi):
         idx_sarki = headers.index("Şarkı Adı")
         idx_sanatci = headers.index("Sanatçı")
         idx_album = next((i for i, h in enumerate(headers) if h.strip() in ("Albüm", "Album", "albüm", "album")), -1)
-        idx_sure = headers.index("Süre (sn)")
+        idx_sure = headers.index("Süre (ms)")
 
         sarki_counts = defaultdict(lambda: {"count": 0, "sanatci": "", "sure": 0})
         toplam_count = 0
@@ -279,7 +315,7 @@ def api_album(album_adi):
             sarki = row[idx_sarki].strip() if len(row) > idx_sarki else ""
             sanatci = row[idx_sanatci].strip() if len(row) > idx_sanatci else ""
             try:
-                sure = int(row[idx_sure])
+                sure = int(row[idx_sure]) // 1000
             except Exception:
                 sure = 0
             sarki_counts[sarki]["count"] += 1
@@ -323,7 +359,7 @@ def api_tum_sarkilar():
 
         idx_sarki = headers.index("Şarkı Adı")
         idx_sanatci = headers.index("Sanatçı")
-        idx_sure = headers.index("Süre (sn)")
+        idx_sure = headers.index("Süre (ms)")
 
         track_counts = defaultdict(lambda: {"count": 0, "sure": 0, "sanatci": ""})
         for row in rows:
@@ -335,7 +371,7 @@ def api_tum_sarkilar():
             track_counts[sarki]["count"] += 1
             track_counts[sarki]["sanatci"] = row[idx_sanatci].strip()
             try:
-                track_counts[sarki]["sure"] += int(row[idx_sure])
+                track_counts[sarki]["sure"] += int(row[idx_sure]) // 1000
             except Exception:
                 pass
 
@@ -358,8 +394,15 @@ def api_tum_sanatcilar():
         if not rows:
             return jsonify({"error": "Veri yok"})
 
+        # Aralik filtresi uygula
+        aralik    = request.args.get("aralik", "buyil")
+        baslangic = request.args.get("baslangic", None)
+        bitis     = request.args.get("bitis", None)
+        from routes.stats import _filter_rows_by_aralik
+        rows = _filter_rows_by_aralik(headers, rows, aralik, baslangic, bitis)
+
         idx_sanatci = headers.index("Sanatçı")
-        idx_sure = headers.index("Süre (sn)")
+        idx_sure = headers.index("Süre (ms)")
 
         artist_counts = defaultdict(lambda: {"count": 0, "sure": 0})
         for row in rows:
@@ -369,7 +412,7 @@ def api_tum_sanatcilar():
             if not sanatci:
                 continue
             try:
-                sure = int(row[idx_sure])
+                sure = int(row[idx_sure]) // 1000
             except Exception:
                 sure = 0
             # "X, Y" işbirliklerini bireysel olarak say
@@ -435,7 +478,7 @@ def api_ay_detay(ay_label):
 
         idx_sarki = headers.index("Şarkı Adı")
         idx_sanatci = headers.index("Sanatçı")
-        idx_sure = headers.index("Süre (sn)")
+        idx_sure = headers.index("Süre (ms)")
         idx_tarih = headers.index("Dinlenme Tarihi")
 
         TR_AYLAR_REV = {v: str(k).zfill(2) for k, v in config.TR_AYLAR.items()}
@@ -468,7 +511,7 @@ def api_ay_detay(ay_label):
             sarki = row[idx_sarki].strip()
             sanatci = row[idx_sanatci].strip()
             try:
-                sure = int(row[idx_sure])
+                sure = int(row[idx_sure]) // 1000
             except Exception:
                 sure = 0
 

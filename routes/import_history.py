@@ -35,18 +35,24 @@ def _ts_to_iso(end_time: str) -> str:
     return end_time
 
 
-def _search_album(client: SpotifyClient, track_name: str, artist_name: str) -> str:
-    """Spotify search ile albüm adı bul (limit=1, yeni API max 10 uyumlu)."""
+def _search_track_info(client: SpotifyClient, track_name: str, artist_name: str) -> dict:
+    """Spotify search ile şarkı bilgilerini bul: albüm adı, track_id, artist_ids."""
     try:
         q    = f"track:{track_name} artist:{artist_name}"
         data = client._req("GET", "/search",
                            params={"q": q, "type": "track", "limit": 1})
         items = data.get("tracks", {}).get("items", [])
         if items:
-            return items[0].get("album", {}).get("name", "—")
+            item = items[0]
+            artists = item.get("artists", [])
+            return {
+                "album_name": item.get("album", {}).get("name", "—"),
+                "track_id":   item.get("id", ""),
+                "artist_ids": ",".join(a["id"] for a in artists if a.get("id")),
+            }
     except Exception as e:
-        logger.warning(f"Albüm arama hatası '{track_name}': {e}")
-    return "—"
+        logger.warning(f"Şarkı arama hatası '{track_name}': {e}")
+    return {"album_name": "—", "track_id": "", "artist_ids": ""}
 
 
 def _parse_tracks(raw: list, skip_short: bool) -> list:
@@ -64,43 +70,83 @@ def _parse_tracks(raw: list, skip_short: bool) -> list:
             "track_id":    "",          # StreamingHistory.json'da bulunmuyor
             "track_name":  item["trackName"],
             "artist_name": item["artistName"],
-            "album_name":  "—",        # sonradan doldurulacak veya "—" kalacak
+            "artist_ids":  "",          # search sonrası doldurulacak
+            "album_name":  "—",        # search sonrası doldurulacak
             "duration_ms": ms,
             "duration_sec": round(ms / 1000),
+            "genre":       "",          # fetch_genres=True ise doldurulacak
         })
     return result
 
 
 # ── Background Worker ─────────────────────────────────────────────────────────
 
-def _import_worker(uid: str, refresh_token: str, tracks: list):
+def _import_worker(uid: str, refresh_token: str, tracks: list, fetch_genres: bool = False):
     """
-    Her şarkı için Spotify search yaparak albüm adını bulur,
-    bulunanları toplu olarak Sheets'e yazar.
+    Her şarkı için Spotify search yaparak albüm adı, track_id ve artist_ids bulur.
+    fetch_genres=True ise ayrıca sanatçı türlerini de çeker ve Tür sütununa yazar.
     İlerleme _progress[uid] dict'inde tutulur.
     """
     total = len(tracks)
-    _progress[uid].update({"total": total, "current": 0, "done": False, "error": None})
+    _progress[uid].update({
+        "total": total, "current": 0, "done": False,
+        "error": None, "phase": "search"
+    })
 
     try:
         client    = SpotifyClient(refresh_token=refresh_token)
         processed = []
 
+        # Faz 1: Her şarkı için search (albüm + track_id + artist_ids)
         for i, t in enumerate(tracks):
             if _progress[uid].get("cancelled"):
                 logger.info(f"Import iptal edildi ({uid})")
                 break
 
-            t["album_name"] = _search_album(client, t["track_name"], t["artist_name"])
+            info = _search_track_info(client, t["track_name"], t["artist_name"])
+            t["album_name"] = info["album_name"]
+            t["track_id"]   = info["track_id"]
+            t["artist_ids"] = info["artist_ids"]
             processed.append(t)
             _progress[uid]["current"] = i + 1
             time.sleep(0.12)   # Spotify rate limit marjı
+
+        # Faz 2: Genre çekme (isteğe bağlı)
+        if fetch_genres and processed and not _progress[uid].get("cancelled"):
+            _progress[uid]["phase"] = "genres"
+
+            # Tüm benzersiz artist_id'leri topla
+            all_ids = list({
+                aid.strip()
+                for t in processed
+                for aid in t.get("artist_ids", "").split(",")
+                if aid.strip()
+            })
+
+            # GenreCache'ten mevcut türleri al, eksikleri API'den çek
+            genre_map = sheets.get_cached_genres()
+            missing   = [aid for aid in all_ids if aid not in genre_map]
+
+            if missing:
+                new_genres = client.get_artists_genres(missing)
+                if new_genres:
+                    sheets.save_genres_batch(new_genres)
+                    genre_map.update(new_genres)
+
+            # Her şarkıya primary genre ata (ilk sanatçının ilk türü)
+            for t in processed:
+                for aid in [a.strip() for a in t.get("artist_ids", "").split(",") if a.strip()]:
+                    genres = genre_map.get(aid, [])
+                    if genres:
+                        t["genre"] = ", ".join(genres[:3])
+                        break
 
         if processed:
             imported, _ = sheets.append_tracks(uid, processed)
             _progress[uid]["imported"] = imported
 
-        _progress[uid]["done"] = True
+        _progress[uid]["done"]  = True
+        _progress[uid]["phase"] = "done"
         logger.info(f"✅ Import tamamlandı ({uid}): {_progress[uid].get('imported',0)} yeni kayıt")
 
     except Exception as e:
@@ -126,6 +172,11 @@ def import_history():
     raw_tracks    = body.get("tracks", [])
     skip_short    = body.get("skip_short", True)
     fetch_albums  = body.get("fetch_albums", False)
+    fetch_genres  = body.get("fetch_genres", False)
+
+    # Genre çekmek için albüm araması da gerekli (track_id + artist_ids lazım)
+    if fetch_genres:
+        fetch_albums = True
 
     if not raw_tracks:
         return jsonify({"error": "Hiç şarkı bulunamadı"}), 400
@@ -136,25 +187,29 @@ def import_history():
         return jsonify({"error": "Filtre sonrası eklenecek şarkı kalmadı"}), 400
 
     if fetch_albums:
-        # Albüm arama: arka planda çalıştır
+        # Arka planda çalıştır (albüm + isteğe bağlı genre arama)
         refresh_token = session.get("refresh_token", "")
         if not refresh_token:
             return jsonify({"error": "Oturum süresi dolmuş, yeniden giriş yapın"}), 401
 
-        _progress[uid] = {"total": len(tracks), "current": 0,
-                          "done": False, "error": None, "imported": 0, "cancelled": False}
+        _progress[uid] = {
+            "total": len(tracks), "current": 0,
+            "done": False, "error": None, "imported": 0,
+            "cancelled": False, "phase": "search",
+            "fetch_genres": fetch_genres,
+        }
 
         t = threading.Thread(
             target=_import_worker,
-            args=(uid, refresh_token, tracks),
+            args=(uid, refresh_token, tracks, fetch_genres),
             daemon=True,
             name=f"import-{uid}",
         )
         t.start()
-        return jsonify({"status": "started", "total": len(tracks)})
+        return jsonify({"status": "started", "total": len(tracks), "fetch_genres": fetch_genres})
 
     else:
-        # Albüm arama yok → direkt yaz (hızlı)
+        # Hızlı yol: Spotify araması yok, direkt yaz
         new_count, _ = sheets.append_tracks(uid, tracks)
         return jsonify({"status": "done", "imported": new_count, "total": len(tracks)})
 
@@ -175,6 +230,13 @@ def import_progress():
     # Tahmini süre: ~0.15s/şarkı (API isteği + 0.12s uyku)
     eta_sec  = round((total - current) * 0.15)
 
+    phase = p.get("phase", "search")
+    phase_label = {
+        "search": "Albüm ve şarkı bilgileri aranıyor",
+        "genres": "Tür bilgileri çekiliyor",
+        "done":   "Tamamlandı",
+    }.get(phase, "İşleniyor")
+
     return jsonify({
         "status":      "done" if done else "running",
         "total":       total,
@@ -183,6 +245,8 @@ def import_progress():
         "error":       p.get("error"),
         "eta_seconds": eta_sec,
         "cancelled":   p.get("cancelled", False),
+        "phase":       phase,
+        "phase_label": phase_label,
     })
 
 

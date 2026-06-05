@@ -7,7 +7,7 @@ Dashboard ana sayfa route'u.
 import logging
 from flask import Blueprint, session, render_template, redirect
 
-from extensions import spotify, load_user_data, sync_job
+from extensions import load_user_data, sync_job
 import config
 
 logger = logging.getLogger(__name__)
@@ -17,16 +17,19 @@ bp = Blueprint("dashboard", __name__)
 @bp.route("/")
 @bp.route("/dashboard")
 def dashboard():
-    uid = session.get("user_id")
-    refresh_token = session.get("refresh_token")
+    uid     = session.get("user_id")
+    r_token = session.get("refresh_token")
 
-    if not uid or not refresh_token:
+    # Kullanıcı giriş yapmamışsa login'e yönlendir
+    if not uid or not r_token:
         return redirect("/login")
 
-    if not spotify.refresh_token and refresh_token:
-        spotify.refresh_token = refresh_token
-        logger.info(f"🔄 Token session'dan geri yüklendi: {uid}")
+    # Bellek cache'inde bu kullanıcının refresh_token'ı yoksa ekle
+    if uid not in config._refresh_tokens:
+        config._refresh_tokens[uid] = r_token
+        logger.info(f"🔄 Refresh token session'dan belleğe yüklendi: {uid}")
 
+    # İlk yüklemede veriyi çek
     if uid not in config._user_cache:
         try:
             load_user_data(uid)

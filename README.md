@@ -29,7 +29,7 @@ Music+, Spotify hesabına bağlanarak dinleme geçmişini **Google Sheets**'e ka
 | 🐾 Pet sistemi | Yumurta aç, fusion yap, aktif pet çarpanları kazan |
 | 🤖 AI sohbet | Gemini ile şarkı önerisi, playlist oluşturma, analiz |
 | 🎧 Playlist yönetimi | Otomatik & manuel playlist oluşturma / düzenleme |
-| 🔄 Otomatik sync | Her 15 dakikada bir Spotify'dan yeni dinlemeleri çeker |
+| 🔄 Otomatik sync | Her 30 dakikada bir Spotify'dan yeni dinlemeleri çeker |
 
 ---
 
@@ -160,13 +160,6 @@ Detaylı adımlar için → **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**
 ## 🔐 Gizlilik
 
 Music+ tamamen kendi altyapında çalışır. Dinleme verilerini kendi Google Sheets'ine kaydeder; hiçbir üçüncü taraf sunucuya veri gönderilmez.
-
----
-
-## 🎤 Şarkı Sözleri
-
-Şarkı sözleri [**LRCLIB**](https://github.com/tranxuanthang/lrclib) tarafından sağlanmaktadır.
-LRCLIB, açık kaynak ve reklamsız bir şarkı sözü API'sidir.
 
 ---
 
