@@ -2,12 +2,15 @@
 Sistem, sağlık ve yardımcı API'ler.
 - GET  /api/system-stats
 - GET  /api/export-csv
+- GET  /api/export-spotify-json
+- GET  /api/export-json
 - GET  /api/sync   (ve /sync)
 - GET  /api/health (ve /health)
 """
 
 import io
 import csv
+import json
 import time
 import psutil
 import logging
@@ -85,6 +88,120 @@ def export_csv():
         stream_with_context(generate()),
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=spotify_verilerim.csv"},
+    )
+
+
+@bp.route("/api/export-spotify-json")
+def export_spotify_json():
+    """
+    Spotify'ın kendi extended history formatını taklit eden JSON export.
+    Format: [{endTime, artistName, trackName, msPlayed}, ...]
+    """
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giriş yapılmamış"}), 401
+
+    headers, rows = get_cached_data(uid)
+    if not rows:
+        return jsonify([])
+
+    # Sütun indexleri
+    def idx(col):
+        try:
+            return headers.index(col)
+        except ValueError:
+            return -1
+
+    i_iso    = idx("_played_at_iso")
+    i_artist = idx("Sanatçı")
+    i_track  = idx("Şarkı Adı")
+    i_ms     = idx("Süre (ms)")
+
+    result = []
+    for row in rows:
+        end_time   = row[i_iso].strip()    if i_iso    != -1 and len(row) > i_iso    else ""
+        artist     = row[i_artist].strip() if i_artist != -1 and len(row) > i_artist else ""
+        track      = row[i_track].strip()  if i_track  != -1 and len(row) > i_track  else ""
+        ms_raw     = row[i_ms].strip()     if i_ms     != -1 and len(row) > i_ms     else "0"
+        try:
+            ms = int(ms_raw)
+        except ValueError:
+            ms = 0
+
+        # Spotify formatına çevir: "YYYY-MM-DD HH:MM"
+        formatted_end = end_time[:16].replace("T", " ") if end_time else ""
+
+        result.append({
+            "endTime":    formatted_end,
+            "artistName": artist,
+            "trackName":  track,
+            "msPlayed":   ms,
+        })
+
+    json_bytes = json.dumps(result, ensure_ascii=False, indent=2).encode("utf-8")
+    return Response(
+        json_bytes,
+        mimetype="application/json",
+        headers={"Content-Disposition": "attachment; filename=spotify_verilerim_spotify.json"},
+    )
+
+
+@bp.route("/api/export-json")
+def export_json():
+    """
+    MusicPlus tam veri formatında JSON export.
+    Format: [{EndTime, trackID, trackName, artistName, artistID, AlbumName, msPlayed, PlayedISO}, ...]
+    """
+    uid = get_current_user_id()
+    if not uid:
+        return jsonify({"error": "Giriş yapılmamış"}), 401
+
+    headers, rows = get_cached_data(uid)
+    if not rows:
+        return jsonify([])
+
+    def idx(col):
+        try:
+            return headers.index(col)
+        except ValueError:
+            return -1
+
+    i_tarih   = idx("Dinlenme Tarihi")
+    i_sid     = idx("Şarkı ID")
+    i_track   = idx("Şarkı Adı")
+    i_artist  = idx("Sanatçı")
+    i_aid     = idx("Sanatçı ID")
+    i_album   = idx("Albüm") if idx("Albüm") != -1 else idx("Album")
+    i_ms      = idx("Süre (ms)")
+    i_iso     = idx("_played_at_iso")
+
+    result = []
+    for row in rows:
+        def safe(i):
+            return row[i].strip() if i != -1 and len(row) > i else ""
+
+        ms_raw = safe(i_ms)
+        try:
+            ms = int(ms_raw)
+        except ValueError:
+            ms = 0
+
+        result.append({
+            "EndTime":    safe(i_tarih),
+            "trackID":    safe(i_sid),
+            "trackName":  safe(i_track),
+            "artistName": safe(i_artist),
+            "artistID":   safe(i_aid),
+            "AlbumName":  safe(i_album),
+            "msPlayed":   ms,
+            "PlayedISO":  safe(i_iso),
+        })
+
+    json_bytes = json.dumps(result, ensure_ascii=False, indent=2).encode("utf-8")
+    return Response(
+        json_bytes,
+        mimetype="application/json",
+        headers={"Content-Disposition": "attachment; filename=spotify_verilerim.json"},
     )
 
 
