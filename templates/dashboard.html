@@ -1502,7 +1502,14 @@
     <div class="section-title" style="margin-top:40px">Veri ve Yönetim</div>
     <button class="action-btn" onclick="openDnaModal()" style="margin-bottom:8px">🧬 MusicDNA'nı Oluştur</button>
     <button class="action-btn" onclick="openImportModal()" style="margin-bottom:8px">📥 Dinleme Geçmişini İçeri Aktar</button>
-    <button class="action-btn" onclick="window.location.href='/api/export-csv'" style="margin-bottom:8px">⬇ Tüm Verilerini İndir (.csv)</button>
+    <div style="position:relative;margin-bottom:8px" id="exportDropdownWrap">
+      <button class="action-btn" onclick="toggleExportDropdown()" id="exportDropdownBtn" style="width:100%;text-align:left">⬇ Verileri Dışa Aktar ▾</button>
+      <div id="exportDropdownMenu" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:200;background:var(--surface);border:1px solid var(--border);border-top:none;">
+        <button onclick="window.location.href='/api/export-csv';toggleExportDropdown()" style="display:block;width:100%;background:none;border:none;color:var(--text);padding:12px 16px;text-align:left;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);">📄 Verileri CSV olarak dışa aktar</button>
+        <button onclick="window.location.href='/api/export-spotify-json';toggleExportDropdown()" style="display:block;width:100%;background:none;border:none;color:var(--text);padding:12px 16px;text-align:left;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);">🎵 Verileri Spotify JSON olarak dışa aktar</button>
+        <button onclick="window.location.href='/api/export-json';toggleExportDropdown()" style="display:block;width:100%;background:none;border:none;color:var(--text);padding:12px 16px;text-align:left;cursor:pointer;font-size:13px;">📦 Verileri JSON olarak dışa aktar</button>
+      </div>
+    </div>
     <button class="action-btn danger" onclick="if(confirm('Çıkış yapmak istediğine emin misin?')) window.location.href='/logout'">↪ Sistemden Çıkış Yap</button>
   </div>
 
@@ -1644,6 +1651,25 @@ function toggleMenu() {
   if(overlay) overlay.classList.toggle('open');
 }
 
+function toggleExportDropdown() {
+  const menu = document.getElementById('exportDropdownMenu');
+  if (!menu) return;
+  const isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    // Dışarı tıklayınca kapat
+    setTimeout(() => {
+      document.addEventListener('click', function _closeExport(e) {
+        const wrap = document.getElementById('exportDropdownWrap');
+        if (wrap && !wrap.contains(e.target)) {
+          menu.style.display = 'none';
+          document.removeEventListener('click', _closeExport);
+        }
+      });
+    }, 10);
+  }
+}
+
 // ===================== ARALIK SEÇİCİ =====================
 let _currentAralik = 'buyil';
 let _ozelBaslangic = null;
@@ -1675,12 +1701,11 @@ function setAralik(val, label, el) {
   document.querySelectorAll('.aralik-option').forEach(o => o.classList.remove('active'));
   el.classList.add('active');
 
-  // Aralik değişince sadece istatistikler ve topluluk sayfaları için yeniden yükle
+  // Aralik değişince sadece istatistikler sayfası için yeniden yükle
   const activeView = document.querySelector('.view-section.active');
   if (!activeView) return;
   const vid = activeView.id.replace('view-', '');
   if (vid === 'istatistikler') reloadStats();
-  if (vid === 'topluluk') loadTopluluk(_currentAralik);
 }
 
 function openOzelAralik() {
@@ -1718,7 +1743,6 @@ function applyOzelAralik() {
   if (!activeView) return;
   const vid = activeView.id.replace('view-', '');
   if (vid === 'istatistikler') reloadStats();
-  if (vid === 'topluluk') loadTopluluk(_currentAralik);
 }
 
 // Dışarı tıklanınca dropdown kapansın
@@ -1750,11 +1774,11 @@ function switchView(viewId) {
   document.getElementById('headerSubtitle').textContent = titles[viewId] || '';
 
   // Aralik dropdown'unu sadece istatistikler ve topluluk sayfalarında göster
-  const showAralik = (viewId === 'istatistikler' || viewId === 'topluluk');
+  const showAralik = (viewId === 'istatistikler');
   const aralilkWrap = document.getElementById('aralilkWrap');
   if (aralilkWrap) aralilkWrap.style.display = showAralik ? 'inline-block' : 'none';
 
-  if (viewId === 'topluluk')  loadTopluluk(_currentAralik);
+  if (viewId === 'topluluk')  loadTopluluk();
   if (viewId === 'duzenle')   loadPlaylists();
   if (viewId === 'hayvanlar') loadPets();
 
@@ -1863,22 +1887,13 @@ let _toplulukLoaded = false;
 let _toplulukAralik = null;
 
 async function loadTopluluk(aralik) {
-  const a = aralik || _currentAralik || 'buyil';
-  // Aralik değişmişse cache'i sıfırla
-  if (a !== _toplulukAralik) {
-    _toplulukLoaded = false;
-    _toplulukAralik = a;
-  }
+  // Topluluk karşılaştırma sayfasında aralik filtresi yok — her zaman tüm zamanlar
   if (_toplulukLoaded) return;
   const content = document.getElementById('toplulukContent');
-  content.innerHTML = '<div class="loading">Topluluk verileri yükleniyor...</div>';
+  content.innerHTML = '<div class="loading">Karşılaştırma verileri yükleniyor...</div>';
 
   try {
-    let toplulukUrl = '/api/istatistikler?aralik=' + a;
-    if (a === 'ozel' && _ozelBaslangic && _ozelBitis) {
-      toplulukUrl += '&baslangic=' + _ozelBaslangic + '&bitis=' + _ozelBitis;
-    }
-    const res  = await fetch(toplulukUrl);
+    const res  = await fetch('/api/karsilastirma');
     const data = await res.json();
 
     if (data.error === 'Henüz kimse izin vermemiş') {
@@ -1897,98 +1912,161 @@ async function loadTopluluk(aralik) {
     }
 
     _toplulukLoaded = true;
-    content.innerHTML = buildToplulukHTML(data);
+    content.innerHTML = buildKarsilastirmaHTML(data);
   } catch(e) {
     content.innerHTML = `<div class="loading" style="color:#ff6b6b">Bağlantı hatası</div>`;
   }
 }
 
-function buildToplulukHTML(d) {
-  const topSarkilar = (d.top_sarkilar || []).map((s, i) => {
-    const max = d.top_sarkilar[0]?.count || 1;
+// ── Rarity renk/ikon tablosu ───────────────────────────────────────────────
+const RARITY_META = {
+  'Common':     { color: '#9ca3af', icon: '⬜', label: 'Common'     },
+  'Rare':       { color: '#3b82f6', icon: '🔷', label: 'Rare'       },
+  'Epic':       { color: '#8b5cf6', icon: '💜', label: 'Epic'       },
+  'Legendary':  { color: '#f59e0b', icon: '🌟', label: 'Legendary'  },
+  'Mysterious': { color: '#ec4899', icon: '🌸', label: 'Mysterious' },
+  'Cosmic':     { color: '#06b6d4', icon: '🌌', label: 'Cosmic'     },
+};
+
+function buildKarsilastirmaHTML(d) {
+  const users = d.users || [];
+  if (!users.length) {
+    return `<div class="section" style="text-align:center;padding:48px 24px;color:var(--muted)">Henüz veri yok.</div>`;
+  }
+
+  // ── Kategori başına kazananı bul ───────────────────────────────────────
+  const maxSure    = Math.max(...users.map(u => u.toplam_sure_saat || 0));
+  const maxSarki   = Math.max(...users.map(u => u.top_sarki?.count  || 0));
+  const maxSanatci = Math.max(...users.map(u => u.top_sanatci?.count || 0));
+  const maxAlbum   = Math.max(...users.map(u => u.top_album?.count  || 0));
+  const maxBest    = Math.max(...users.map(u => u.en_uzun_seri || 0));
+  const maxAktif   = Math.max(...users.map(u => u.aktif_seri   || 0));
+  const RARITY_TIER = {'Common':1,'Rare':2,'Epic':3,'Legendary':4,'Mysterious':5,'Cosmic':6};
+  const maxPetTier = Math.max(...users.map(u => RARITY_TIER[u.en_guclu_pet?.rarity] || 0));
+
+  function crown(val, max) {
+    return (val === max && max > 0) ? ' <span style="color:#f59e0b;font-size:13px" title="En iyi">👑</span>' : '';
+  }
+
+  function petBadge(pet) {
+    if (!pet) return '<span style="color:var(--muted);font-size:12px">— Henüz yok</span>';
+    const meta = RARITY_META[pet.rarity] || RARITY_META['Common'];
+    const eggLabel = pet.egg_type === 'golden' ? '🥚✨' : pet.egg_type === 'diamond' ? '💎' : '🥚';
+    return `<span style="color:${meta.color};font-weight:700;font-size:13px">${meta.icon} ${meta.label}</span> <span style="font-size:11px;color:var(--muted)">${eggLabel} ×${pet.coin_mult?.toFixed(1)}</span>`;
+  }
+
+  // ── Kullanıcı kartları ─────────────────────────────────────────────────
+  const cards = users.map(u => {
+    const isMe = u.is_me;
+    const pTier = RARITY_TIER[u.en_guclu_pet?.rarity] || 0;
     return `
-    <div class="rank-item" style="cursor:default">
-      <div class="num">${String(i+1).padStart(2,'0')}</div>
-      <div class="info">
-        <div class="name">${s.sarki}</div>
-        <div class="sub-info">${s.sanatci}</div>
-        <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(s.count/max*100)}%"></div></div>
+    <div style="background:var(--surface);border:1px solid ${isMe ? 'var(--green)' : 'var(--border)'};padding:20px 18px;margin-bottom:16px;position:relative">
+      ${isMe ? '<div style="position:absolute;top:10px;right:12px;font-size:10px;color:var(--green);font-weight:700;letter-spacing:1px">SEN</div>' : ''}
+      <div style="font-family:\'Syne\',sans-serif;font-size:17px;font-weight:800;margin-bottom:14px;color:${isMe?'var(--green)':'var(--text)'}">
+        ${u.display_name}
       </div>
-      <div class="count">
-        <div style="display:flex; align-items:flex-end;"><strong>${s.count}</strong>kez</div>
+
+      <!-- Toplam süre -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:12px;color:var(--muted)">⏱ Toplam Dinleme</span>
+        <span style="font-weight:700;font-size:14px">${u.toplam_sure_saat?.toLocaleString('tr')} saat${crown(u.toplam_sure_saat, maxSure)}</span>
+      </div>
+
+      <!-- En çok şarkı -->
+      <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <span style="font-size:12px;color:var(--muted)">🎵 En Çok Şarkı</span>
+          <span style="font-weight:700;font-size:13px">${u.top_sarki?.count || 0} kez${crown(u.top_sarki?.count, maxSarki)}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${u.top_sarki?.ad || '—'} <span style="color:var(--muted)">· ${u.top_sarki?.sanatci || ''}</span>
+        </div>
+      </div>
+
+      <!-- En çok sanatçı -->
+      <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <span style="font-size:12px;color:var(--muted)">🎤 En Çok Sanatçı</span>
+          <span style="font-weight:700;font-size:13px">${u.top_sanatci?.count || 0} kez${crown(u.top_sanatci?.count, maxSanatci)}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text);margin-top:3px">${u.top_sanatci?.ad || '—'}</div>
+      </div>
+
+      <!-- En çok albüm -->
+      <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <span style="font-size:12px;color:var(--muted)">💿 En Çok Albüm</span>
+          <span style="font-weight:700;font-size:13px">${u.top_album?.count || 0} kez${crown(u.top_album?.count, maxAlbum)}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${u.top_album?.ad || '—'} <span style="color:var(--muted)">· ${u.top_album?.sanatci || ''}</span>
+        </div>
+      </div>
+
+      <!-- Seriler -->
+      <div style="display:flex;gap:16px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--muted)">🔥 En Uzun Seri</div>
+          <div style="font-weight:700;font-size:15px;margin-top:2px">${u.en_uzun_seri || 0} gün${crown(u.en_uzun_seri, maxBest)}</div>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--muted)">⚡ Aktif Seri</div>
+          <div style="font-weight:700;font-size:15px;margin-top:2px;color:${u.aktif_seri>0?'var(--green)':'var(--text)'}">${u.aktif_seri || 0} gün${crown(u.aktif_seri, maxAktif)}</div>
+        </div>
+      </div>
+
+      <!-- En güçlü pet -->
+      <div style="padding:8px 0">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">🐾 En Güçlü Pet${crown(pTier, maxPetTier)}</div>
+        <div>${petBadge(u.en_guclu_pet)}</div>
       </div>
     </div>`;
   }).join('');
 
-  const topSanatcilar = (d.top_sanatcilar || []).map((s, i) => {
-    const max = d.top_sanatcilar[0]?.count || 1;
+  // ── Liderlik tablosu satırları ─────────────────────────────────────────
+  const categories = [
+    { label: '⏱ Toplam Süre',    vals: users.map(u => ({ name: u.display_name, val: u.toplam_sure_saat, fmt: v => v?.toLocaleString('tr') + ' saat' })) },
+    { label: '🎵 Tek Şarkı Rekoru', vals: users.map(u => ({ name: u.display_name, val: u.top_sarki?.count, fmt: v => v + ' kez — ' + (u.top_sarki?.ad || '') })) },
+    { label: '🎤 Tek Sanatçı Rekoru', vals: users.map(u => ({ name: u.display_name, val: u.top_sanatci?.count, fmt: v => v + ' kez — ' + (u.top_sanatci?.ad || '') })) },
+    { label: '💿 Tek Albüm Rekoru', vals: users.map(u => ({ name: u.display_name, val: u.top_album?.count, fmt: v => v + ' kez — ' + (u.top_album?.ad || '') })) },
+    { label: '🔥 En Uzun Seri',   vals: users.map(u => ({ name: u.display_name, val: u.en_uzun_seri, fmt: v => v + ' gün' })) },
+    { label: '⚡ Aktif Seri',     vals: users.map(u => ({ name: u.display_name, val: u.aktif_seri,   fmt: v => v + ' gün' })) },
+    { label: '🐾 En Güçlü Pet',  vals: users.map(u => ({ name: u.display_name, val: RARITY_TIER[u.en_guclu_pet?.rarity] || 0, fmt: () => u.en_guclu_pet ? (RARITY_META[u.en_guclu_pet.rarity]?.icon + ' ' + u.en_guclu_pet.rarity) : '—' })) },
+  ];
+
+  const leaderRows = categories.map(cat => {
+    const sorted = [...cat.vals].sort((a,b) => (b.val||0) - (a.val||0));
+    const winner = sorted[0];
     return `
-    <div class="rank-item" style="cursor:default">
-      <div class="num">${String(i+1).padStart(2,'0')}</div>
-      <div class="info">
-        <div class="name">${s.sanatci}</div>
-        <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(s.count/max*100)}%"></div></div>
-      </div>
-      <div class="count">
-        <div style="display:flex; align-items:flex-end;"><strong>${s.count}</strong>kez</div>
-      </div>
-    </div>`;
+    <tr>
+      <td style="padding:10px 12px;font-size:12px;color:var(--muted);white-space:nowrap">${cat.label}</td>
+      <td style="padding:10px 12px;font-weight:700;font-size:13px;color:var(--green)">${winner?.name || '—'}</td>
+      <td style="padding:10px 12px;font-size:12px;color:var(--text)">${winner ? winner.fmt(winner.val) : '—'}</td>
+    </tr>`;
   }).join('');
-
-  const haftaHTML = (d.hafta || []).map(g => `
-    <div class="week-day ${g.sure_sn>0?'has-data':''}">
-      <div class="day-name">${g.gun?.slice(0,3)}</div>
-      <div class="day-date">${g.tarih?.slice(0,5)}</div>
-      <div class="day-sure ${g.sure_sn===0?'empty':''}">${fmtSure(g.sure_sn)}</div>
-    </div>`).join('');
-
-  const saatBars = renderHourChart(d.genel_saatler || []);
-  const vakitHTML = renderVakitler(d.genel_vakitler || []);
-
-  const aylarHTML = `<table class="month-table">
-    <thead><tr><th>Ay</th><th>Aylık Toplam</th><th>Günlük Ortalama</th><th>Dinleme Sayısı</th></tr></thead>
-    <tbody>${(d.aylar||[]).slice().reverse().map(a => `
-      <tr>
-        <td>${a.ay}</td>
-        <td class="green">${a.toplam}</td>
-        <td>${a.ortalama}</td>
-        <td>${(a.kayit_sayisi||0).toLocaleString('tr')}</td>
-      </tr>`).join('')}
-    </tbody></table>`;
 
   return `
     <div class="stats-row">
-      <div class="stat-card"><div class="label">Toplam Dinlenme</div><div class="value">${(d.toplam_kayit||0).toLocaleString('tr')}</div><div class="sub">kayıt · ${d.katilimci_sayisi||0} kişi</div></div>
-      <div class="stat-card"><div class="label">Farklı Şarkı</div><div class="value">${(d.farkli_sarki||0).toLocaleString('tr')}</div></div>
-      <div class="stat-card"><div class="label">Farklı Sanatçı</div><div class="value">${_normalizeArtistData(d.top_sanatcilar||[]).length.toLocaleString('tr')}</div></div>
-      <div class="stat-card"><div class="label">Toplam Süre</div><div class="value">${Math.floor((d.toplam_sure_sn||0)/3600).toLocaleString('tr')}</div><div class="sub">saat</div></div>
+      <div class="stat-card"><div class="label">Katılımcı</div><div class="value">${d.katilimci_sayisi || 0}</div><div class="sub">kişi</div></div>
     </div>
+
     <div class="section">
-      <div class="section-title">Son 7 Gün</div>
-      <div class="week-grid">${haftaHTML}</div>
+      <div class="section-title">🏆 Liderlik Tablosu</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="padding:8px 12px;font-size:11px;color:var(--muted);text-align:left;font-weight:600">KATEGORİ</th>
+            <th style="padding:8px 12px;font-size:11px;color:var(--muted);text-align:left;font-weight:600">KAZANAN 👑</th>
+            <th style="padding:8px 12px;font-size:11px;color:var(--muted);text-align:left;font-weight:600">DEĞER</th>
+          </tr>
+        </thead>
+        <tbody>${leaderRows}</tbody>
+      </table>
     </div>
-    <div class="two-col">
-      <div class="section">
-        <div class="section-title">En Çok Dinlenen Şarkılar</div>
-        <div class="rank-list">${topSarkilar}</div>
-      </div>
-      <div class="section">
-        <div class="section-title">En Çok Dinlenen Sanatçılar</div>
-        <div class="rank-list">${topSanatcilar}</div>
-      </div>
-    </div>
+
     <div class="section">
-      <div class="section-title">Tüm Zamanlar Dinleme Alışkanlıkları</div>
-      <div style="background:var(--surface); padding:24px; border:1px solid var(--border);">
-        <div class="modal-section-title" style="margin-top:0">Genel Saat Dağılımı</div>
-        ${saatBars}
-        <div class="modal-section-title" style="margin-top:24px">Genel Vakit Dağılımı</div>
-        ${vakitHTML}
-      </div>
-    </div>
-    <div class="section">
-      <div class="section-title">Aylık Analiz</div>
-      ${aylarHTML}
+      <div class="section-title">👤 Oyuncu Kartları</div>
+      ${cards}
     </div>`;
 }
 
