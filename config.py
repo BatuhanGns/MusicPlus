@@ -12,17 +12,21 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "spotify-stats-2026-pkce-persistent-se
 PERMANENT_SESSION_LIFETIME = timedelta(days=30)
 
 # ── Spotify ──────────────────────────────────────────────────────────────────
-SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID", "")
+SPOTIFY_CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID", "")
 SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
 SPOTIFY_REFRESH_TOKEN = os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
 
 # ── Google Sheets ────────────────────────────────────────────────────────────
-GOOGLE_SHEETS_ID = os.environ.get("GOOGLE_SHEETS_ID", "")
-GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS_JSON", "{}")
+GOOGLE_SHEETS_ID         = os.environ.get("GOOGLE_SHEETS_ID", "")
+GOOGLE_CREDENTIALS_JSON  = os.environ.get("GOOGLE_CREDENTIALS_JSON", "{}")
 
 # ── Gemini AI ────────────────────────────────────────────────────────────────
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY", "")
 AI_MAX_REQUESTS = 3000
+
+# ── Mail (Resend API) ─────────────────────────────────────────────────────────
+RESEND_API_KEY    = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "Music+ <onboarding@resend.dev>")
 
 # ── Uygulama Sabitleri ───────────────────────────────────────────────────────
 TR_GUNLER = {
@@ -46,18 +50,15 @@ HAM_HEADERS = [
 
 # ── Global State (uygulama ömrü boyunca bellekte) ────────────────────────────
 SERVER_START_TIME = time.time()
-ai_requests_used = 0
-_ai_total_cache = {"value": 0, "ts": 0}
-_user_cache = {}
-_ai_history = {}
-AI_MAX_HISTORY = 20
-_cached_rows = []
-_cached_headers = []
-_last_sync = "Henüz sync yapılmadı"
-_gorsel_cache = {}
+ai_requests_used  = 0
+_ai_total_cache   = {"value": 0, "ts": 0}
+_user_cache       = {}
+_ai_history       = {}
+AI_MAX_HISTORY    = 20
+_cached_rows      = []
+_cached_headers   = []
+_last_sync        = "Henüz sync yapılmadı"
+_gorsel_cache     = {}
 
 # ── Refresh Token Belleği ─────────────────────────────────────────────────────
-# Sheets yerine bellekte tutulur. Kullanıcı giriş yaptıkça dolar.
-# Server restart'ta sıfırlanır — kullanıcı tekrar giriş yapınca yeniden dolar.
-# Spotify token rotasyonu olduğunda sync_job anında günceller → invalid_grant olmaz.
 _refresh_tokens: dict = {}  # { user_id: refresh_token }

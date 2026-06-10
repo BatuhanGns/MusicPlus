@@ -184,10 +184,10 @@ def compute_gamification(headers, rows) -> dict:
         if len(row) <= max(idx_sarki, idx_sanatci, idx_sure):
             continue
 
-        sarki   = row[idx_sarki].strip()
-        sanatci = row[idx_sanatci].strip()
-        album   = row[idx_album].strip() if idx_album != -1 and len(row) > idx_album else ""
-        iso     = row[idx_iso].strip()   if idx_iso   != -1 and len(row) > idx_iso   else ""
+        sarki   = (row[idx_sarki] or "").strip()
+        sanatci = (row[idx_sanatci] or "").strip()
+        album   = (row[idx_album] or "").strip() if idx_album != -1 and len(row) > idx_album else ""
+        iso     = (row[idx_iso] or "").strip()   if idx_iso   != -1 and len(row) > idx_iso   else ""
 
         try:
             sure = int(row[idx_sure]) // 1000

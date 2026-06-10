@@ -17,7 +17,6 @@ HAM_HEADERS = [
     "Dinlenme Tarihi", "Şarkı ID", "Şarkı Adı", "Sanatçı",
     "Sanatçı ID", "Albüm", "Süre (ms)", "_played_at_iso", "Tür"
 ]
-# Sütun indexleri (0-based)
 COL_TARIH      = 0
 COL_SARKI_ID   = 1
 COL_SARKI_ADI  = 2
@@ -83,16 +82,18 @@ class SheetsClient:
             return None
         ws = self._find_sheet("Settings")
         if not ws:
-            ws = self.sh.add_worksheet(title="Settings", rows=100, cols=10)
-            ws.append_row(["user_id", "display_name", "stats_permission", "last_sync", "refresh_token", "coins", "xp", "access_token", "expires_at"], value_input_option="RAW")
+            ws = self.sh.add_worksheet(title="Settings", rows=100, cols=16)
+            ws.append_row([
+                "user_id", "display_name", "stats_permission", "last_sync",
+                "refresh_token", "coins", "xp", "access_token", "expires_at",
+                "email", "spotify_odeme_gunu", "streak_bildirimi",
+                "ozet_bildirimi", "ozet_sikligi", "son_streak_bildirimi", "son_ozet_bildirimi"
+            ], value_input_option="RAW")
             logger.info("✅ Settings sayfası oluşturuldu.")
         self._ensure_limits_sheet()
         return ws
 
     def _ensure_limits_sheet(self):
-        """Limits sayfasını oluşturur — yoksa.
-        Sütunlar: user_id | display_name | model | today_used | total_used | last_used | reset_date
-        """
         if not self.sh:
             return None
         ws = self._find_sheet("Limits")
@@ -106,9 +107,6 @@ class SheetsClient:
         return ws
 
     def _ensure_monthly_archive_sheet(self):
-        """Aylık_Arsiv sayfasını oluşturur — yoksa.
-        Sütunlar: ay | user_id | display_name | model | requests
-        """
         if not self.sh:
             return None
         ws = self._find_sheet("Aylık_Arşiv")
@@ -123,7 +121,6 @@ class SheetsClient:
 
     @staticmethod
     def _pretty_model(model: str) -> str:
-        """Ham model adını okunabilir hale getirir."""
         m = model.lower()
         if "31b" in m:
             return "Gemma 4 31B"
@@ -131,13 +128,9 @@ class SheetsClient:
             return "Gemma 4 26B"
         if "gemma" in m:
             return "Gemma 4"
-        return model  # bilinmeyen → olduğu gibi
+        return model
 
     def log_ai_request(self, user_id: str, display_name: str, model: str):
-        """Kullanıcının AI isteğini Limits sayfasına kaydeder.
-        - today_used: bugünkü UTC güne ait istek sayısı (sıfırlanabilir)
-        - total_used: hiç sıfırlanmayan kümülatif toplam
-        """
         try:
             ws = self._find_sheet("Limits") or self._ensure_limits_sheet()
             if not ws:
@@ -146,13 +139,11 @@ class SheetsClient:
             today   = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             now_str = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M")
             records = ws.get_all_values()
-            # user_id + pretty_model kombinasyonunu ara
             for i, row in enumerate(records[1:], start=2):
                 if len(row) >= 3 and row[0] == user_id and row[2] == pretty:
                     prev_today = int(row[3]) if len(row) > 3 and row[3].isdigit() else 0
                     prev_total = int(row[4]) if len(row) > 4 and row[4].isdigit() else 0
                     reset_date = row[6] if len(row) > 6 else ""
-                    # Gün değiştiyse today_used sıfırla
                     if reset_date != today:
                         prev_today = 0
                     ws.update(
@@ -160,7 +151,6 @@ class SheetsClient:
                         [[user_id, display_name, pretty, prev_today + 1, prev_total + 1, now_str, today]]
                     )
                     return
-            # Yeni satır
             ws.append_row(
                 [user_id, display_name, pretty, 1, 1, now_str, today],
                 value_input_option="RAW"
@@ -169,9 +159,6 @@ class SheetsClient:
             logger.warning(f"⚠️ Limits log hatası: {e}")
 
     def reset_daily_limits(self):
-        """Her gün 00:00 UTC'de today_used sütununu sıfırlar.
-        Sıfırlamadan önce geçen günün verisini Aylık_Arşiv'e yazar.
-        """
         try:
             ws = self._find_sheet("Limits") or self._ensure_limits_sheet()
             if not ws:
@@ -181,9 +168,9 @@ class SheetsClient:
             if len(records) < 2:
                 return
 
-            yesterday  = (datetime.now(timezone.utc).replace(hour=0, minute=0, second=0) 
+            yesterday  = (datetime.now(timezone.utc).replace(hour=0, minute=0, second=0)
                           - __import__('datetime').timedelta(days=1))
-            ay_label   = yesterday.strftime("%Y-%m")  # örn. "2026-05"
+            ay_label   = yesterday.strftime("%Y-%m")
             now_str    = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M")
             today      = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
@@ -207,12 +194,10 @@ class SheetsClient:
                     "values": [[0, tot, now_str, today]]
                 })
 
-            # Arşive yaz
             if archive_rows and archive_ws:
                 archive_ws.append_rows(archive_rows, value_input_option="RAW")
                 logger.info(f"📦 Aylık arşive {len(archive_rows)} satır yazıldı ({ay_label})")
 
-            # Limits sayfasında today_used sıfırla
             if updates:
                 ws.batch_update(updates)
                 logger.info(f"🔄 Günlük limit sıfırlandı ({len(updates)} satır)")
@@ -221,7 +206,6 @@ class SheetsClient:
             logger.warning(f"⚠️ Günlük sıfırlama hatası: {e}")
 
     def get_limits_summary(self) -> list:
-        """Limits sayfasındaki güncel kayıtları döndürür."""
         try:
             ws = self._find_sheet("Limits")
             if not ws:
@@ -236,20 +220,16 @@ class SheetsClient:
             return []
 
     def get_total_used_from_sheets(self) -> int:
-        """Sheets'teki gerçek toplam kullanımı döndürür.
-        Hem yeni format (total_used) hem eski format (requests_used) desteklenir."""
         try:
             summary = self.get_limits_summary()
             if not summary:
                 return 0
             total = 0
             for r in summary:
-                # Yeni format
                 v = r.get("total_used", "")
                 if str(v).isdigit():
                     total += int(v)
                     continue
-                # Eski format fallback
                 v2 = r.get("requests_used", "")
                 if str(v2).isdigit():
                     total += int(v2)
@@ -258,7 +238,6 @@ class SheetsClient:
             return 0
 
     def get_user_permission(self, user_id: str) -> bool:
-        """Kullanıcının istatistikler sayfası izni var mı?"""
         ws = self._find_sheet("Settings")
         if not ws:
             return False
@@ -268,7 +247,6 @@ class SheetsClient:
         return False
 
     def set_user_permission(self, user_id: str, display_name: str, allowed: bool, refresh_token: str = ""):
-        """Kullanıcının istatistikler sayfası iznini günceller"""
         ws = self._find_sheet("Settings") or self._ensure_settings_sheet()
         now_str = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M")
         records = ws.get_all_values()
@@ -281,7 +259,6 @@ class SheetsClient:
         ws.append_row([user_id, display_name, str(allowed), now_str, refresh_token], value_input_option="RAW")
 
     def save_refresh_token(self, user_id: str, refresh_token: str):
-        """Kullanıcının refresh token'ını günceller (E sütunu)"""
         ws = self._find_sheet("Settings")
         if not ws:
             return
@@ -292,7 +269,6 @@ class SheetsClient:
                 return
 
     def save_access_token(self, user_id: str, access_token: str, expires_at: float):
-        """Access token ve sona erme zamanını kaydeder (H ve I sütunları)."""
         ws = self._find_sheet("Settings")
         if not ws:
             return
@@ -303,9 +279,6 @@ class SheetsClient:
                 return
 
     def get_access_token(self, user_id: str) -> dict:
-        """Kaydedilmiş access token ve expires_at değerini döndürür.
-        Döndürür: {"access_token": str, "expires_at": float} veya {}
-        """
         ws = self._find_sheet("Settings")
         if not ws:
             return {}
@@ -324,7 +297,6 @@ class SheetsClient:
         return {}
 
     def get_all_users_with_tokens(self) -> list:
-        """Tüm kullanıcıları token'larıyla döndürür — scheduled sync için"""
         ws = self._find_sheet("Settings")
         if not ws:
             return []
@@ -345,7 +317,6 @@ class SheetsClient:
         return users
 
     def get_all_permitted_users(self) -> list:
-        """İzin vermiş tüm kullanıcı id'lerini döndürür"""
         ws = self._find_sheet("Settings")
         if not ws:
             return []
@@ -365,7 +336,6 @@ class SheetsClient:
                 return
 
     def save_gamification_cache(self, user_id: str, coins: int, xp: int):
-        """Hesaplanan coin ve XP degerlerini Settings sayfasina yazar (F ve G sutunlari)."""
         ws = self._find_sheet("Settings") or self._ensure_settings_sheet()
         if not ws:
             return
@@ -380,7 +350,6 @@ class SheetsClient:
             logger.warning(f"Gamification cache kaydetme hatasi: {e}")
 
     def get_gamification_cache(self, user_id: str) -> dict:
-        """Settings sayfasindan onceden hesaplanmis coin ve XP degerlerini okur."""
         ws = self._find_sheet("Settings")
         if not ws:
             return {}
@@ -395,7 +364,104 @@ class SheetsClient:
             logger.warning(f"Gamification cache okuma hatasi: {e}")
         return {}
 
-    # ─── Kullanıcı veri sayfası ─────────────────────────────────────────────
+    # ─── Bildirim Ayarları ────────────────────────────────────────────────────
+    # Settings sütunları:
+    #   A=user_id, B=display_name, C=stats_permission, D=last_sync,
+    #   E=refresh_token, F=coins, G=xp, H=access_token, I=expires_at,
+    #   J=email, K=spotify_odeme_gunu, L=streak_bildirimi,
+    #   M=ozet_bildirimi, N=ozet_sikligi,
+    #   O=son_streak_bildirimi, P=son_ozet_bildirimi
+
+    def get_notification_users(self) -> list:
+        ws = self._find_sheet("Settings")
+        if not ws:
+            return []
+        try:
+            result = []
+            for row in ws.get_all_values()[1:]:
+                if not row or not row[0]:
+                    continue
+                def _get(idx, default=""):
+                    return row[idx] if len(row) > idx else default
+                result.append({
+                    "user_id":              _get(0),
+                    "display_name":         _get(1),
+                    "email":                _get(9),
+                    "spotify_odeme_gunu":   _get(10),
+                    "streak_bildirimi":     _get(11),
+                    "ozet_bildirimi":       _get(12),
+                    "ozet_sikligi":         _get(13, "weekly"),
+                    "son_streak_bildirimi": _get(14),
+                    "son_ozet_bildirimi":   _get(15),
+                })
+            return result
+        except Exception as e:
+            logger.error(f"get_notification_users hatası: {e}")
+            return []
+
+    def get_notification_settings(self, user_id: str) -> dict:
+        ws = self._find_sheet("Settings")
+        if not ws:
+            return {}
+        try:
+            for row in ws.get_all_values()[1:]:
+                if row and row[0] == user_id:
+                    def _get(idx, default=""):
+                        return row[idx] if len(row) > idx else default
+                    return {
+                        "email":              _get(9),
+                        "spotify_odeme_gunu": _get(10),
+                        "streak_bildirimi":   _get(11, "false"),
+                        "ozet_bildirimi":     _get(12, "false"),
+                        "ozet_sikligi":       _get(13, "weekly"),
+                    }
+        except Exception as e:
+            logger.error(f"get_notification_settings hatası ({user_id}): {e}")
+        return {}
+
+    def save_notification_settings(self, user_id: str, settings: dict):
+        ws = self._find_sheet("Settings") or self._ensure_settings_sheet()
+        if not ws:
+            return
+        try:
+            records    = ws.get_all_values()
+            email      = settings.get("email", "")
+            odeme_gunu = settings.get("spotify_odeme_gunu", "")
+            streak_bil = str(settings.get("streak_bildirimi", False)).capitalize()
+            ozet_bil   = str(settings.get("ozet_bildirimi", False)).capitalize()
+            ozet_sik   = settings.get("ozet_sikligi", "weekly")
+            for i, row in enumerate(records[1:], start=2):
+                if row and row[0] == user_id:
+                    ws.update(
+                        f"J{i}:N{i}",
+                        [[email, odeme_gunu, streak_bil, ozet_bil, ozet_sik]],
+                        value_input_option="RAW"
+                    )
+                    return
+            logger.warning(f"save_notification_settings: kullanıcı bulunamadı ({user_id})")
+        except Exception as e:
+            logger.error(f"save_notification_settings hatası ({user_id}): {e}")
+
+    def set_notification_field(self, user_id: str, field: str, value: str):
+        col_map = {
+            "son_streak_bildirimi": "O",
+            "son_ozet_bildirimi":   "P",
+        }
+        col = col_map.get(field)
+        if not col:
+            return
+        ws = self._find_sheet("Settings")
+        if not ws:
+            return
+        try:
+            for i, row in enumerate(ws.get_all_values()[1:], start=2):
+                if row and row[0] == user_id:
+                    ws.update(f"{col}{i}", [[value]])
+                    return
+        except Exception as e:
+            logger.error(f"set_notification_field hatası ({user_id}, {field}): {e}")
+
+    # ─── Kullanıcı veri sayfası ──────────────────────────────────────────────
 
     def _ensure_user_sheet(self, user_id: str):
         if not self.sh:
@@ -411,14 +477,10 @@ class SheetsClient:
         ws = self._find_sheet(user_id)
         if not ws:
             return set()
-        col = ws.col_values(8)  # _played_at_iso sütunu (col H = 8. sütun)
+        col = ws.col_values(8)
         return set(col[1:])
 
     def append_tracks(self, user_id: str, tracks: list):
-        """Kullanıcının kendi sayfasına yeni şarkıları ekler.
-        Döndürür: (new_count, new_tracks)
-          new_tracks: [{track_name, artist_name, album_name, duration_sec}, ...]
-        """
         ws = self._ensure_user_sheet(user_id)
         existing = self._get_existing_played_ats(user_id)
         new_rows   = []
@@ -435,7 +497,7 @@ class SheetsClient:
                     t["album_name"],
                     t["duration_ms"],
                     iso,
-                    t.get("genre", ""),   # Tür (Spotify API'den, boş olabilir)
+                    t.get("genre", ""),
                 ])
                 new_tracks.append({
                     "track_name":   t["track_name"],
@@ -448,23 +510,12 @@ class SheetsClient:
             ws.append_rows(new_rows, value_input_option="RAW")
         return len(new_rows), new_tracks
 
-
     def get_last_played_at_ms(self, user_id: str):
-        """
-        Kullanıcının Sheets'indeki en son _played_at_iso değerini
-        Unix timestamp (milisaniye) olarak döndürür.
-
-        Bu değer Spotify'ın 'after' parametresine gönderilir.
-        Böylece her sync sadece son kayıttan SONRA dinlenenleri çeker
-        → Render uyku sonrası kaçırılan şarkılar da telafi edilir.
-
-        Hiç kayıt yoksa None döner → Spotify son 50 şarkıyı getirir.
-        """
         ws = self._find_sheet(user_id)
         if not ws:
             return None
         try:
-            col = ws.col_values(8)  # _played_at_iso sütunu (col H = 8. sütun)
+            col = ws.col_values(8)
             values = [v.strip() for v in col[1:] if v.strip() and v.strip() != "—"]
             if not values:
                 return None
@@ -476,7 +527,6 @@ class SheetsClient:
             return None
 
     def get_user_data(self, user_id: str):
-        """Kullanıcının tüm verisini döndürür → (headers, rows)"""
         ws = self._find_sheet(user_id)
         if not ws:
             return HAM_HEADERS, []
@@ -486,110 +536,69 @@ class SheetsClient:
         return all_values[0], all_values[1:]
 
     def get_combined_data(self, user_ids: list):
-        """İzin veren tüm kullanıcıların verisini birleştirerek döndürür"""
         all_rows = []
         for uid in user_ids:
             _, rows = self.get_user_data(uid)
             all_rows.extend(rows)
         return HAM_HEADERS, all_rows
 
-
-    # ─── Schema Migration ─────────────────────────────────────────────────────────
-
     def migrate_user_sheet(self, user_id: str, genre_map: dict = None) -> dict:
-        """
-        Kullanıcının sayfasını yeni formata getirir (arkaplanda çalışabilir).
-        Eski format: [Tarih, ŞarkıID, ŞarkıAdı, Sanatçı, SanatçıID, Albüm, Süre(ms), Süre(sn), ISO]
-        Yeni format: [Tarih, ŞarkıID, ŞarkıAdı, Sanatçı, SanatçıID, Albüm, Süre(ms), ISO, Tür]
-
-        genre_map: {artist_id: [genre, ...]} — isteğe bağlı, varsa Tür sütunu doldurulur.
-        Döndürür: {"migrated": int, "skipped": int, "already_ok": bool}
-        """
         ws = self._find_sheet(user_id)
         if not ws:
             return {"error": "Sayfa bulunamadı"}
-
         try:
             all_values = ws.get_all_values()
         except Exception as e:
             return {"error": str(e)}
-
         if not all_values:
             return {"migrated": 0, "skipped": 0, "already_ok": True}
-
         headers = all_values[0]
-
-        # Mevcut format tespiti
-        has_sure_sn  = "Süre (sn)" in headers
-        has_tur      = "Tür" in headers
+        has_sure_sn    = "Süre (sn)" in headers
+        has_tur        = "Tür" in headers
         has_sanatci_id = "Sanatçı ID" in headers
-
-        # Zaten yeni formattaysa işlem yapma
         if not has_sure_sn and has_tur:
             return {"migrated": 0, "skipped": 0, "already_ok": True}
-
         rows = all_values[1:]
         if not rows:
-            # Sadece başlığı güncelle
             ws.update("A1:I1", [list(HAM_HEADERS)], value_input_option="RAW")
             return {"migrated": 0, "skipped": 0, "already_ok": False}
-
-        # Eski sütun indexlerini dinamik bul
         def idx(col_name, fallback=-1):
             try:
                 return headers.index(col_name)
             except ValueError:
                 return fallback
-
         old_tarih      = idx("Dinlenme Tarihi", 0)
-        old_sarki_id   = idx("Şarkı ID",        1)
-        old_sarki_adi  = idx("Şarkı Adı",       2)
-        old_sanatci    = idx("Sanatçı",          3)
-        old_sanatci_id = idx("Sanatçı ID",       4) if has_sanatci_id else -1
-        old_album      = idx("Albüm",            5)
-        old_sure_ms    = idx("Süre (ms)",        6)
-        old_iso        = idx("_played_at_iso",   7 if has_sanatci_id else 6)
-        old_tur        = idx("Tür",              -1)
-
-        new_rows = [list(HAM_HEADERS)]  # başlık satırı
-
+        old_sarki_id   = idx("Şarkı ID", 1)
+        old_sarki_adi  = idx("Şarkı Adı", 2)
+        old_sanatci    = idx("Sanatçı", 3)
+        old_sanatci_id = idx("Sanatçı ID", 4) if has_sanatci_id else -1
+        old_album      = idx("Albüm", 5)
+        old_sure_ms    = idx("Süre (ms)", 6)
+        old_iso        = idx("_played_at_iso", 7 if has_sanatci_id else 6)
+        old_tur        = idx("Tür", -1)
+        new_rows = [list(HAM_HEADERS)]
         migrated = 0
         skipped  = 0
-
         for row in rows:
-            # Eksik sütunlar için güvenli erişim
             def get(i, default=""):
-                return row[i].strip() if i >= 0 and i < len(row) else default
-
+                return (row[i] or "").strip() if i >= 0 and i < len(row) else default
             artist_id = get(old_sanatci_id)
-
-            # Tür: önce eski sütundan, yoksa genre_map'ten
             tur = ""
             if old_tur >= 0:
                 tur = get(old_tur)
             if not tur and genre_map and artist_id:
-                # artist_id virgülle ayrılmış olabilir (işbirlikleri)
                 for aid in [a.strip() for a in artist_id.split(",") if a.strip()]:
                     genres = genre_map.get(aid, [])
                     if genres:
-                        tur = ", ".join(genres[:3])  # max 3 tür
+                        tur = ", ".join(genres[:3])
                         break
-
             new_row = [
-                get(old_tarih),
-                get(old_sarki_id),
-                get(old_sarki_adi),
-                get(old_sanatci),
-                artist_id,
-                get(old_album),
-                get(old_sure_ms),
-                get(old_iso),
-                tur,
+                get(old_tarih), get(old_sarki_id), get(old_sarki_adi),
+                get(old_sanatci), artist_id, get(old_album),
+                get(old_sure_ms), get(old_iso), tur,
             ]
             new_rows.append(new_row)
             migrated += 1
-
-        # Sayfayı komple yeniden yaz
         try:
             ws.clear()
             ws.update(f"A1:I{len(new_rows)}", new_rows, value_input_option="RAW")
@@ -598,11 +607,6 @@ class SheetsClient:
         except Exception as e:
             logger.error(f"❌ Migration yazma hatası ({user_id}): {e}")
             return {"error": str(e)}
-
-    # ─── GenreCache sayfası ──────────────────────────────────────────────────────
-    # Yapı: artist_id | genres_json
-    # Her artist_id için Spotify'dan çekilen türleri saklar.
-    # Yoksa yeniden API çağrısı yapılmaz — rate limit koruması.
 
     def _ensure_genre_cache_sheet(self):
         if not self.sh:
@@ -615,27 +619,20 @@ class SheetsClient:
         return ws
 
     def get_cached_genres(self) -> dict:
-        """GenreCache sayfasındaki tüm sanatçı→genre eşleşmelerini döndürür.
-        Döndürür: {artist_id: [genre, ...]}
-        """
         ws = self._find_sheet("GenreCache")
         if not ws:
             return {}
         rows = ws.get_all_values()
         cache = {}
-        for row in rows[1:]:  # başlık satırını atla
-            if len(row) >= 2 and row[0].strip():
+        for row in rows[1:]:
+            if len(row) >= 2 and (row[0] or "").strip():
                 try:
-                    cache[row[0].strip()] = json.loads(row[1]) if row[1].strip() else []
+                    cache[(row[0] or "").strip()] = json.loads(row[1]) if (row[1] or "").strip() else []
                 except Exception:
-                    cache[row[0].strip()] = []
+                    cache[(row[0] or "").strip()] = []
         return cache
 
     def save_genres_batch(self, genre_map: dict):
-        """Yeni artist_id→genres eşleşmelerini GenreCache sayfasına ekler.
-        genre_map: {artist_id: [genre, ...]}
-        Zaten var olan artist_id'ler güncellenmez (append-only, hız için).
-        """
         if not genre_map:
             return
         ws = self._ensure_genre_cache_sheet()
@@ -647,10 +644,6 @@ class SheetsClient:
             logger.info(f"✅ GenreCache: {len(new_rows)} sanatçı yazıldı.")
 
     def get_artist_ids_from_user_sheet(self, user_id: str) -> dict:
-        """Kullanıcı sayfasından Sanatçı → Sanatçı ID eşleşmelerini çeker.
-        Sanatçı ID'si olmayan eski kayıtlar için boş string döner.
-        Döndürür: {artist_name: artist_id_or_empty}
-        """
         ws = self._find_sheet(user_id)
         if not ws:
             return {}
@@ -667,9 +660,8 @@ class SheetsClient:
         for row in all_values[1:]:
             if len(row) <= max(idx_sanatci, idx_id):
                 continue
-            name = row[idx_sanatci].strip()
-            aid  = row[idx_id].strip() if row[idx_id].strip() else ""
+            name = (row[idx_sanatci] or "").strip()
+            aid  = (row[idx_id] or "").strip() if (row[idx_id] or "").strip() else ""
             if name and name not in result:
                 result[name] = aid
         return result
-

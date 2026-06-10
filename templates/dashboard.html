@@ -218,6 +218,9 @@
   .lyrics-loading{color:var(--muted);font-size:12px;letter-spacing:1px;text-align:center;padding:32px;}
   .lyrics-not-found{color:var(--muted);font-size:12px;text-align:center;padding:32px;line-height:1.8;}
   .lyrics-not-found span{color:var(--text);display:block;font-size:14px;margin-bottom:8px;}
+  .lyrics-report-btn{display:block;margin:16px auto 0;background:transparent;border:1px solid var(--border);color:var(--muted);padding:8px 16px;cursor:pointer;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;transition:all .2s;}
+  .lyrics-report-btn:hover{border-color:#ef4444;color:#ef4444;}
+  .lyrics-report-btn.sent{border-color:var(--green);color:var(--green);pointer-events:none;}
 
   /* SYNCED LYRICS PANEL */
   .synced-lyrics-panel{display:none;background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--green);margin-bottom:32px;position:relative;}
@@ -228,6 +231,9 @@
   .synced-line.active{font-size:19px;font-weight:800;color:var(--green);opacity:1;}
   .synced-line.next{font-size:12px;opacity:.35;}
   .synced-no-support{text-align:center;padding:40px;font-size:11px;color:var(--muted);letter-spacing:1px;}
+  .synced-report-btn{position:absolute;top:8px;right:8px;background:transparent;border:none;color:var(--muted);font-size:11px;cursor:pointer;padding:4px 8px;font-family:'DM Mono',monospace;letter-spacing:1px;transition:color .2s;opacity:.5;}
+  .synced-report-btn:hover{color:#ef4444;opacity:1;}
+  .synced-report-btn.sent{color:var(--green);opacity:1;pointer-events:none;}
 
   /* AYAR SATIRI */
   .setting-row{display:flex;align-items:center;justify-content:space-between;gap:20px;background:var(--surface);border:1px solid var(--border);padding:20px 24px;cursor:pointer;transition:border-color .2s;margin-bottom:8px;user-select:none;}
@@ -668,6 +674,35 @@
   .pl-create-btn:hover{opacity:.85;}
   .pl-create-btn:disabled{opacity:.4;cursor:not-allowed;}
   .pl-create-result{font-size:11px;margin-top:10px;padding:8px;text-align:center;}
+  /* ── AI / Collab playlist badges ── */
+  .pl-ai-badge{display:inline-block;font-size:9px;letter-spacing:1.5px;font-family:'DM Mono',monospace;padding:2px 7px;border:1px solid #a78bfa55;color:#a78bfa;background:#a78bfa0d;margin-left:8px;vertical-align:middle;text-transform:uppercase;}
+  .pl-collab-badge{display:inline-block;font-size:9px;letter-spacing:1.5px;font-family:'DM Mono',monospace;padding:2px 7px;border:1px solid #38bdf855;color:#38bdf8;background:#38bdf80d;margin-left:8px;vertical-align:middle;text-transform:uppercase;}
+  .pl-ai-card{background:var(--surface);border:1px solid #a78bfa33;margin-bottom:12px;overflow:hidden;}
+  .pl-ai-card .pl-create-header:hover{background:#a78bfa08;}
+  .pl-collab-card{background:var(--surface);border:1px solid #38bdf833;margin-bottom:12px;overflow:hidden;}
+  .pl-collab-card .pl-create-header:hover{background:#38bdf808;}
+  .pl-ai-btn{background:#7c3aed;color:#fff;border:none;padding:11px 24px;font-family:'DM Mono',monospace;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;width:100%;transition:opacity .15s;margin-top:4px;}
+  .pl-ai-btn:hover{opacity:.85;}
+  .pl-ai-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .pl-user-picker{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+  .pl-picker-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1px solid var(--border);background:var(--surface);font-size:11px;cursor:pointer;transition:background .15s,border-color .15s;}
+  .pl-picker-chip:hover{border-color:#7c3aed88;}
+  .pl-picker-chip.selected{background:#7c3aed22;border-color:#7c3aed;color:#a78bfa;}
+  .pl-picker-chip .chip-x{font-size:13px;line-height:1;color:var(--muted);margin-left:2px;}
+  .pl-picker-empty{font-size:11px;color:var(--muted);padding:6px 0;}
+    .pl-collab-btn{background:#0284c7;color:#fff;border:none;padding:11px 24px;font-family:'DM Mono',monospace;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;width:100%;transition:opacity .15s;margin-top:4px;}
+  .pl-collab-btn:hover{opacity:.85;}
+  .pl-collab-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .pl-user-tag{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);padding:4px 10px;font-size:11px;font-family:'DM Mono',monospace;margin:3px;}
+  .pl-user-tag .pl-tag-remove{cursor:pointer;color:var(--muted);font-size:13px;line-height:1;}
+  .pl-user-tag .pl-tag-remove:hover{color:#ef4444;}
+  .pl-user-input-row{display:flex;gap:8px;margin-bottom:10px;}
+  .pl-user-input-row input{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;font-family:'DM Mono',monospace;font-size:11px;outline:none;}
+  .pl-user-input-row input:focus{border-color:#38bdf8;}
+  .pl-user-input-row button{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+  .pl-user-input-row button:hover{border-color:#38bdf8;color:#38bdf8;}
+  .pl-user-list{display:flex;flex-wrap:wrap;margin-bottom:12px;min-height:28px;}
+  .pl-info-box{background:var(--surface2);border:1px solid var(--border);padding:10px 14px;font-size:10px;color:var(--muted);line-height:1.7;margin-bottom:12px;}
   /* ── Section header (başlık + chart menüsü) ── */
   .section-header{display:flex;align-items:center;justify-content:space-between;
     margin-bottom:12px;flex-wrap:wrap;gap:8px;}
@@ -1053,6 +1088,7 @@
 
     <!-- SYNCED LYRICS PANEL -->
     <div class="synced-lyrics-panel" id="syncedLyricsPanel">
+      <button class="synced-report-btn" id="syncedReportBtn" onclick="reportSyncedLyrics(this)" title="Sözler Hatalı Bildir">⚑ Bildir</button>
       <div class="synced-line-wrap" id="syncedLineWrap">
         <div class="synced-no-support">Şarkı bekleniyor...</div>
       </div>
@@ -1178,6 +1214,111 @@
 
         <button class="pl-create-btn" onclick="doCreatePlaylist('top-artists','artists')">✦ Playlist Oluştur</button>
         <div class="pl-create-result" id="plResultArtists"></div>
+      </div>
+    </div>
+
+    <!-- AI OTOMATİK PLAYLIST -->
+    <div class="pl-ai-card" id="plCardAutoAI">
+      <div class="pl-create-header" onclick="togglePlCard('AutoAI')">
+        <div>
+          <div class="pl-create-title">🤖 AI ile Otomatik Playlist <span class="pl-ai-badge">AI</span></div>
+          <div class="pl-create-sub">Dinleme geçmişini analiz edip haftalık güncellenen kişisel playlist</div>
+        </div>
+        <span class="pl-expand-icon" id="plExpandAutoAI">▸</span>
+      </div>
+      <div class="pl-create-body" id="plBodyAutoAI" style="display:none">
+        <div class="pl-info-box">
+          🔄 Her Pazar otomatik güncellenir.
+        </div>
+        <label class="pl-adv-label">Playlist adı</label>
+        <input class="pl-custom-input" id="plAutoAIName" type="text" placeholder="Music+ AI Playlist" style="margin-bottom:12px">
+        <label class="pl-adv-label">Maksimum süre (dakika)</label>
+        <div class="pl-count-btns" id="plCountAutoAI">
+          <button class="pl-count-btn" data-val="30">30 dk</button>
+          <button class="pl-count-btn active" data-val="60">60 dk</button>
+          <button class="pl-count-btn" data-val="90">90 dk</button>
+          <button class="pl-count-btn" data-val="120">120 dk</button>
+          <button class="pl-count-btn" data-val="custom">Özel</button>
+        </div>
+        <input class="pl-custom-input" id="plCustomAutoAI" type="number" min="1" max="9999" placeholder="Dakika gir..." style="display:none;margin-bottom:12px">
+        <div class="pl-advanced-toggle" onclick="toggleAdvanced('AutoAI')">
+          ♻️ Mevcut playlist'i güncelle <span id="plAdvIconAutoAI">▸</span>
+        </div>
+        <div class="pl-advanced-body" id="plAdvBodyAutoAI" style="display:none">
+          <label class="pl-adv-label">Mevcut Playlist ID (güncelleme için)</label>
+          <input class="pl-custom-input" id="plAutoAIExistingId" type="text" placeholder="spotify playlist ID (boş bırakırsan yeni oluşturulur)">
+        </div>
+        <button class="pl-ai-btn" onclick="doCreateAutoAIPlaylist()">✦ AI Playlist Oluştur</button>
+        <div class="pl-create-result" id="plResultAutoAI"></div>
+      </div>
+    </div>
+
+    <!-- ORTAK PLAYLIST (TEK SEFERLİK) -->
+    <div class="pl-collab-card" id="plCardCollab">
+      <div class="pl-create-header" onclick="togglePlCard('Collab')">
+        <div>
+          <div class="pl-create-title">👥 Ortak Playlist <span class="pl-ai-badge">AI</span></div>
+          <div class="pl-create-sub">Birden fazla kullanıcının zevkini birleştiren tek seferlik playlist</div>
+        </div>
+        <span class="pl-expand-icon" id="plExpandCollab">▸</span>
+      </div>
+      <div class="pl-create-body" id="plBodyCollab" style="display:none">
+
+        <label class="pl-adv-label">Playlist adı</label>
+        <input class="pl-custom-input" id="plCollabName" type="text" placeholder="Ortak Playlist" style="margin-bottom:12px">
+        <label class="pl-adv-label">Kullanıcı ekle</label>
+        <div class="pl-user-picker" id="plCollabPicker"></div>
+        <div class="pl-user-list" id="plCollabUserList"></div>
+        <label class="pl-adv-label">Maksimum süre (dakika)</label>
+        <div class="pl-count-btns" id="plCountCollab">
+          <button class="pl-count-btn" data-val="30">30 dk</button>
+          <button class="pl-count-btn active" data-val="60">60 dk</button>
+          <button class="pl-count-btn" data-val="90">90 dk</button>
+          <button class="pl-count-btn" data-val="120">120 dk</button>
+          <button class="pl-count-btn" data-val="custom">Özel</button>
+        </div>
+        <input class="pl-custom-input" id="plCustomCollab" type="number" min="1" max="9999" placeholder="Dakika gir..." style="display:none;margin-bottom:12px">
+        <button class="pl-collab-btn" onclick="doCreateCollabPlaylist(false)">✦ Ortak Playlist Oluştur</button>
+        <div class="pl-create-result" id="plResultCollab"></div>
+      </div>
+    </div>
+
+    <!-- AI OTOMATİK ORTAK PLAYLIST -->
+    <div class="pl-collab-card" id="plCardAutoCollab" style="border-color:#7c3aed44;">
+      <div class="pl-create-header" onclick="togglePlCard('AutoCollab')">
+        <div>
+          <div class="pl-create-title">🤖👥 AI Otomatik Ortak Playlist <span class="pl-ai-badge">AI</span></div>
+          <div class="pl-create-sub">Haftalık otomatik güncellenen, AI destekli ortak çalma listesi</div>
+        </div>
+        <span class="pl-expand-icon" id="plExpandAutoCollab">▸</span>
+      </div>
+      <div class="pl-create-body" id="plBodyAutoCollab" style="display:none">
+        <div class="pl-info-box">
+          🔄 Her Pazar otomatik güncellenir.
+        </div>
+        <label class="pl-adv-label">Playlist adı</label>
+        <input class="pl-custom-input" id="plAutoCollabName" type="text" placeholder="Music+ Ortak AI Playlist" style="margin-bottom:12px">
+        <label class="pl-adv-label">Kullanıcı ekle</label>
+        <div class="pl-user-picker" id="plAutoCollabPicker"></div>
+        <div class="pl-user-list" id="plAutoCollabUserList"></div>
+        <label class="pl-adv-label">Maksimum süre (dakika)</label>
+        <div class="pl-count-btns" id="plCountAutoCollab">
+          <button class="pl-count-btn" data-val="30">30 dk</button>
+          <button class="pl-count-btn active" data-val="60">60 dk</button>
+          <button class="pl-count-btn" data-val="90">90 dk</button>
+          <button class="pl-count-btn" data-val="120">120 dk</button>
+          <button class="pl-count-btn" data-val="custom">Özel</button>
+        </div>
+        <input class="pl-custom-input" id="plCustomAutoCollab" type="number" min="1" max="9999" placeholder="Dakika gir..." style="display:none;margin-bottom:12px">
+        <div class="pl-advanced-toggle" onclick="toggleAdvanced('AutoCollab')">
+          ♻️ Mevcut playlist'i güncelle <span id="plAdvIconAutoCollab">▸</span>
+        </div>
+        <div class="pl-advanced-body" id="plAdvBodyAutoCollab" style="display:none">
+          <label class="pl-adv-label">Mevcut Playlist ID (güncelleme için)</label>
+          <input class="pl-custom-input" id="plAutoCollabExistingId" type="text" placeholder="spotify playlist ID (boş bırakırsan yeni oluşturulur)">
+        </div>
+        <button class="pl-ai-btn" style="background:linear-gradient(135deg,#7c3aed,#0284c7)" onclick="doCreateCollabPlaylist(true)">✦ AI Ortak Playlist Oluştur</button>
+        <div class="pl-create-result" id="plResultAutoCollab"></div>
       </div>
     </div>
 
@@ -1510,6 +1651,57 @@
         <button onclick="window.location.href='/api/export-json';toggleExportDropdown()" style="display:block;width:100%;background:none;border:none;color:var(--text);padding:12px 16px;text-align:left;cursor:pointer;font-size:13px;">📦 Verileri JSON olarak dışa aktar</button>
       </div>
     </div>
+    <div class="section-title" style="margin-top:40px">Bildirimler</div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);padding:24px;margin-bottom:16px;">
+      <p style="font-size:11px;color:var(--muted);margin:0 0 20px;line-height:1.7;">
+        Music+ sana e-posta ile bildirim gönderebilir. Spotify hesabındaki e-posta otomatik doldurulur, istersen değiştirebilirsin.
+      </p>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">E-Posta Adresi</label>
+        <input id="notifEmail" type="email" placeholder="ornek@gmail.com"
+          style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 14px;font-family:'DM Mono',monospace;font-size:13px;outline:none;">
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">Spotify Ödeme Günü (1-31, boş bırakabilirsin)</label>
+        <input id="notifOdemeGunu" type="number" min="1" max="31" placeholder="Örn: 15"
+          style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 14px;font-family:'DM Mono',monospace;font-size:13px;outline:none;">
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:1px;background:var(--border);margin-bottom:20px;">
+        <div style="background:var(--surface2);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleNotifToggle('streak')">
+          <div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:3px;">🔥 Streak Uyarısı</div>
+            <div style="font-size:11px;color:var(--muted);line-height:1.5;">Bugün dinlemezsen seriniz bozulmadan 6 saat önce uyarı al. Spotify ödeme hatırlatması da bu seçeneğe bağlı.</div>
+          </div>
+          <div class="setting-toggle" id="notif-toggle-streak" style="margin-left:16px;flex-shrink:0;"><div class="toggle-knob"></div></div>
+        </div>
+        <div style="background:var(--surface2);padding:16px 20px;" >
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleNotifToggle('ozet')">
+            <div>
+              <div style="font-size:13px;font-weight:700;margin-bottom:3px;">📊 Dinleme Özeti</div>
+              <div style="font-size:11px;color:var(--muted);line-height:1.5;">Haftalık veya aylık dinleme istatistiklerini e-posta ile al.</div>
+            </div>
+            <div class="setting-toggle" id="notif-toggle-ozet" style="margin-left:16px;flex-shrink:0;"><div class="toggle-knob"></div></div>
+          </div>
+          <div id="notif-ozet-sikligi" style="margin-top:12px;display:none;gap:8px;flex-wrap:wrap;">
+            <button id="notif-btn-weekly"  onclick="setOzetSikligi('weekly')"
+              style="background:var(--green);color:#000;border:none;padding:6px 14px;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;cursor:pointer;">Haftalık</button>
+            <button id="notif-btn-monthly" onclick="setOzetSikligi('monthly')"
+              style="background:transparent;color:var(--muted);border:1px solid var(--border);padding:6px 14px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;">Aylık</button>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="saveNotifSettings()"
+        style="width:100%;background:var(--green);color:#000;border:none;padding:12px;font-family:'DM Mono',monospace;font-size:12px;font-weight:800;letter-spacing:1px;cursor:pointer;">
+        KAYDET
+      </button>
+      <div id="notifSaveMsg" style="text-align:center;font-size:11px;color:var(--green);margin-top:10px;min-height:16px;"></div>
+    </div>
+
     <button class="action-btn danger" onclick="if(confirm('Çıkış yapmak istediğine emin misin?')) window.location.href='/logout'">↪ Sistemden Çıkış Yap</button>
   </div>
 
@@ -2118,6 +2310,9 @@ async function fetchNowPlaying() {
     if (newTrack !== prevTrack && _settings.syncedLyrics) {
       _lastSyncedTrack = '';
       loadSyncedLyrics(d.artist_name, d.track_name);
+      // Bildir butonunu sıfırla
+      const rb = document.getElementById('syncedReportBtn');
+      if (rb) { rb.textContent = '⚑ Bildir'; rb.classList.remove('sent'); rb.style.pointerEvents = ''; }
     }
 
     document.getElementById('npTrack').textContent  = d.track_name;
@@ -2525,9 +2720,9 @@ async function loadLyrics(artist, track) {
         const lyrics = best.plainLyrics || best.syncedLyrics?.replace(/\[\d+:\d+\.\d+\]/g, '').trim();
         if (lyrics) {
           if (_settings.syncedLyrics && best.syncedLyrics) {
-            inner.innerHTML = _buildHighlightedLyrics(best.syncedLyrics);
+            inner.innerHTML = _buildHighlightedLyrics(best.syncedLyrics) + _reportBtn(cleanArtist, track);
           } else {
-            inner.innerHTML = `<pre>${lyrics.trim()}</pre>`;
+            inner.innerHTML = `<pre>${lyrics.trim()}</pre>` + _reportBtn(cleanArtist, track);
           }
           return;
         }
@@ -2538,15 +2733,54 @@ async function loadLyrics(artist, track) {
 
     const data = await res.json();
     if (data.syncedLyrics && _settings.syncedLyrics) {
-      inner.innerHTML = _buildHighlightedLyrics(data.syncedLyrics);
+      inner.innerHTML = _buildHighlightedLyrics(data.syncedLyrics) + _reportBtn(artist, track);
       _scrollToActiveLyricLine();
     } else {
       const lyrics = data.plainLyrics || data.syncedLyrics?.replace(/\[\d+:\d+\.\d+\]/g, '').trim();
-      if (lyrics) inner.innerHTML = `<pre>${lyrics.trim()}</pre>`;
+      if (lyrics) inner.innerHTML = `<pre>${lyrics.trim()}</pre>` + _reportBtn(artist, track);
       else inner.innerHTML = `<div class="lyrics-not-found"><span>${track}</span>Bu şarkı için söz bulunamadı.</div>`;
     }
   } catch(e) {
     inner.innerHTML = `<div class="lyrics-not-found"><span>Bağlantı hatası</span>Şarkı sözleri yüklenemedi.</div>`;
+  }
+}
+
+function _reportBtn(artist, track) {
+  const a = artist.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const t = track.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return `<button class="lyrics-report-btn" onclick="reportLyrics(this,'${a}','${t}')">⚑ Sözler Hatalı Bildir</button>`;
+}
+
+async function reportSyncedLyrics(btn) {
+  const track  = document.getElementById('npTrack').textContent;
+  const artist = document.getElementById('npArtist').textContent;
+  await _doReport(btn, artist, track, 'synced');
+}
+
+async function reportLyrics(btn, artist, track) {
+  await _doReport(btn, artist, track, 'plain');
+}
+
+async function _doReport(btn, artist, track, type) {
+  btn.textContent = '...';
+  try {
+    const res = await fetch('https://warning.pluspreview.workers.dev', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ sarki: track, sanatci: artist })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      btn.textContent = type === 'synced' ? `⚑ ${data.count}x` : `✓ Bildirildi (${data.count} kişi)`;
+      btn.classList.add('sent');
+    } else if (res.status === 429) {
+      btn.textContent = type === 'synced' ? '✕ Limit' : '✕ Günlük limitinize ulaştınız';
+      btn.classList.add('sent');
+    } else {
+      btn.textContent = '✕ Hata';
+    }
+  } catch {
+    btn.textContent = '✕ Hata';
   }
 }
 
@@ -2557,14 +2791,36 @@ function _buildHighlightedLyrics(syncedLyrics) {
     if (m) {
       const ms   = (parseInt(m[1]) * 60 + parseFloat(m[2])) * 1000;
       const text = m[3].trim();
-      lines.push(`<<div class="lyric-line" data-time="${ms}">${text || '·'}</div>`);
+      lines.push(`<div class="lyric-line" data-time="${ms}">${text || '·'}</div>`);
     }
   });
   return `<div class="lyric-lines">${lines.join('')}</div>`;
 }
 
+// ── Kullanıcı dokunma takibi ─────────────────────────────────────────────────
+let _userTouching    = false;
+let _touchResumeTimer = null;
+
+(function _initLyricsTouchHandlers() {
+  const panel = document.getElementById('lyricsPanel');
+  if (!panel) return;
+
+  const onTouch = () => {
+    _userTouching = true;
+    clearTimeout(_touchResumeTimer);
+    _touchResumeTimer = setTimeout(() => { _userTouching = false; }, 5000);
+  };
+
+  panel.addEventListener('touchstart',  onTouch, { passive: true });
+  panel.addEventListener('touchmove',   onTouch, { passive: true });
+  panel.addEventListener('mousedown',   onTouch);
+  panel.addEventListener('wheel',       onTouch, { passive: true });
+})();
+
 function _scrollToActiveLyricLine() {
   if (!_settings.syncedLyrics) return;
+  if (_userTouching) return;   // kullanıcı kaydırıyorsa dokunma
+
   const inner = document.getElementById('lyricsInner');
   const lines = inner.querySelectorAll('.lyric-line');
   if (!lines.length) return;
@@ -2590,6 +2846,91 @@ updateNpTime = function() {
 
 initSettings();
 loadIzin();
+loadNotifSettings();
+
+// ── Bildirim Ayarları JS ─────────────────────────────────────────────────────
+let _notifOzetSikligi = 'weekly';
+
+async function loadNotifSettings() {
+  try {
+    const res  = await fetch('/api/bildirim-ayarlari');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    document.getElementById('notifEmail').value      = data.email || '';
+    document.getElementById('notifOdemeGunu').value  = data.spotify_odeme_gunu || '';
+
+    if (data.streak_bildirimi === 'True' || data.streak_bildirimi === true) {
+      document.getElementById('notif-toggle-streak').classList.add('on');
+    }
+    if (data.ozet_bildirimi === 'True' || data.ozet_bildirimi === true) {
+      document.getElementById('notif-toggle-ozet').classList.add('on');
+      document.getElementById('notif-ozet-sikligi').style.display = 'flex';
+    }
+    _notifOzetSikligi = data.ozet_sikligi || 'weekly';
+    setOzetSikligi(_notifOzetSikligi);
+  } catch(e) {}
+}
+
+function toggleNotifToggle(id) {
+  const el = document.getElementById(`notif-toggle-${id}`);
+  el.classList.toggle('on');
+  if (id === 'ozet') {
+    const sikligi = document.getElementById('notif-ozet-sikligi');
+    sikligi.style.display = el.classList.contains('on') ? 'flex' : 'none';
+  }
+}
+
+function setOzetSikligi(val) {
+  _notifOzetSikligi = val;
+  const btnW = document.getElementById('notif-btn-weekly');
+  const btnM = document.getElementById('notif-btn-monthly');
+  if (!btnW || !btnM) return;
+  if (val === 'weekly') {
+    btnW.style.background = 'var(--green)'; btnW.style.color = '#000'; btnW.style.border = 'none';
+    btnM.style.background = 'transparent';  btnM.style.color = 'var(--muted)'; btnM.style.border = '1px solid var(--border)';
+  } else {
+    btnM.style.background = 'var(--green)'; btnM.style.color = '#000'; btnM.style.border = 'none';
+    btnW.style.background = 'transparent';  btnW.style.color = 'var(--muted)'; btnW.style.border = '1px solid var(--border)';
+  }
+}
+
+async function saveNotifSettings() {
+  const msg        = document.getElementById('notifSaveMsg');
+  const email      = document.getElementById('notifEmail').value.trim();
+  const odemeGunu  = document.getElementById('notifOdemeGunu').value.trim();
+  const streakAcik = document.getElementById('notif-toggle-streak').classList.contains('on');
+  const ozetAcik   = document.getElementById('notif-toggle-ozet').classList.contains('on');
+
+  msg.textContent = 'Kaydediliyor...';
+  msg.style.color = 'var(--muted)';
+
+  try {
+    const res = await fetch('/api/bildirim-ayarlari', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        email,
+        spotify_odeme_gunu: odemeGunu,
+        streak_bildirimi:   streakAcik,
+        ozet_bildirimi:     ozetAcik,
+        ozet_sikligi:       _notifOzetSikligi,
+      })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      msg.textContent = '✓ Kaydedildi';
+      msg.style.color = 'var(--green)';
+    } else {
+      msg.textContent = '✕ ' + (data.error || 'Hata');
+      msg.style.color = '#ef4444';
+    }
+  } catch {
+    msg.textContent = '✕ Bağlantı hatası';
+    msg.style.color = '#ef4444';
+  }
+  setTimeout(() => { msg.textContent = ''; }, 3000);
+}
 
 const _lyricStyle = document.createElement('style');
 _lyricStyle.textContent = `.lyric-lines{padding:20px 28px;}.lyric-line{font-family:'DM Mono',monospace;font-size:13px;line-height:2.2;color:var(--muted);cursor:default;transition:color .3s,font-size .3s;}.lyric-line.lyric-active{color:var(--green);font-size:15px;font-weight:700;font-family:'Syne',sans-serif;}`;
@@ -3242,6 +3583,169 @@ async function doCreatePlaylist(type, section) {
     resultEl.textContent = '❌ ' + e.message;
     btn.textContent = '✦ Playlist Oluştur';
     btn.disabled = false;
+  }
+}
+
+// ── AI & Collab Playlist UI ───────────────────────────────────────────────
+_initPlCountBtns('AutoAI');
+_initPlCountBtns('Collab');
+_initPlCountBtns('AutoCollab');
+
+// Collab user picker
+const _collabUsers = { collab: [], autoCollab: [] };
+let _collabUserPool = []; // [{id, name}, ...]
+
+async function _loadCollabUserPool() {
+  if (_collabUserPool.length) return;
+  try {
+    const r = await fetch('/api/collab-users');
+    _collabUserPool = await r.json();
+  } catch(e) { _collabUserPool = []; }
+}
+
+function _renderCollabPicker(key) {
+  const pickerId = key === 'collab' ? 'plCollabPicker' : 'plAutoCollabPicker';
+  const listId   = key === 'collab' ? 'plCollabUserList' : 'plAutoCollabUserList';
+  const picker   = document.getElementById(pickerId);
+  if (!picker) return;
+
+  if (!_collabUserPool.length) {
+    picker.innerHTML = '<span class="pl-picker-empty">İstatistik paylaşan başka kullanıcı yok.</span>';
+    return;
+  }
+
+  picker.innerHTML = _collabUserPool.map(u => {
+    const sel = _collabUsers[key].includes(u.id);
+    return `<div class="pl-picker-chip${sel ? ' selected' : ''}" onclick="_toggleCollabUser('${key}','${u.id}','${(u.name||'').replace(/'/g,"&#39;")}')">
+      ${u.name}${sel ? ' <span class="chip-x">×</span>' : ''}
+    </div>`;
+  }).join('');
+
+  // seçili kullanıcıları aşağıdaki tag listesinde de göster
+  const listEl = document.getElementById(listId);
+  if (listEl) {
+    listEl.innerHTML = _collabUsers[key].map(uid => {
+      const u = _collabUserPool.find(x => x.id === uid);
+      const name = u ? u.name : uid;
+      return `<div class="pl-user-tag"><span>${name}</span></div>`;
+    }).join('');
+  }
+}
+
+function _toggleCollabUser(key, uid, name) {
+  const idx = _collabUsers[key].indexOf(uid);
+  if (idx === -1) _collabUsers[key].push(uid);
+  else            _collabUsers[key].splice(idx, 1);
+  _renderCollabPicker(key);
+}
+
+// Kart açılınca picker'ı yükle
+const _origTogglePlCard = typeof togglePlCard === 'function' ? togglePlCard : null;
+document.addEventListener('DOMContentLoaded', async () => {
+  await _loadCollabUserPool();
+  _renderCollabPicker('collab');
+  _renderCollabPicker('autoCollab');
+});
+
+function _getDuration(section) {
+  const s = section.charAt(0).toUpperCase() + section.slice(1);
+  const container = document.getElementById('plCount' + s);
+  const customInput = document.getElementById('plCustom' + s);
+  const active = container ? container.querySelector('.pl-count-btn.active') : null;
+  if (!active) return 60;
+  if (active.dataset.val === 'custom') return parseInt(customInput.value) || 60;
+  return parseInt(active.dataset.val) || 60;
+}
+
+async function doCreateAutoAIPlaylist() {
+  const btn       = document.querySelector('#plBodyAutoAI .pl-ai-btn');
+  const resultEl  = document.getElementById('plResultAutoAI');
+  const name      = (document.getElementById('plAutoAIName').value || '').trim() || 'Music+ AI Playlist';
+  const maxDur    = _getDuration('AutoAI');
+  const existId   = (document.getElementById('plAutoAIExistingId').value || '').trim() || null;
+
+  btn.disabled    = true;
+  btn.textContent = '⏳ AI analiz ediyor...';
+  resultEl.style.color   = 'var(--muted)';
+  resultEl.textContent   = 'Dinleme geçmişi analiz ediliyor, bu 15-30 saniye sürebilir...';
+
+  try {
+    const res = await fetch('/api/playlist/create-auto', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, max_duration_min: maxDur, playlist_id: existId })
+    });
+    const d = await res.json();
+    if (d.error) throw new Error(d.error);
+    resultEl.style.color = '#a78bfa';
+    resultEl.textContent = `✅ AI playlist hazır! ${d.track_count} şarkı · ${d.total_min || '?'} dk · ID: ${d.playlist_id}`;
+    btn.textContent = '✦ AI Playlist Oluştur';
+    btn.disabled    = false;
+    // Playlist ID'yi güncelleme alanına yaz
+    const idInput = document.getElementById('plAutoAIExistingId');
+    if (idInput && d.playlist_id) idInput.value = d.playlist_id;
+    const advBody = document.getElementById('plAdvBodyAutoAI');
+    if (advBody) advBody.style.display = 'block';
+    loadPlaylists();
+  } catch(e) {
+    resultEl.style.color = '#ef4444';
+    resultEl.textContent = '❌ ' + e.message;
+    btn.textContent = '✦ AI Playlist Oluştur';
+    btn.disabled    = false;
+  }
+}
+
+async function doCreateCollabPlaylist(isAuto) {
+  const prefix     = isAuto ? 'AutoCollab' : 'Collab';
+  const userKey    = isAuto ? 'autoCollab' : 'collab';
+  const endpoint   = isAuto ? '/api/playlist/create-auto-collab' : '/api/playlist/create-collab';
+  const btn        = document.querySelector(`#plBody${prefix} .pl-${isAuto ? 'ai' : 'collab'}-btn`);
+  const resultEl   = document.getElementById(`plResult${prefix}`);
+  const name       = (document.getElementById(`pl${prefix}Name`).value || '').trim()
+                     || (isAuto ? 'Music+ Ortak AI Playlist' : 'Ortak Playlist');
+  const maxDur     = _getDuration(prefix);
+  const userIds    = [..._collabUsers[userKey]];
+  const existId    = isAuto ? ((document.getElementById('plAutoCollabExistingId').value || '').trim() || null) : null;
+
+  if (userIds.length === 0) {
+    resultEl.style.color = '#ef4444';
+    resultEl.textContent = '❌ En az bir kullanıcı ID ekleyin';
+    return;
+  }
+
+  btn.disabled    = true;
+  btn.textContent = '⏳ AI analiz ediyor...';
+  resultEl.style.color = 'var(--muted)';
+  resultEl.textContent = 'Kullanıcı geçmişleri analiz ediliyor, bu 20-40 saniye sürebilir...';
+
+  const body = { name, max_duration_min: maxDur, user_ids: userIds };
+  if (isAuto && existId) body.playlist_id = existId;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const d = await res.json();
+    if (d.error) throw new Error(d.error);
+    const color = isAuto ? '#a78bfa' : '#38bdf8';
+    resultEl.style.color = color;
+    resultEl.textContent = `✅ Ortak playlist hazır! ${d.track_count} şarkı · ${d.total_min || '?'} dk · ID: ${d.playlist_id}`;
+    btn.textContent = isAuto ? '✦ AI Ortak Playlist Oluştur' : '✦ Ortak Playlist Oluştur';
+    btn.disabled    = false;
+    if (isAuto) {
+      const idInput = document.getElementById('plAutoCollabExistingId');
+      if (idInput && d.playlist_id) idInput.value = d.playlist_id;
+      const advBody = document.getElementById('plAdvBodyAutoCollab');
+      if (advBody) advBody.style.display = 'block';
+    }
+    loadPlaylists();
+  } catch(e) {
+    resultEl.style.color = '#ef4444';
+    resultEl.textContent = '❌ ' + e.message;
+    btn.textContent = isAuto ? '✦ AI Ortak Playlist Oluştur' : '✦ Ortak Playlist Oluştur';
+    btn.disabled    = false;
   }
 }
 

@@ -66,7 +66,7 @@ def _filter_rows_by_aralik(headers, rows, aralik, baslangic=None, bitis=None):
     for row in rows:
         if len(row) <= idx_iso:
             continue
-        iso = row[idx_iso].strip()
+        iso = (row[idx_iso] or "").strip()
         if not iso or iso == "—":
             continue
         iso16 = iso[:16]
@@ -195,8 +195,8 @@ def api_genres():
         for row in filtered:
             if len(row) <= max(idx_sanatci, idx_aid):
                 continue
-            raw_name = row[idx_sanatci].strip()
-            raw_id   = row[idx_aid].strip() if len(row) > idx_aid else ""
+            raw_name = (row[idx_sanatci] or "").strip()
+            raw_id   = (row[idx_aid] or "").strip() if len(row) > idx_aid else ""
             if not raw_name:
                 continue
             # "Sanatçı A, Sanatçı B" formatındaki işbirliklerini ayır

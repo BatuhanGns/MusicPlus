@@ -7,7 +7,7 @@ import config
 from extensions import sheets, scheduled_sync_all
 from routes import register_blueprints
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s:%(lineno)d %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -21,16 +21,9 @@ def create_app():
 
 
 def _refresh_all_access_tokens():
-    """
-    50 dakikada bir tüm kullanıcıların access token'larını yeniler.
-    - Sheets'teki expires_at okunur; süresi dolmak üzereyse yenilenir.
-    - Yeni token hem bellek cache'ine hem Sheets H/I sütunlarına yazılır.
-    - Refresh token iptal olmuşsa o kullanıcı atlanır, diğerleri etkilenmez.
-    """
     from clients.spotify_client import SpotifyClient
     import time as _time
 
-    # Sheets'ten tüm kullanıcıları yükle (server restart sonrası kurtarma)
     try:
         users = sheets.get_all_users_with_tokens()
         for u in users:
@@ -50,7 +43,6 @@ def _refresh_all_access_tokens():
     logger.info(f"⏰ Access token yenileme başladı ({len(tokens)} kullanıcı)")
     for uid, r_token in tokens.items():
         try:
-            # Sheets'teki expires_at kontrol et; hâlâ geçerliyse atla
             saved = sheets.get_access_token(uid)
             if saved and _time.time() < saved.get("expires_at", 0) - 60:
                 logger.info(f"⏭️ Token hâlâ geçerli, atlanıyor: {uid}")
@@ -71,14 +63,10 @@ def _refresh_all_access_tokens():
 
 
 def _start_scheduler():
-    """
-    - spotify_sync   : 15dk'da bir şarkı sync
-    - token_refresh  : 45dk'da bir access token yenileme
-    - daily_limit_reset: her gece 00:00 UTC'de limit sıfırlama
-    """
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.executors.pool import ThreadPoolExecutor
+        from utils.notifications import run_notifications
 
         executors    = {"default": ThreadPoolExecutor(2)}
         job_defaults = {"coalesce": True, "misfire_grace_time": 900}
@@ -113,8 +101,30 @@ def _start_scheduler():
             replace_existing=True,
         )
 
+        # Günlük bildirim maili — her gün 18:00 UTC (TR 21:00)
+        scheduler.add_job(
+            run_notifications,
+            "cron",
+            hour=18, minute=0,
+            id="daily_notifications",
+            timezone="UTC",
+            replace_existing=True,
+        )
+
+        # Haftalık otomatik playlist güncelleme — Pazar 20:00 UTC
+        from routes.playlists import run_auto_playlist_updates
+        scheduler.add_job(
+            run_auto_playlist_updates,
+            "cron",
+            day_of_week="sun",
+            hour=20, minute=0,
+            id="weekly_auto_playlists",
+            timezone="UTC",
+            replace_existing=True,
+        )
+
         scheduler.start()
-        logger.info("✅ Scheduler başlatıldı (sync=15dk, token_refresh=45dk)")
+        logger.info("✅ Scheduler başlatıldı (sync=15dk, token_refresh=50dk, bildirim=18:00 UTC)")
 
     except Exception as e:
         logger.error(f"Scheduler hatası, fallback thread başlatılıyor: {e}")
@@ -122,7 +132,6 @@ def _start_scheduler():
 
 
 def _start_fallback_thread():
-    """APScheduler başlamazsa manuel thread'lerle çalışır."""
     import threading, time
 
     def sync_loop():
@@ -132,7 +141,7 @@ def _start_fallback_thread():
                 scheduled_sync_all()
             except Exception as ex:
                 logger.error(f"Fallback sync hatası: {ex}")
-            time.sleep(900)  # 15 dakika
+            time.sleep(900)
 
     def token_loop():
         time.sleep(120)
@@ -141,13 +150,13 @@ def _start_fallback_thread():
                 _refresh_all_access_tokens()
             except Exception as ex:
                 logger.error(f"Fallback token yenileme hatası: {ex}")
-            time.sleep(3000)  # 50 dakika
+            time.sleep(3000)
 
     t1 = threading.Thread(target=sync_loop,  daemon=True, name="sync-fallback")
     t2 = threading.Thread(target=token_loop, daemon=True, name="token-refresh-fallback")
     t1.start()
     t2.start()
-    logger.info("✅ Fallback thread'ler başlatıldı (sync=15dk, token_refresh=45dk)")
+    logger.info("✅ Fallback thread'ler başlatıldı (sync=15dk, token_refresh=50dk)")
 
 
 app = create_app()

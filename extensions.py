@@ -203,3 +203,38 @@ def scheduled_sync_all():
                 logger.error(f"❌ Scheduled sync hatası ({uid}): {e}")
     except Exception as e:
         logger.error(f"❌ Scheduled sync genel hata: {e}")
+
+
+def get_spotify_for_user(user_id: str):
+    """
+    Belirtilen kullanıcı için SpotifyClient instance'ı oluşturur.
+    Haftalık otomatik playlist güncellemesi için kullanılır.
+    """
+    try:
+        token_data    = sheets.get_access_token(user_id)
+        refresh_token = config._refresh_tokens.get(user_id, "")
+
+        if not refresh_token:
+            users = sheets.get_all_users_with_tokens()
+            for u in users:
+                if u["user_id"] == user_id:
+                    refresh_token = u["refresh_token"]
+                    break
+
+        if not refresh_token:
+            logger.warning(f"get_spotify_for_user: {user_id} için refresh token bulunamadı")
+            return None
+
+        def _on_rotate(new_rt, _uid=user_id):
+            config._refresh_tokens[_uid] = new_rt
+            try:
+                sheets.save_refresh_token(_uid, new_rt)
+            except Exception:
+                pass
+
+        client = SpotifyClient(refresh_token=refresh_token, token_refresh_callback=_on_rotate)
+        return client
+
+    except Exception as e:
+        logger.error(f"get_spotify_for_user hata ({user_id}): {e}")
+        return None

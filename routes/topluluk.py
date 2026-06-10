@@ -40,8 +40,8 @@ def _filter_rows_by_aralik(headers, rows, aralik):
     return [
         row for row in rows
         if len(row) > idx_iso
-        and row[idx_iso].strip() not in ("", "—")
-        and row[idx_iso].strip()[:16] >= since_str
+        and (row[idx_iso] or "").strip() not in ("", "—")
+        and (row[idx_iso] or "").strip()[:16] >= since_str
     ]
 
 
@@ -227,3 +227,28 @@ def api_izin_get():
         return jsonify({"allowed": sheets.get_user_permission(uid)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/collab-users")
+def api_collab_users():
+    """Settings'deki izin vermiş kullanıcıları {id, name} listesi olarak döner (kendisi hariç)."""
+    try:
+        uid = get_current_user_id()
+        if not uid:
+            return jsonify([])
+        ws = sheets._find_sheet("Settings")
+        if not ws:
+            return jsonify([])
+        users = []
+        for row in ws.get_all_values()[1:]:
+            if not row or len(row) < 3:
+                continue
+            row_uid  = row[0]
+            row_name = row[1] or row_uid
+            allowed  = row[2].lower() == "true"
+            if allowed and row_uid != uid:
+                users.append({"id": row_uid, "name": row_name})
+        return jsonify(users)
+    except Exception as e:
+        logger.error(f"collab-users hata: {e}")
+        return jsonify([])

@@ -119,10 +119,10 @@ def export_spotify_json():
 
     result = []
     for row in rows:
-        end_time   = row[i_iso].strip()    if i_iso    != -1 and len(row) > i_iso    else ""
-        artist     = row[i_artist].strip() if i_artist != -1 and len(row) > i_artist else ""
-        track      = row[i_track].strip()  if i_track  != -1 and len(row) > i_track  else ""
-        ms_raw     = row[i_ms].strip()     if i_ms     != -1 and len(row) > i_ms     else "0"
+        end_time   = (row[i_iso] or "").strip()    if i_iso    != -1 and len(row) > i_iso    else ""
+        artist     = (row[i_artist] or "").strip() if i_artist != -1 and len(row) > i_artist else ""
+        track      = (row[i_track] or "").strip()  if i_track  != -1 and len(row) > i_track  else ""
+        ms_raw     = (row[i_ms] or "").strip()     if i_ms     != -1 and len(row) > i_ms     else "0"
         try:
             ms = int(ms_raw)
         except ValueError:
@@ -178,7 +178,7 @@ def export_json():
     result = []
     for row in rows:
         def safe(i):
-            return row[i].strip() if i != -1 and len(row) > i else ""
+            return (row[i] or "").strip() if i != -1 and len(row) > i else ""
 
         ms_raw = safe(i_ms)
         try:

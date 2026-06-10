@@ -84,16 +84,16 @@ def compute_stats(headers, rows):
     for row in rows:
         if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_tarih):
             continue
-        sarki = row[idx_sarki].strip()
-        sanatci = row[idx_sanatci].strip()
-        tarih = row[idx_tarih].strip()
-        album = row[idx_album].strip() if idx_album != -1 and len(row) > idx_album else ""
+        sarki = (row[idx_sarki] or "").strip()
+        sanatci = (row[idx_sanatci] or "").strip()
+        tarih = (row[idx_tarih] or "").strip()
+        album = (row[idx_album] or "").strip() if idx_album != -1 and len(row) > idx_album else ""
         try:
             sure = int(row[idx_sure]) // 1000
         except Exception:
             sure = 0
 
-        iso = row[idx_iso].strip() if idx_iso != -1 and len(row) > idx_iso else ""
+        iso = (row[idx_iso] or "").strip() if idx_iso != -1 and len(row) > idx_iso else ""
         toplam_sure += sure
 
         if iso and iso != "—":

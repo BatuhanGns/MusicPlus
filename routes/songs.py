@@ -145,18 +145,18 @@ def api_sarki_detay(sarki_adi):
         for row in rows:
             if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_iso):
                 continue
-            if row[idx_sarki].strip() != sarki_adi:
+            if (row[idx_sarki] or "").strip() != sarki_adi:
                 continue
 
             toplam_count += 1
-            sanatci = row[idx_sanatci].strip()
+            sanatci = (row[idx_sanatci] or "").strip()
             try:
                 sure = int(row[idx_sure]) // 1000
                 toplam_sure += sure
             except Exception:
                 pass
 
-            iso = row[idx_iso].strip()
+            iso = (row[idx_iso] or "").strip()
             if iso and iso != "—":
                 if ilk_dinlenme_iso is None or iso < ilk_dinlenme_iso:
                     ilk_dinlenme_iso = iso
@@ -221,12 +221,12 @@ def api_sanatci_detay(sanatci_adi):
             if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_iso):
                 continue
             # "Pera" için "Milat, Pera" gibi işbirliklerini de say
-            sanatcilar_raw = [s.strip() for s in row[idx_sanatci].split(",")]
+            sanatcilar_raw = [s.strip() for s in (row[idx_sanatci] or "").split(",")]
             if sanatci_adi not in sanatcilar_raw:
                 continue
 
             toplam_count += 1
-            sarki = row[idx_sarki].strip()
+            sarki = (row[idx_sarki] or "").strip()
             try:
                 sure = int(row[idx_sure]) // 1000
                 toplam_sure += sure
@@ -237,7 +237,7 @@ def api_sanatci_detay(sanatci_adi):
                 sarki_counts[sarki]["count"] += 1
                 sarki_counts[sarki]["sure"] += sure
 
-            iso = row[idx_iso].strip()
+            iso = (row[idx_iso] or "").strip()
             if iso and iso != "—":
                 try:
                     dt = datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M")
@@ -252,9 +252,9 @@ def api_sanatci_detay(sanatci_adi):
         if idx_album != -1:
             for row in rows:
                 if len(row) > max(idx_sanatci, idx_album):
-                    sanatcilar_raw = [s.strip() for s in row[idx_sanatci].split(",")]
+                    sanatcilar_raw = [s.strip() for s in (row[idx_sanatci] or "").split(",")]
                     if sanatci_adi in sanatcilar_raw:
-                        alb = row[idx_album].strip()
+                        alb = (row[idx_album] or "").strip()
                         if alb:
                             unique_albums.add(alb)
 
@@ -309,11 +309,11 @@ def api_album(album_adi):
         sanatci_ad = ""
 
         for row in rows:
-            alb = row[idx_album].strip() if idx_album != -1 and len(row) > idx_album else ""
+            alb = (row[idx_album] or "").strip() if idx_album != -1 and len(row) > idx_album else ""
             if alb.lower() != album_adi.lower():
                 continue
-            sarki = row[idx_sarki].strip() if len(row) > idx_sarki else ""
-            sanatci = row[idx_sanatci].strip() if len(row) > idx_sanatci else ""
+            sarki = (row[idx_sarki] or "").strip() if len(row) > idx_sarki else ""
+            sanatci = (row[idx_sanatci] or "").strip() if len(row) > idx_sanatci else ""
             try:
                 sure = int(row[idx_sure]) // 1000
             except Exception:
@@ -365,11 +365,11 @@ def api_tum_sarkilar():
         for row in rows:
             if len(row) <= max(idx_sarki, idx_sanatci, idx_sure):
                 continue
-            sarki = row[idx_sarki].strip()
+            sarki = (row[idx_sarki] or "").strip()
             if not sarki:
                 continue
             track_counts[sarki]["count"] += 1
-            track_counts[sarki]["sanatci"] = row[idx_sanatci].strip()
+            track_counts[sarki]["sanatci"] = (row[idx_sanatci] or "").strip()
             try:
                 track_counts[sarki]["sure"] += int(row[idx_sure]) // 1000
             except Exception:
@@ -408,7 +408,7 @@ def api_tum_sanatcilar():
         for row in rows:
             if len(row) <= max(idx_sanatci, idx_sure):
                 continue
-            sanatci = row[idx_sanatci].strip()
+            sanatci = (row[idx_sanatci] or "").strip()
             if not sanatci:
                 continue
             try:
@@ -449,8 +449,8 @@ def api_tum_albumler():
 
         counts = defaultdict(lambda: {"count": 0, "sanatci": ""})
         for row in rows:
-            alb = row[idx_album].strip() if len(row) > idx_album else ""
-            san = row[idx_sanatci].strip() if len(row) > idx_sanatci else ""
+            alb = (row[idx_album] or "").strip() if len(row) > idx_album else ""
+            san = (row[idx_sanatci] or "").strip() if len(row) > idx_sanatci else ""
             if alb:
                 counts[alb]["count"] += 1
                 counts[alb]["sanatci"] = san
@@ -498,7 +498,7 @@ def api_ay_detay(ay_label):
         for row in rows:
             if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_tarih):
                 continue
-            tarih = row[idx_tarih].strip()
+            tarih = (row[idx_tarih] or "").strip()
             if not tarih:
                 continue
             try:
@@ -508,8 +508,8 @@ def api_ay_detay(ay_label):
             except Exception:
                 continue
 
-            sarki = row[idx_sarki].strip()
-            sanatci = row[idx_sanatci].strip()
+            sarki = (row[idx_sarki] or "").strip()
+            sanatci = (row[idx_sanatci] or "").strip()
             try:
                 sure = int(row[idx_sure]) // 1000
             except Exception:
