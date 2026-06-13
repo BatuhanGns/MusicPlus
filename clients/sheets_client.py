@@ -1,10 +1,11 @@
 import os
 import json
 import logging
-from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 import gspread
 from google.oauth2.service_account import Credentials
+
+import config  # HAM_HEADERS tek kaynaktan okunur
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +14,9 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-HAM_HEADERS = [
-    "Dinlenme Tarihi", "Şarkı ID", "Şarkı Adı", "Sanatçı",
-    "Sanatçı ID", "Albüm", "Süre (ms)", "_played_at_iso", "Tür"
-]
+# Sütun indeksleri — config.HAM_HEADERS ile eşleşmeli
+# ["Dinlenme Tarihi", "Şarkı ID", "Şarkı Adı", "Sanatçı",
+#  "Sanatçı ID", "Albüm", "Süre (ms)", "_played_at_iso"]
 COL_TARIH      = 0
 COL_SARKI_ID   = 1
 COL_SARKI_ADI  = 2
@@ -25,7 +25,6 @@ COL_SANATCI_ID = 4
 COL_ALBUM      = 5
 COL_SURE_MS    = 6
 COL_ISO        = 7
-COL_TUR        = 8
 
 TR_AYLAR = {
     1: "Ocak", 2: "Şubat", 3: "Mart", 4: "Nisan",
@@ -168,8 +167,10 @@ class SheetsClient:
             if len(records) < 2:
                 return
 
-            yesterday  = (datetime.now(timezone.utc).replace(hour=0, minute=0, second=0)
-                          - __import__('datetime').timedelta(days=1))
+            # timedelta doğrudan import'tan kullanılır — __import__ antipattern kaldırıldı
+            yesterday  = datetime.now(timezone.utc).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ) - timedelta(days=1)
             ay_label   = yesterday.strftime("%Y-%m")
             now_str    = datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M")
             today      = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -468,8 +469,8 @@ class SheetsClient:
             return None
         ws = self._find_sheet(user_id)
         if not ws:
-            ws = self.sh.add_worksheet(title=user_id, rows=50000, cols=10)
-            ws.append_row(HAM_HEADERS, value_input_option="RAW")
+            ws = self.sh.add_worksheet(title=user_id, rows=50000, cols=9)
+            ws.append_row(config.HAM_HEADERS, value_input_option="RAW")
             logger.info(f"✅ Kullanıcı sayfası oluşturuldu: {user_id}")
         return ws
 
@@ -477,27 +478,27 @@ class SheetsClient:
         ws = self._find_sheet(user_id)
         if not ws:
             return set()
-        col = ws.col_values(8)
+        # COL_ISO = 7 → 8. sütun (1-indexed)
+        col = ws.col_values(COL_ISO + 1)
         return set(col[1:])
 
     def append_tracks(self, user_id: str, tracks: list):
         ws = self._ensure_user_sheet(user_id)
-        existing = self._get_existing_played_ats(user_id)
+        existing   = self._get_existing_played_ats(user_id)
         new_rows   = []
         new_tracks = []
         for t in tracks:
             iso = t["played_at"]
             if iso not in existing:
                 new_rows.append([
-                    format_tarih(iso),
-                    t["track_id"],
-                    t["track_name"],
-                    t["artist_name"],
-                    t.get("artist_ids", ""),
-                    t["album_name"],
-                    t["duration_ms"],
-                    iso,
-                    t.get("genre", ""),
+                    format_tarih(iso),          # Dinlenme Tarihi
+                    t["track_id"],              # Şarkı ID
+                    t["track_name"],            # Şarkı Adı
+                    t["artist_name"],           # Sanatçı
+                    t.get("artist_ids", ""),    # Sanatçı ID
+                    t["album_name"],            # Albüm
+                    t["duration_ms"],           # Süre (ms)
+                    iso,                        # _played_at_iso
                 ])
                 new_tracks.append({
                     "track_name":   t["track_name"],
@@ -515,7 +516,7 @@ class SheetsClient:
         if not ws:
             return None
         try:
-            col = ws.col_values(8)
+            col = ws.col_values(COL_ISO + 1)
             values = [v.strip() for v in col[1:] if v.strip() and v.strip() != "—"]
             if not values:
                 return None
@@ -529,10 +530,10 @@ class SheetsClient:
     def get_user_data(self, user_id: str):
         ws = self._find_sheet(user_id)
         if not ws:
-            return HAM_HEADERS, []
+            return config.HAM_HEADERS, []
         all_values = ws.get_all_values()
         if len(all_values) < 2:
-            return HAM_HEADERS, []
+            return config.HAM_HEADERS, []
         return all_values[0], all_values[1:]
 
     def get_combined_data(self, user_ids: list):
@@ -540,9 +541,13 @@ class SheetsClient:
         for uid in user_ids:
             _, rows = self.get_user_data(uid)
             all_rows.extend(rows)
-        return HAM_HEADERS, all_rows
+        return config.HAM_HEADERS, all_rows
 
-    def migrate_user_sheet(self, user_id: str, genre_map: dict = None) -> dict:
+    def migrate_user_sheet(self, user_id: str) -> dict:
+        """
+        Eski formattaki (Tür sütunlu) kullanıcı sayfasını 8 sütunlu yeni formata taşır.
+        Tür sütunu artık kullanılmıyor.
+        """
         ws = self._find_sheet(user_id)
         if not ws:
             return {"error": "Sayfa bulunamadı"}
@@ -552,96 +557,61 @@ class SheetsClient:
             return {"error": str(e)}
         if not all_values:
             return {"migrated": 0, "skipped": 0, "already_ok": True}
+
         headers = all_values[0]
-        has_sure_sn    = "Süre (sn)" in headers
-        has_tur        = "Tür" in headers
-        has_sanatci_id = "Sanatçı ID" in headers
-        if not has_sure_sn and has_tur:
+
+        # Zaten 8 sütunlu yeni formattaysa atla
+        if headers == list(config.HAM_HEADERS):
             return {"migrated": 0, "skipped": 0, "already_ok": True}
+
         rows = all_values[1:]
         if not rows:
-            ws.update("A1:I1", [list(HAM_HEADERS)], value_input_option="RAW")
+            ws.update("A1:H1", [list(config.HAM_HEADERS)], value_input_option="RAW")
             return {"migrated": 0, "skipped": 0, "already_ok": False}
+
         def idx(col_name, fallback=-1):
             try:
                 return headers.index(col_name)
             except ValueError:
                 return fallback
+
         old_tarih      = idx("Dinlenme Tarihi", 0)
         old_sarki_id   = idx("Şarkı ID", 1)
         old_sarki_adi  = idx("Şarkı Adı", 2)
         old_sanatci    = idx("Sanatçı", 3)
-        old_sanatci_id = idx("Sanatçı ID", 4) if has_sanatci_id else -1
-        old_album      = idx("Albüm", 5)
-        old_sure_ms    = idx("Süre (ms)", 6)
-        old_iso        = idx("_played_at_iso", 7 if has_sanatci_id else 6)
-        old_tur        = idx("Tür", -1)
-        new_rows = [list(HAM_HEADERS)]
+        old_sanatci_id = idx("Sanatçı ID", -1)
+        old_album      = idx("Albüm", -1)
+        old_sure_ms    = idx("Süre (ms)", -1)
+        old_iso        = idx("_played_at_iso", -1)
+
+        new_rows = [list(config.HAM_HEADERS)]
         migrated = 0
-        skipped  = 0
+
         for row in rows:
             def get(i, default=""):
-                return (row[i] or "").strip() if i >= 0 and i < len(row) else default
-            artist_id = get(old_sanatci_id)
-            tur = ""
-            if old_tur >= 0:
-                tur = get(old_tur)
-            if not tur and genre_map and artist_id:
-                for aid in [a.strip() for a in artist_id.split(",") if a.strip()]:
-                    genres = genre_map.get(aid, [])
-                    if genres:
-                        tur = ", ".join(genres[:3])
-                        break
+                return (row[i] or "").strip() if 0 <= i < len(row) else default
+
             new_row = [
-                get(old_tarih), get(old_sarki_id), get(old_sarki_adi),
-                get(old_sanatci), artist_id, get(old_album),
-                get(old_sure_ms), get(old_iso), tur,
+                get(old_tarih),
+                get(old_sarki_id),
+                get(old_sarki_adi),
+                get(old_sanatci),
+                get(old_sanatci_id),
+                get(old_album),
+                get(old_sure_ms),
+                get(old_iso),
             ]
             new_rows.append(new_row)
             migrated += 1
+
         try:
             ws.clear()
-            ws.update(f"A1:I{len(new_rows)}", new_rows, value_input_option="RAW")
+            ws.update(f"A1:H{len(new_rows)}", new_rows, value_input_option="RAW")
             logger.info(f"✅ Migration tamamlandı ({user_id}): {migrated} satır")
-            return {"migrated": migrated, "skipped": skipped, "already_ok": False}
+            return {"migrated": migrated, "skipped": 0, "already_ok": False}
         except Exception as e:
             logger.error(f"❌ Migration yazma hatası ({user_id}): {e}")
             return {"error": str(e)}
-
-    def _ensure_genre_cache_sheet(self):
-        if not self.sh:
-            return None
-        ws = self._find_sheet("GenreCache")
-        if not ws:
-            ws = self.sh.add_worksheet(title="GenreCache", rows=5000, cols=2)
-            ws.append_row(["artist_id", "genres_json"], value_input_option="RAW")
-            logger.info("✅ GenreCache sayfası oluşturuldu.")
-        return ws
-
-    def get_cached_genres(self) -> dict:
-        ws = self._find_sheet("GenreCache")
-        if not ws:
-            return {}
-        rows = ws.get_all_values()
-        cache = {}
-        for row in rows[1:]:
-            if len(row) >= 2 and (row[0] or "").strip():
-                try:
-                    cache[(row[0] or "").strip()] = json.loads(row[1]) if (row[1] or "").strip() else []
-                except Exception:
-                    cache[(row[0] or "").strip()] = []
-        return cache
-
-    def save_genres_batch(self, genre_map: dict):
-        if not genre_map:
-            return
-        ws = self._ensure_genre_cache_sheet()
-        if not ws:
-            return
-        new_rows = [[aid, json.dumps(genres, ensure_ascii=False)] for aid, genres in genre_map.items()]
-        if new_rows:
-            ws.append_rows(new_rows, value_input_option="RAW")
-            logger.info(f"✅ GenreCache: {len(new_rows)} sanatçı yazıldı.")
 
     def get_artist_ids_from_user_sheet(self, user_id: str) -> dict:
         ws = self._find_sheet(user_id)
@@ -661,7 +631,7 @@ class SheetsClient:
             if len(row) <= max(idx_sanatci, idx_id):
                 continue
             name = (row[idx_sanatci] or "").strip()
-            aid  = (row[idx_id] or "").strip() if (row[idx_id] or "").strip() else ""
+            aid  = (row[idx_id] or "").strip()
             if name and name not in result:
                 result[name] = aid
         return result

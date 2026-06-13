@@ -99,7 +99,7 @@ class GeminiClient:
         for model in MODELS:
             try:
                 logger.info(f"Gemini istegi: {model}, {len(messages)} mesaj")
-                config = types.GenerateContentConfig(
+                gen_config = types.GenerateContentConfig(
                     system_instruction=system_prompt,
                     thinking_config=types.ThinkingConfig(thinking_level="HIGH"),
                     temperature=0.9,
@@ -107,7 +107,7 @@ class GeminiClient:
                 for chunk in client.models.generate_content_stream(
                     model=model,
                     contents=gemini_contents,
-                    config=config,
+                    config=gen_config,
                 ):
                     if not chunk.candidates:
                         continue

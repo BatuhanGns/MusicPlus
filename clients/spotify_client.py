@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+import threading
 import requests
 import base64
 import urllib.parse
@@ -14,8 +15,22 @@ TOKEN_URL = "https://accounts.spotify.com/api/token"
 API_BASE  = "https://api.spotify.com/v1"
 
 # Bellek cache: { user_id: {"access_token": str, "expires_at": float} }
-# Sheets ile senkronize tutulur; uygulama başında Sheets'ten yüklenir.
 _access_token_cache: dict = {}
+
+# ── Refresh token rotasyon kilidi ────────────────────────────────────────────
+# Aynı kullanıcı için eş zamanlı iki refresh isteği gönderilmesini önler.
+# Spotify token rotation'da eski token hemen geçersiz olur; ikinci thread
+# eski token'la "invalid_grant" alır. Lock ile sadece bir thread refresh yapar,
+# diğeri tamamlanınca güncel cache'ten okur.
+_refresh_locks: dict = {}          # { user_id: threading.Lock }
+_refresh_locks_meta = threading.Lock()  # _refresh_locks dict'ini korur
+
+
+def _get_refresh_lock(uid: str) -> threading.Lock:
+    with _refresh_locks_meta:
+        if uid not in _refresh_locks:
+            _refresh_locks[uid] = threading.Lock()
+        return _refresh_locks[uid]
 
 
 class SpotifyClient:
@@ -36,7 +51,7 @@ class SpotifyClient:
         scopes = " ".join([
             "user-read-recently-played",
             "user-read-currently-playing",
-            "user-read-private",          # /v1/artists genre verisi için gerekli
+            "user-read-private",
             "user-modify-playback-state",
             "playlist-read-private",
             "playlist-modify-public",
@@ -127,8 +142,9 @@ class SpotifyClient:
         """
         Access token öncelik sırası:
           1. Bellek cache'i (en hızlı)
-          2. Sheets (server restart sonrası kurtarma)
-          3. Refresh token ile yenile → hem cache'e hem Sheets'e yaz
+          2. Instance değişkeni (background sync)
+          3. Sheets (server restart sonrası kurtarma)
+          4. Refresh token ile yenile → hem cache'e hem Sheets'e yaz
         """
         in_req = has_request_context()
 
@@ -150,8 +166,7 @@ class SpotifyClient:
         if uid and sheets_client:
             try:
                 saved = sheets_client.get_access_token(uid)
-                if saved and time.time() < saved["expires_at"] - 60:
-                    # Sheets'teki token hâlâ geçerli → cache'e al, kullan
+                if saved and time.time() < saved.get("expires_at", 0) - 60:
                     _access_token_cache[uid] = saved
                     self._access_token     = saved["access_token"]
                     self._token_expires_at = saved["expires_at"]
@@ -173,29 +188,57 @@ class SpotifyClient:
         return self._do_refresh(r_token, uid=uid, in_req=in_req, sheets_client=sheets_client)
 
     def _do_refresh(self, r_token: str, uid: str = None, in_req: bool = False, sheets_client=None):
-        """Refresh token ile yeni access token alır; cache'e ve Sheets'e yazar."""
+        """
+        Refresh token ile yeni access token alır.
+        Token rotation race condition'ı önlemek için kullanıcı başına kilit kullanır:
+        Eş zamanlı iki thread aynı kullanıcı için refresh yapmaya çalışırsa,
+        biri bekler ve diğerinin yazdığı güncel token'ı cache'ten okur.
+        """
+        # uid varsa kilitli refresh yap
+        if uid:
+            lock = _get_refresh_lock(uid)
+            with lock:
+                # Kilidi aldıktan sonra cache tekrar kontrol et —
+                # başka thread zaten refresh yapmış olabilir
+                if uid in _access_token_cache:
+                    cached = _access_token_cache[uid]
+                    if time.time() < cached["expires_at"] - 60:
+                        logger.info(f"⚡ Lock sonrası cache hit: {uid}")
+                        return cached["access_token"]
+                return self._execute_refresh(r_token, uid=uid, in_req=in_req, sheets_client=sheets_client)
+        else:
+            return self._execute_refresh(r_token, uid=None, in_req=in_req, sheets_client=sheets_client)
+
+    def _execute_refresh(self, r_token: str, uid: str = None, in_req: bool = False, sheets_client=None):
+        """Spotify'a gerçek token yenileme isteği gönderir."""
         credentials = base64.b64encode(
             f"{self.client_id}:{self.client_secret}".encode()
         ).decode()
 
-        resp = requests.post(TOKEN_URL, headers={
-            "Authorization": f"Basic {credentials}",
-            "Content-Type":  "application/x-www-form-urlencoded",
-        }, data={
-            "grant_type":    "refresh_token",
-            "refresh_token":  r_token,
-        })
+        try:
+            resp = requests.post(TOKEN_URL, headers={
+                "Authorization": f"Basic {credentials}",
+                "Content-Type":  "application/x-www-form-urlencoded",
+            }, data={
+                "grant_type":    "refresh_token",
+                "refresh_token":  r_token,
+            }, timeout=15)
+        except requests.exceptions.Timeout:
+            logger.error("❌ Token yenileme timeout (15s)")
+            raise Exception("Spotify token yenileme zaman aşımına uğradı.")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ Token yenileme ağ hatası: {e}")
+            raise
 
         if resp.status_code != 200:
-            logger.error(f"Token yenileme hatasi: {resp.text}")
+            logger.error(f"Token yenileme hatasi ({resp.status_code}): {resp.text}")
             if "invalid_grant" in resp.text:
-                logger.error("❌ Refresh token gecersiz veya iptal edilmis!")
+                logger.error(f"❌ Refresh token geçersiz/iptal edilmiş: uid={uid}")
                 if in_req:
                     session.clear()
-                # Cache'den temizle
                 if uid and uid in _access_token_cache:
                     del _access_token_cache[uid]
-        resp.raise_for_status()
+            resp.raise_for_status()
 
         d           = resp.json()
         new_token   = d["access_token"]
@@ -214,7 +257,7 @@ class SpotifyClient:
                 "expires_at":   new_expires,
             }
 
-        # Sheets'e yaz (hem access token hem expires_at)
+        # Sheets'e yaz
         if uid and sheets_client:
             try:
                 sheets_client.save_access_token(uid, new_token, new_expires)
@@ -226,9 +269,9 @@ class SpotifyClient:
         if in_req and new_refresh and new_refresh != r_token:
             session["refresh_token"] = new_refresh
 
-        # Token rotasyonu
+        # Token rotasyonu callback'i
         if new_refresh and new_refresh != r_token:
-            logger.info("🔄 Spotify yeni refresh token verdi (token rotasyonu).")
+            logger.info(f"🔄 Spotify yeni refresh token verdi (rotation): uid={uid}")
             if self._token_refresh_callback:
                 try:
                     self._token_refresh_callback(new_refresh)
@@ -238,11 +281,10 @@ class SpotifyClient:
         return new_token
 
     # ------------------------------------------------------------------ #
-    #  CORE HTTP                                                           #
+    #  CORE HTTP — 401 retry desteği ile                                  #
     # ------------------------------------------------------------------ #
 
     def _req(self, method, endpoint, **kwargs):
-        # _sheets_client instance'a bağlanmışsa otomatik kullan
         sc = getattr(self, "_sheets_client", None)
         token = self._get_access_token(sheets_client=sc)
         headers = kwargs.pop("headers", {})
@@ -252,6 +294,24 @@ class SpotifyClient:
 
         url = f"{API_BASE}{endpoint}" if not endpoint.startswith("http") else endpoint
         resp = requests.request(method, url, headers=headers, **kwargs)
+
+        # 401: token süresi dolmuş → bir kez yenile ve tekrar dene
+        if resp.status_code == 401:
+            logger.warning(f"⚠️ 401 alındı, token yenileniyor: {method} {endpoint}")
+            # Cache'i sıfırla
+            in_req = has_request_context()
+            uid = session.get("user_id") if in_req else None
+            if uid and uid in _access_token_cache:
+                del _access_token_cache[uid]
+            self._access_token    = None
+            self._token_expires_at = 0
+            try:
+                new_token = self._get_access_token(sheets_client=sc)
+                headers["Authorization"] = f"Bearer {new_token}"
+                resp = requests.request(method, url, headers=headers, **kwargs)
+            except Exception as retry_err:
+                logger.error(f"❌ 401 sonrası token yenileme başarısız: {retry_err}")
+                raise
 
         if resp.status_code >= 400:
             logger.error(
@@ -364,8 +424,6 @@ class SpotifyClient:
             raw_played_at = item["played_at"]
             try:
                 from datetime import datetime, timezone
-                # Spotify bazen milisaniyesiz ('2026-06-04T21:32:49Z'),
-                # bazen milisaniyeli ('2026-06-04T21:32:49.123Z') döndürür
                 for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
                     try:
                         dt = datetime.strptime(raw_played_at, fmt).replace(
@@ -413,6 +471,7 @@ class SpotifyClient:
                 if not p:
                     continue
                 image_url   = p["images"][0]["url"] if p.get("images") else None
+                # Feb 2026: playlist yanıtında "tracks" → "items" olarak yeniden adlandırıldı
                 track_count = (p.get("items") or p.get("tracks") or {}).get("total", 0)
                 all_playlists.append({
                     "id":          p["id"],
@@ -434,6 +493,7 @@ class SpotifyClient:
             for entry in data.get("items", []):
                 if not entry:
                     continue
+                # Feb 2026: playlist item key "track" → "item" olarak değişti
                 track = entry.get("item") or entry.get("track")
                 if not track:
                     continue
@@ -453,8 +513,9 @@ class SpotifyClient:
 
     def _search_track(self, query):
         try:
+            # Feb 2026: search limit max 10'a düştü
             data  = self._req("GET", "/search",
-                              params={"q": query, "type": "track", "limit": 1})
+                              params={"q": query, "type": "track", "limit": 5})
             items = data.get("tracks", {}).get("items", [])
             return items[0]["id"] if items else None
         except Exception as e:
@@ -486,6 +547,10 @@ class SpotifyClient:
         track_ids  = [t["id"] for t in tracks if t.get("id")]
         random.shuffle(track_ids)
         track_uris = [f"spotify:track:{tid}" for tid in track_ids]
+
+        # PUT ilk 100'ü yazar ve playlist'i sıfırlar, POST geri kalanları ekler.
+        # 100'den fazla şarkıda POST ile eklenenler her zaman sona gider;
+        # bu Spotify API kısıtlamasıdır, shuffle sırası mümkün olduğunca korunur.
         self._req("PUT", f"/playlists/{playlist_id}/items", json={"uris": track_uris[:100]})
         for i in range(100, len(track_uris), 100):
             self._req("POST", f"/playlists/{playlist_id}/items", json={"uris": track_uris[i:i + 100]})
@@ -501,10 +566,14 @@ class SpotifyClient:
         return len(uris)
 
     # ------------------------------------------------------------------ #
-    #  LIBRARY — LIKE / UNLIKE                                            #
+    #  LIBRARY — LIKE / UNLIKE  (Feb 2026 unified /me/library endpoint)   #
     # ------------------------------------------------------------------ #
 
     def _get_liked_track_ids(self, track_ids):
+        """
+        Feb 2026: GET /me/tracks/contains kaldırıldı.
+        Yeni endpoint: GET /me/library/contains — Spotify URI alır.
+        """
         liked = set()
         for i in range(0, len(track_ids), 40):
             chunk = track_ids[i:i + 40]
@@ -523,15 +592,17 @@ class SpotifyClient:
     def like_all_tracks_in_playlist(self, playlist_id):
         tracks = self._get_playlist_tracks(playlist_id)
         uris   = [f"spotify:track:{t['id']}" for t in tracks if t.get("id")]
+        # Feb 2026: PUT /me/tracks → PUT /me/library (URI alır)
         for i in range(0, len(uris), 40):
-            self._req("PUT", "/me/library", params={"uris": ",".join(uris[i:i + 40])})
+            self._req("PUT", "/me/library", json={"uris": uris[i:i + 40]})
         return len(uris)
 
     def unlike_all_tracks_in_playlist(self, playlist_id):
         tracks = self._get_playlist_tracks(playlist_id)
         uris   = [f"spotify:track:{t['id']}" for t in tracks if t.get("id")]
+        # Feb 2026: DELETE /me/tracks → DELETE /me/library (URI alır)
         for i in range(0, len(uris), 40):
-            self._req("DELETE", "/me/library", params={"uris": ",".join(uris[i:i + 40])})
+            self._req("DELETE", "/me/library", json={"uris": uris[i:i + 40]})
         return len(uris)
 
     def remove_liked_tracks_from_playlist(self, playlist_id):
@@ -548,63 +619,51 @@ class SpotifyClient:
         return self._remove_tracks_from_playlist(playlist_id, unliked)
 
     # ------------------------------------------------------------------ #
-    #  FOLLOW / UNFOLLOW ARTISTS                                          #
+    #  FOLLOW / UNFOLLOW ARTISTS  (Feb 2026 unified /me/library)         #
     # ------------------------------------------------------------------ #
 
     def follow_all_artists_in_playlist(self, playlist_id):
         tracks     = self._get_playlist_tracks(playlist_id)
         artist_ids = list({a["id"] for t in tracks for a in t.get("artists", []) if a.get("id")})
+        # Feb 2026: PUT /me/following → PUT /me/library (artist URI alır)
         uris = [f"spotify:artist:{aid}" for aid in artist_ids]
         for i in range(0, len(uris), 40):
-            self._req("PUT", "/me/library", params={"uris": ",".join(uris[i:i + 40])})
+            self._req("PUT", "/me/library", json={"uris": uris[i:i + 40]})
         return len(artist_ids)
 
     def unfollow_all_artists_in_playlist(self, playlist_id):
         tracks     = self._get_playlist_tracks(playlist_id)
         artist_ids = list({a["id"] for t in tracks for a in t.get("artists", []) if a.get("id")})
+        # Feb 2026: DELETE /me/following → DELETE /me/library (artist URI alır)
         uris = [f"spotify:artist:{aid}" for aid in artist_ids]
         for i in range(0, len(uris), 40):
-            self._req("DELETE", "/me/library", params={"uris": ",".join(uris[i:i + 40])})
+            self._req("DELETE", "/me/library", json={"uris": uris[i:i + 40]})
         return len(artist_ids)
 
     def get_artists_genres(self, artist_ids: list) -> dict:
         """
-        Verilen Spotify artist ID'leri için türleri döndürür.
-        GET /v1/artists?ids=... — max 50 ID/istek
-        Döndürür: {artist_id: [genre, ...], ...}
-        Boş genres array dönen sanatçılar için [] tutulur.
-
-        NOT: Bu endpoint user-read-private scope'u gerektirir.
-        403 alınırsa token yenilenmeli — kullanıcı yeniden login olmalı.
+        Feb 2026: GET /artists (batch) kaldırıldı.
+        Sadece tek sanatçı sorgusu GET /artists/{id} hâlâ çalışıyor.
+        Küçük batch'ler için tek tek sorguluyoruz; büyük listelerde
+        performans düşer ama artık tek seçenek bu.
+        Kota tasarrufu için GenreCache'teki mevcut veriler önce kontrol edilmeli.
         """
         result = {}
-        scope_error = False
-
-        for i in range(0, len(artist_ids), 50):
-            chunk = artist_ids[i:i + 50]
-            if not chunk:
+        for aid in artist_ids:
+            if not aid:
                 continue
             try:
-                data = self._req("GET", "/artists", params={"ids": ",".join(chunk)})
-                for artist in data.get("artists") or []:
-                    if not artist:
-                        continue
-                    aid = artist.get("id")
-                    if aid:
-                        result[aid] = artist.get("genres", [])
+                data = self._req("GET", f"/artists/{aid}")
+                if data and data.get("id"):
+                    result[data["id"]] = data.get("genres", [])
             except Exception as e:
                 err_str = str(e)
                 if "403" in err_str:
-                    if not scope_error:
-                        logger.error(
-                            "get_artists_genres: 403 Forbidden — token'da 'user-read-private' "
-                            "scope'u eksik. Kullanıcının yeniden giriş yapması gerekiyor."
-                        )
-                        scope_error = True
-                    # 403'te diğer batch'leri deneme, hepsi başarısız olur
+                    logger.error(
+                        "get_artists_genres: 403 Forbidden — token'da 'user-read-private' "
+                        "scope'u eksik. Kullanıcının yeniden giriş yapması gerekiyor."
+                    )
                     break
                 else:
-                    logger.warning(f"get_artists_genres batch hatasi (offset={i}): {e}")
-
+                    logger.warning(f"get_artists_genres hata (artist={aid}): {e}")
         return result
-
