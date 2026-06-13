@@ -56,7 +56,8 @@ def run_notifications():
             )
 
         # ── Spotify ödeme hatırlatması ──────────────────────────────────────
-        if odeme_gunu and streak_acik:
+        # Ödeme hatırlatması streak bildiriminden bağımsızdır
+        if odeme_gunu:
             _check_odeme(
                 email, display_name, odeme_gunu, now_utc,
                 send_mail, mail_spotify_odeme
@@ -159,62 +160,123 @@ def _check_ozet(uid, email, display_name, sikligi, now_utc, today_str, u,
 
 
 def _hesapla_ozet(uid: str, sheets, sikligi: str, now_utc: datetime) -> dict:
-    """Son 7 gün veya son ay istatistiklerini hesaplar."""
+    """
+    Haftalık veya aylık özet istatistiklerini hesaplar.
+
+    Haftalık : Son tamamlanan Pazartesi–Pazar haftası
+               (Pazar günü gönderilirse bu hafta, diğer günlerde önceki hafta)
+    Aylık    : İçinde bulunulan ayın 1'inden bugüne (ayın başında gönderilir)
+    """
     from utils.gamification import calc_streak
+    import calendar
 
     headers, rows = sheets.get_user_data(uid)
     if not rows:
         return {}
 
-    idx_sarki   = headers.index("Şarkı Adı")
-    idx_sanatci = headers.index("Sanatçı")
-    idx_sure    = headers.index("Süre (ms)")
-    idx_iso     = headers.index("_played_at_iso")
+    def _idx(col):
+        try:
+            return headers.index(col)
+        except ValueError:
+            return -1
+
+    idx_sarki   = _idx("Şarkı Adı")
+    idx_sanatci = _idx("Sanatçı")
+    idx_sure    = _idx("Süre (ms)")
+    idx_iso     = _idx("_played_at_iso")
+
+    if any(i == -1 for i in [idx_sarki, idx_sanatci, idx_sure, idx_iso]):
+        logger.warning("_hesapla_ozet: Zorunlu sütun eksik")
+        return {}
+
+    today = now_utc.date()
 
     if sikligi == "weekly":
-        baslangic = (now_utc - timedelta(days=7)).date()
+        # Pazartesi=0 … Pazar=6
+        # Pazar (weekday=6) → bu haftanın Pazartesi'si baslangic
+        # Diğer günler → önceki haftanın Pazartesi'si
+        days_since_monday = today.weekday()          # 0=Pzt, 6=Paz
+        this_monday = today - timedelta(days=days_since_monday)
+        if today.weekday() == 6:                     # Pazar → bu hafta
+            baslangic = this_monday
+            bitis     = today
+        else:                                         # Diğer → geçen hafta
+            baslangic = this_monday - timedelta(days=7)
+            bitis     = this_monday - timedelta(days=1)
+        donem_label = f"{baslangic.strftime('%d.%m')} – {bitis.strftime('%d.%m.%Y')}"
     else:
-        # Önceki ay
-        if now_utc.month == 1:
-            baslangic = now_utc.replace(year=now_utc.year - 1, month=12, day=1).date()
-        else:
-            baslangic = now_utc.replace(month=now_utc.month - 1, day=1).date()
+        # Aylık: ayın 1'i → bugün (bu ay özeti)
+        baslangic   = today.replace(day=1)
+        bitis       = today
+        ay_adi      = [
+            "", "Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
+            "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"
+        ][today.month]
+        donem_label = f"{ay_adi} {today.year}"
 
     sarki_say   = defaultdict(int)
     sanatci_say = defaultdict(int)
+    sarki_sure  = defaultdict(int)   # şarkı başına toplam süre (ms)
     toplam      = 0
     toplam_ms   = 0
-    daily_dates = set()
+    aktif_gunler = set()
 
     for row in rows:
         if len(row) <= max(idx_sarki, idx_sanatci, idx_sure, idx_iso):
             continue
-        iso = row[idx_iso]
+        iso = (row[idx_iso] or "").strip()
         if not iso:
             continue
-        gun = datetime.fromisoformat(iso.replace("Z", "+00:00")).date()
-        if gun < baslangic:
-            continue
-        toplam += 1
         try:
-            toplam_ms += int(row[idx_sure])
-        except (ValueError, TypeError):
-            pass
-        sarki_say[row[idx_sarki]] += 1
-        sanatci_say[row[idx_sanatci]] += 1
-        daily_dates.add(gun.strftime("%Y-%m-%d"))
+            gun = datetime.fromisoformat(iso.replace("Z", "+00:00")).date()
+        except ValueError:
+            continue
+        if not (baslangic <= gun <= bitis):
+            continue
 
-    en_cok_sarki   = max(sarki_say,   key=sarki_say.get)   if sarki_say   else "—"
-    en_cok_sanatci = max(sanatci_say, key=sanatci_say.get) if sanatci_say else "—"
-    streak_data    = calc_streak({
+        sarki   = (row[idx_sarki]   or "").strip()
+        sanatci = (row[idx_sanatci] or "").strip()
+        try:
+            sure_ms = int(row[idx_sure])
+        except (ValueError, TypeError):
+            sure_ms = 0
+
+        toplam    += 1
+        toplam_ms += sure_ms
+        aktif_gunler.add(gun)
+
+        if sarki:
+            sarki_say[sarki]  += 1
+            sarki_sure[sarki] += sure_ms
+        if sanatci:
+            for tek in [s.strip() for s in sanatci.split(",") if s.strip()]:
+                sanatci_say[tek] += 1
+
+    # Top 5 şarkı — dinlenme sayısına göre
+    top5_sarki = sorted(sarki_say.items(), key=lambda x: -x[1])[:5]
+    top5_sarki = [
+        {"sarki": ad, "count": cnt, "sure_dk": round(sarki_sure.get(ad, 0) / 60000)}
+        for ad, cnt in top5_sarki
+    ]
+
+    # Top 5 sanatçı — dinlenme sayısına göre
+    top5_sanatci = sorted(sanatci_say.items(), key=lambda x: -x[1])[:5]
+    top5_sanatci = [{"sanatci": ad, "count": cnt} for ad, cnt in top5_sanatci]
+
+    streak_data = calc_streak({
         row[idx_iso][:10] for row in rows
-        if len(row) > idx_iso and row[idx_iso]
+        if len(row) > idx_iso and (row[idx_iso] or "").strip()
     })
 
     return {
+        "donem_label":    donem_label,
         "toplam_dinlenme": toplam,
         "toplam_sure_dk":  round(toplam_ms / 60000),
-        "en_cok_sarki":    en_cok_sarki,
-        "en_cok_sanatci":  en_cok_sanatci,
+        "aktif_gun":       len(aktif_gunler),
+        "top5_sarki":      top5_sarki,
+        "top5_sanatci":    top5_sanatci,
+        # Geriye dönük uyumluluk için tek şarkı/sanatçı da tut
+        "en_cok_sarki":    top5_sarki[0]["sarki"]   if top5_sarki   else "—",
+        "en_cok_sanatci":  top5_sanatci[0]["sanatci"] if top5_sanatci else "—",
         "streak":          streak_data.get("current", 0),
     }
