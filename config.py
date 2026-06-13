@@ -8,7 +8,13 @@ import time
 from datetime import timedelta
 
 # ── Flask ────────────────────────────────────────────────────────────────────
-SECRET_KEY = os.environ.get("SECRET_KEY", "spotify-stats-2026-pkce-persistent-secret-key")
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY ortam değişkeni ayarlanmamış! "
+        "Güvenli rastgele bir değer oluşturup env'e ekleyin: "
+        "python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
 PERMANENT_SESSION_LIFETIME = timedelta(days=30)
 
 # ── Spotify ──────────────────────────────────────────────────────────────────
@@ -24,9 +30,13 @@ GOOGLE_CREDENTIALS_JSON  = os.environ.get("GOOGLE_CREDENTIALS_JSON", "{}")
 GEMINI_API_KEY  = os.environ.get("GEMINI_API_KEY", "")
 AI_MAX_REQUESTS = 3000
 
-# ── Mail (Resend API) ─────────────────────────────────────────────────────────
-RESEND_API_KEY    = os.environ.get("RESEND_API_KEY", "")
-RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "Music+ <onboarding@resend.dev>")
+# ── Mail (EmailJS REST API) ───────────────────────────────────────────────────
+# Kurulum: emailjs.com → ücretsiz kayıt → Gmail bağla → template oluştur
+# Account → Security → Allow EmailJS API for non-browser applications → AÇ
+EMAILJS_SERVICE_ID  = os.environ.get("EMAILJS_SERVICE_ID",  "")
+EMAILJS_TEMPLATE_ID = os.environ.get("EMAILJS_TEMPLATE_ID", "")
+EMAILJS_PUBLIC_KEY  = os.environ.get("EMAILJS_PUBLIC_KEY",  "")
+EMAILJS_PRIVATE_KEY = os.environ.get("EMAILJS_PRIVATE_KEY", "")
 
 # ── Uygulama Sabitleri ───────────────────────────────────────────────────────
 TR_GUNLER = {
@@ -43,9 +53,19 @@ VAKIT = {
     range(18, 24): "Akşam (18-24)",
     range(0, 6): "Gece (00-06)",
 }
+
+# Sheets sütun düzeni — tek kaynak olarak burada tanımlanır.
+# sheets_client.py ve helpers.py bu listeye göre çalışır.
+# Kullanıcı istedi: "Tür" sütunu YOK — 8 sütun.
 HAM_HEADERS = [
-    "Dinlenme Tarihi", "Şarkı ID", "Şarkı Adı", "Sanatçı",
-    "Albüm", "Süre (ms)", "_played_at_iso", "Tür",
+    "Dinlenme Tarihi",  # 0
+    "Şarkı ID",         # 1
+    "Şarkı Adı",        # 2
+    "Sanatçı",          # 3
+    "Sanatçı ID",       # 4
+    "Albüm",            # 5
+    "Süre (ms)",        # 6
+    "_played_at_iso",   # 7
 ]
 
 # ── Global State (uygulama ömrü boyunca bellekte) ────────────────────────────
@@ -53,12 +73,12 @@ SERVER_START_TIME = time.time()
 ai_requests_used  = 0
 _ai_total_cache   = {"value": 0, "ts": 0}
 _user_cache       = {}
+_gorsel_cache     = {}  # Albüm/sanatçı görsel URL cache'i
 _ai_history       = {}
 AI_MAX_HISTORY    = 20
 _cached_rows      = []
 _cached_headers   = []
 _last_sync        = "Henüz sync yapılmadı"
-_gorsel_cache     = {}
 
 # ── Refresh Token Belleği ─────────────────────────────────────────────────────
 _refresh_tokens: dict = {}  # { user_id: refresh_token }

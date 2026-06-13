@@ -13,6 +13,12 @@ logger = logging.getLogger(__name__)
 
 def create_app():
     app = Flask(__name__)
+
+    # ── Güvenli Session Cookie Ayarları ──────────────────────────────────────
+    app.config["SESSION_COOKIE_SECURE"]   = True   # Sadece HTTPS üzerinden gönderilir
+    app.config["SESSION_COOKIE_HTTPONLY"] = True   # JS ile erişilemez (XSS koruması)
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # CSRF azaltma
+
     app.secret_key = config.SECRET_KEY
     app.config["PERMANENT_SESSION_LIFETIME"] = config.PERMANENT_SESSION_LIFETIME
     register_blueprints(app)
