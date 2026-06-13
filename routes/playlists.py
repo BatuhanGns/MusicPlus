@@ -16,7 +16,6 @@ Playlist yönetimi API'leri.
 """
 
 import logging
-import traceback
 import json
 from collections import Counter, defaultdict
 from datetime import datetime, timezone, timedelta
@@ -352,15 +351,16 @@ def _create_or_update_spotify_playlist(
     if playlist_id:
         # Mevcut şarkıları temizle
         try:
-            existing = spotify._req("GET", f"/playlists/{playlist_id}/tracks?limit=100")
+            existing = spotify._req("GET", f"/playlists/{playlist_id}/items?limit=100")
             existing_uris = [
-                {"uri": t["track"]["uri"]}
+                {"uri": (t.get("item") or t.get("track") or {}).get("uri")}
                 for t in existing.get("items", [])
-                if t.get("track")
+                if (t.get("item") or t.get("track"))
             ]
+            existing_uris = [u for u in existing_uris if u.get("uri")]
             if existing_uris:
-                spotify._req("DELETE", f"/playlists/{playlist_id}/tracks",
-                             json={"tracks": existing_uris})
+                spotify._req("DELETE", f"/playlists/{playlist_id}/items",
+                             json={"items": existing_uris})
         except Exception as e:
             logger.warning(f"Playlist temizleme hata: {e}")
 
@@ -434,10 +434,8 @@ def api_create_auto_playlist():
         })
 
     except Exception as e:
-        tb_str = traceback.format_exc()
-        print(f"AUTO PLAYLIST 500 HATA:\n{tb_str}", flush=True)
-        logger.error(f"Auto playlist hata: {e}")
-        return jsonify({"error": str(e), "traceback": tb_str}), 500
+        logger.error(f"Auto playlist hata: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
 
 
 # ── Otomatik Güncellenen Ortak Playlist ──────────────────────────────────────
@@ -683,15 +681,16 @@ def _create_or_update_spotify_playlist_with_client(sp, playlist_id, name, desc, 
     """Verilen spotify client instance ile playlist günceller."""
     if playlist_id:
         try:
-            existing = sp._req("GET", f"/playlists/{playlist_id}/tracks?limit=100")
+            existing = sp._req("GET", f"/playlists/{playlist_id}/items?limit=100")
             existing_uris = [
-                {"uri": t["track"]["uri"]}
+                {"uri": (t.get("item") or t.get("track") or {}).get("uri")}
                 for t in existing.get("items", [])
-                if t.get("track")
+                if (t.get("item") or t.get("track"))
             ]
+            existing_uris = [u for u in existing_uris if u.get("uri")]
             if existing_uris:
-                sp._req("DELETE", f"/playlists/{playlist_id}/tracks",
-                        json={"tracks": existing_uris})
+                sp._req("DELETE", f"/playlists/{playlist_id}/items",
+                        json={"items": existing_uris})
         except Exception as e:
             logger.warning(f"Playlist temizleme hata: {e}")
         try:

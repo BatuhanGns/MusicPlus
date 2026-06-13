@@ -211,8 +211,24 @@ def manual_sync():
     uid = get_current_user_id()
     if not uid:
         return jsonify({"status": "error", "message": "Giriş yapılmamış"}), 401
+
+    # Cache'i tamamen temizle — Sheets'teki gerçek veri ne ise onu göster.
+    # Butona basınca cache by-pass edilir, sync_job içindeki load_user_data
+    # Sheets'ten taze çekerek cache'i yeniden doldurur.
+    config._user_cache.pop(uid, None)
+
     sync_job(uid)
-    return jsonify({"status": "ok", "message": "Manuel sync tamamlandı", "son_sync": config._last_sync, "refreshed": True})
+
+    # sync_job içinde load_user_data çağrılır; satır sayısını buradan oku
+    _, rows = get_cached_data(uid)
+
+    return jsonify({
+        "status":    "ok",
+        "message":   "Manuel sync tamamlandı",
+        "son_sync":  config._last_sync,
+        "refreshed": True,
+        "row_count": len(rows),
+    })
 
 
 
@@ -287,3 +303,5 @@ def health():
             "son_sync": config._last_sync,
         }
     )
+
+

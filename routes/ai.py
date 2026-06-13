@@ -12,6 +12,7 @@ AI (Gemini) modülü API'leri.
 
 import json as _json
 import logging
+import threading
 from flask import Blueprint, Response, request, jsonify, stream_with_context
 
 import config
@@ -20,6 +21,17 @@ from utils.helpers import compute_stats
 
 logger = logging.getLogger(__name__)
 bp = Blueprint("ai", __name__)
+
+
+# Kullanıcı başına AI geçmişi kilitleri (thread-safe eş zamanlı istek koruması)
+_ai_history_locks: dict = {}
+_ai_history_locks_meta = threading.Lock()
+
+def _get_ai_lock(uid: str) -> threading.Lock:
+    with _ai_history_locks_meta:
+        if uid not in _ai_history_locks:
+            _ai_history_locks[uid] = threading.Lock()
+        return _ai_history_locks[uid]
 
 
 @bp.route("/api/ai/chat", methods=["POST"])
@@ -33,8 +45,11 @@ def api_ai_chat():
     if not user_message:
         return jsonify({"error": "Mesaj boş"}), 400
 
-    history = config._ai_history.get(uid, [])
-    history.append({"role": "user", "content": user_message})
+    # Thread-safe geçmiş kopyası al
+    lock = _get_ai_lock(uid)
+    with lock:
+        history = list(config._ai_history.get(uid, []))  # Shallow copy — race condition önlenir
+        history.append({"role": "user", "content": user_message})
 
     # Spotify context topla
     now_playing = None
@@ -116,7 +131,9 @@ def api_ai_chat():
             if full_response:
                 history.append({"role": "assistant", "content": full_response})
             trimmed = history[-config.AI_MAX_HISTORY:]
-            config._ai_history[uid] = trimmed
+            # Thread-safe yaz
+            with _get_ai_lock(uid):
+                config._ai_history[uid] = trimmed
 
             if request_successful:
                 config.ai_requests_used += 1

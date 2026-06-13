@@ -28,19 +28,19 @@ bp = Blueprint("songs", __name__)
 
 # ── Görsel Cache ─────────────────────────────────────────────────────────────
 # {cache_key: (url_or_none, timestamp)}  — 24 saatte bir yenilenir
-_gorsel_cache: dict = {}
+# _gorsel_cache config._gorsel_cache üzerinden kullanılır (tek kaynak)
 _GORSEL_TTL = 86400  # 24 saat
 
 
 def _gorsel_cache_get(key: str):
     """Cache'ten URL döndürür. Süresi geçmişse veya hiç yoksa None."""
     import time as _time
-    entry = _gorsel_cache.get(key)
+    entry = config._gorsel_cache.get(key)
     if not entry:
         return "MISS"   # cache'te hiç yok
     url, ts = entry
     if _time.time() - ts > _GORSEL_TTL:
-        del _gorsel_cache[key]
+        del config._gorsel_cache[key]
         return "MISS"   # süresi dolmuş
     return url          # None olabilir (bilinen bulunamayan)
 
@@ -51,7 +51,7 @@ def _gorsel_cache_set(key: str, url):
     # None değerleri cache'leme — token geçersizdi ya da geçici hataydı.
     # Böylece token düzeldikten sonra yeniden dener.
     if url is not None:
-        _gorsel_cache[key] = (url, _time.time())
+        config._gorsel_cache[key] = (url, _time.time())
 
 
 def _spotify_search_image(q, item_type="artist"):
